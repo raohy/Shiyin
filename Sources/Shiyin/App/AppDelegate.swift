@@ -47,22 +47,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// 录音中或有工作在跑时先确认（R11.7、R13.4）
-    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    /// 结束前要问的话（R11.7、R13.4；更新还在下载，design §12，4.7.1）：没有要问的是 nil。DEBUG 的 quitprompt 也读这个
+    static func terminationPrompt() -> (title: String, info: String)? {
         let model = AppModel.shared
         let recording = model.recorder.isRecording
         let busy = model.runner.isBusy
-        guard recording || busy else { return .terminateNow }
+        // 更新器自己下载完、替换前结束时状态是「准备安装」，不会问
+        let updating = model.updater.state == .downloading
+        guard recording || busy || updating else { return nil }
+        let title = recording ? String(localized: "正在录音，要结束拾音吗？")
+            : busy ? String(localized: "还有工作在进行，要结束拾音吗？") : String(localized: "更新还在下载，要结束拾音吗？")
+        var info: [String] = []
+        if recording { info.append(String(localized: "录音会先存好，下次打开拾音时开始转录。")) }
+        if busy { info.append(String(localized: "进行中的转录或整理会中断，下次打开时从头重跑。")) }
+        if updating { info.append(String(localized: "更新的下载会中断，之后再按一次「下载并更新」就好。")) }
+        return (title, info.joined(separator: "\n"))
+    }
+
+    /// 录音中、有工作在跑、更新还在下载时先确认
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let recording = AppModel.shared.recorder.isRecording
+        guard let prompt = Self.terminationPrompt() else { return .terminateNow }
         #if DEBUG
         // shiyinctl quit：等于在确认对话框按「结束」
         if DebugControl.confirmQuit { return finishTermination(recording: recording) }
         #endif
 
         let alert = NSAlert()
-        alert.messageText = recording ? String(localized: "正在录音，要结束拾音吗？") : String(localized: "还有工作在进行，要结束拾音吗？")
-        var info: [String] = []
-        if recording { info.append(String(localized: "录音会先存好，下次打开拾音时开始转录。")) }
-        if busy { info.append(String(localized: "进行中的转录或整理会中断，下次打开时从头重跑。")) }
-        alert.informativeText = info.joined(separator: "\n")
+        alert.messageText = prompt.title
+        alert.informativeText = prompt.info
         alert.addButton(withTitle: String(localized: "结束"))
         alert.addButton(withTitle: String(localized: "取消"))
         NSApp.activate()

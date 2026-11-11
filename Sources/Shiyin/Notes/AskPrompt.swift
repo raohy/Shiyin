@@ -7,6 +7,22 @@ enum AskPrompt {
         var meetingId: Int64?
         var time: String
         var quote: String
+
+        init(meetingId: Int64? = nil, time: String, quote: String) {
+            self.meetingId = meetingId
+            self.time = time
+            self.quote = quote
+        }
+
+        /// 模型不一定照 schema 填（design §21.8）：time、quote 没有或是 null 时当成空字符串，之后由 validate 丢掉用不到的
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            meetingId = try? c.decodeIfPresent(Int64.self, forKey: .meetingId)
+            time = (try? c.decodeIfPresent(String.self, forKey: .time)) ?? ""
+            quote = (try? c.decodeIfPresent(String.self, forKey: .quote)) ?? ""
+        }
+
+        private enum CodingKeys: String, CodingKey { case meetingId, time, quote }
     }
 
     struct Answer: Codable, Hashable {
@@ -17,6 +33,32 @@ enum AskPrompt {
         /// 跨会议：用了哪些关键词、送了哪些会议（存起来给画面显示「参考了 N 场会议」）
         var keywords: [String]?
         var meetingIds: [Int64]?
+
+        init(answer: String, found: Bool, citations: [Citation], keywords: [String]? = nil, meetingIds: [Int64]? = nil) {
+            self.answer = answer
+            self.found = found
+            self.citations = citations
+            self.keywords = keywords
+            self.meetingIds = meetingIds
+        }
+
+        /// 只有 answer 一定要有（design §21.8）：found 没有时看有没有出处，citations 没有是空的，不是对象的出处略过
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            answer = try c.decode(String.self, forKey: .answer)
+            citations = ((try? c.decodeIfPresent([Lossy<Citation>].self, forKey: .citations)) ?? nil)?.compactMap(\.value) ?? []
+            found = (try? c.decodeIfPresent(Bool.self, forKey: .found)) ?? !citations.isEmpty
+            keywords = try? c.decodeIfPresent([String].self, forKey: .keywords)
+            meetingIds = try? c.decodeIfPresent([Int64].self, forKey: .meetingIds)
+        }
+
+        private enum CodingKeys: String, CodingKey { case answer, found, citations, keywords, meetingIds }
+    }
+
+    /// 数组里解不了的项目变成 nil，不让整个数组失败
+    private struct Lossy<T: Decodable>: Decodable {
+        let value: T?
+        init(from decoder: Decoder) throws { value = try? T(from: decoder) }
     }
 
     /// 跨会议时一场会议的资料：会议记录的摘要、决议，加上搜索命中的段落（前后各一段）
@@ -197,7 +239,7 @@ enum AskPrompt {
                                        format: LLMClient.OutputFormat, onStart: (Subprocess) -> Void) async throws -> T {
         let data = try await LLMClient.generateJSON(provider: provider, model: model, system: system, prompt: prompt, format: format, onStart: onStart)
         do { return try JSONDecoder().decode(T.self, from: data) }
-        catch { throw LLMError.badOutput(error.localizedDescription + provider.badOutputHint) }
+        catch { throw LLMError.badAnswer(error.localizedDescription + provider.badOutputHint) }
     }
 
     /// 丢掉不能用的出处：时间格式不对、跨会议时不是提供的会议

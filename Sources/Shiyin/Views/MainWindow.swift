@@ -48,7 +48,13 @@ struct RootView: View {
             } message: {
                 Text(model.recorder.failureMessage ?? "")
             }
-            .overlay(alignment: .bottom) { NoticeToast() }
+            .overlay(alignment: .bottom) {
+                VStack(spacing: 8) {
+                    UpdateProgressToast()
+                    NoticeToast()
+                }
+                .padding(.bottom, 72)
+            }
     }
 }
 
@@ -63,11 +69,45 @@ struct NoticeToast: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background(.regularMaterial, in: Capsule())
-                .padding(.bottom, 72)
                 .task(id: message) {
                     try? await Task.sleep(for: .seconds(3))
                     if model.noticeMessage == message { model.noticeMessage = nil }
                 }
+        }
+    }
+}
+
+/// 更新下载中、准备安装时一直显示（design §12，4.7.1）：网络慢的时候看得出来还在下载
+struct UpdateProgressToast: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        switch model.updater.state {
+        case .downloading:
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.down.circle")
+                    Text(model.updater.progress?.text ?? model.updater.state.label).monospacedDigit()
+                    Text("下载好会自动重新打开").foregroundStyle(.secondary)
+                }
+                if let fraction = model.updater.progress?.fraction { ProgressView(value: fraction).tint(.signal) } else { ProgressView().progressViewStyle(.linear) }
+            }
+            .font(.callout)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: 520)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        case .installing:
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(model.updater.state.label)
+            }
+            .font(.callout)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.regularMaterial, in: Capsule())
+        default:
+            EmptyView()
         }
     }
 }

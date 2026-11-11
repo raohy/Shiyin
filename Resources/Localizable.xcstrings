@@ -1514,6 +1514,17 @@
         }
       }
     },
+    "下载好会自动重新打开": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shiyin will reopen when it's done"
+          }
+        }
+      }
+    },
     "下载并更新": {
       "extractionState": "manual",
       "localizations": {
@@ -4033,6 +4044,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "The returned meeting notes have the wrong format: %@"
+          }
+        }
+      }
+    },
+    "回传的回答格式不正确：%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The answer came back in the wrong format: %@"
           }
         }
       }
@@ -8062,6 +8084,17 @@
         }
       }
     },
+    "更新的下载会中断，之后再按一次「下载并更新」就好。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The update download will stop. You can start it again later."
+          }
+        }
+      }
+    },
     "更新网址": {
       "extractionState": "manual",
       "localizations": {
@@ -8091,6 +8124,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "The update URL must use https"
+          }
+        }
+      }
+    },
+    "更新还在下载，要结束拾音吗？": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An update is still downloading. Quit Shiyin?"
           }
         }
       }
@@ -8532,6 +8576,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Welcome to Shiyin"
+          }
+        }
+      }
+    },
+    "正在下载 %@　%lld%%（%@ / %@）": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading %1$@  %2$lld%% (%3$@ of %4$@)"
+          }
+        }
+      }
+    },
+    "正在下载 %@　已下载 %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading %1$@  %2$@ so far"
           }
         }
       }

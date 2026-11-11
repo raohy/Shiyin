@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-拾音 Shiyin 是 macOS 原生的會議紀錄 app（SwiftUI，macOS 26）。目前是 4.7.0（4.1 加上三個分頁的減法、待確認就地回答、收音提醒送通知、可選的 Qwen3-ASR 引擎，Windows 同步；4.1.1 整理工具設定好才用、失敗說清楚怎麼修；4.1.2 忘了停止錄音時提醒、自動停止；4.2 可以連公司的企業伺服器（在公司的伺服器轉錄、整理，公司詞彙表、加入連結）；4.2.1 企業伺服器的安全強化；4.2.2 只裝 Codex 桌面版也能整理、只有 Claude 桌面版時說明怎麼裝 Claude Code，Windows 加上 AMD 顯示卡加速、錄得到 Teams 的聲音；4.2.3 錄音按鈕和錄音畫面可以選、換麥克風，藍牙耳機的麥克風錄現場會議時提醒，會議內容的文字大小（⌘＋／⌘－），右上角的匯出按鈕；4.3 會議的參考文件（加入 PDF、Word、PowerPoint、圖片，整理和提問時一起參考、註明出處）、整理工具的額度用完時說清楚，Windows 只有 Intel 顯示卡的電腦也試著用顯示卡轉錄；4.5 會議語言加廣東話、韓文（實驗性），每種語言的做法寫在共用的語言檔（台語評估過、還沒加，design §41.9）；4.6 會議紀錄可以切換成心智圖（匯出 PNG、PDF、SVG、複製圖片；design §42）、播放條上的議題時間軸（design §43）；4.7 讓 AI 工具讀取會議（本地 MCP：Claude Code、Codex、Claude Desktop 可以列出、搜尋、讀會議，`Shiyin --mcp`、Windows 的 `shiyin-mcp.exe`；design §44）；第三版加上英文版、開源準備、轉錄準確度、日文、更多整理工具、穩定性修正；3.5 加上草稿紀錄、聲紋、猜說話者、對會議提問、偵測會議；3.6 加上重新辨識說話者、合併和改句子的說話者、分不準的提醒、收音提醒，修正錄音中畫面卡住；4.0 加上 Windows 版、待確認的是非題、聲紋沒把握時先問、短句的說話者、沒有 claude／codex 時先不整理）：
+拾音 Shiyin 是 macOS 原生的會議紀錄 app（SwiftUI，macOS 26）。目前是 4.7.1（4.1 加上三個分頁的減法、待確認就地回答、收音提醒送通知、可選的 Qwen3-ASR 引擎，Windows 同步；4.1.1 整理工具設定好才用、失敗說清楚怎麼修；4.1.2 忘了停止錄音時提醒、自動停止；4.2 可以連公司的企業伺服器（在公司的伺服器轉錄、整理，公司詞彙表、加入連結）；4.2.1 企業伺服器的安全強化；4.2.2 只裝 Codex 桌面版也能整理、只有 Claude 桌面版時說明怎麼裝 Claude Code，Windows 加上 AMD 顯示卡加速、錄得到 Teams 的聲音；4.2.3 錄音按鈕和錄音畫面可以選、換麥克風，藍牙耳機的麥克風錄現場會議時提醒，會議內容的文字大小（⌘＋／⌘－），右上角的匯出按鈕；4.3 會議的參考文件（加入 PDF、Word、PowerPoint、圖片，整理和提問時一起參考、註明出處）、整理工具的額度用完時說清楚，Windows 只有 Intel 顯示卡的電腦也試著用顯示卡轉錄；4.5 會議語言加廣東話、韓文（實驗性），每種語言的做法寫在共用的語言檔（台語評估過、還沒加，design §41.9）；4.6 會議紀錄可以切換成心智圖（匯出 PNG、PDF、SVG、複製圖片；design §42）、播放條上的議題時間軸（design §43）；4.7 讓 AI 工具讀取會議（本地 MCP：Claude Code、Codex、Claude Desktop 可以列出、搜尋、讀會議，`Shiyin --mcp`、Windows 的 `shiyin-mcp.exe`；design §44）；4.7.1 更新下載時看得到進度、下載中結束先提醒，提問的回答缺欄位時照樣顯示；第三版加上英文版、開源準備、轉錄準確度、日文、更多整理工具、穩定性修正；3.5 加上草稿紀錄、聲紋、猜說話者、對會議提問、偵測會議；3.6 加上重新辨識說話者、合併和改句子的說話者、分不準的提醒、收音提醒，修正錄音中畫面卡住；4.0 加上 Windows 版、待確認的是非題、聲紋沒把握時先問、短句的說話者、沒有 claude／codex 時先不整理）：
 
 - 錄音：AVAudioEngine 收麥克風、Core Audio process tap 收電腦聲音，寫成雙聲道 WAV（`Sources/Shiyin/Capture/`）
 - 即時逐字稿：系統的 SpeechAnalyzer（語系依會議語言，寫在語言檔的 `live.mac`：zh_CN、en_US、ja_JP、zh_HK（粵語）、ko_KR）
@@ -15,7 +15,7 @@
 
 不需要 Python、Homebrew、ffmpeg。選型的理由在 design.md 的決策紀錄（D#）。已經刪掉的舊文件（第二版的規格 `docs/archive/v2/`、選型實驗 `docs/spikes/`、3.4.0 以前完整的 `docs/tasks.md`）用 `git show b621ed6:<路徑>` 看。
 
-**Windows 版**（2026-10-20 起開發，4.0.0 跟 Mac 一起發布）：C# .NET 10＋WinUI 3，程式放 `windows/`，功能對齊 Mac 4.7.0；需求在 requirements 第 22 節（R26～R28），設計在 `docs/design-windows.md`，任務在 tasks.md 的「Windows 版」。見下面的「Windows 版」一節。
+**Windows 版**（2026-10-20 起開發，4.0.0 跟 Mac 一起發布）：C# .NET 10＋WinUI 3，程式放 `windows/`，功能對齊 Mac 4.7.1；需求在 requirements 第 22 節（R26～R28），設計在 `docs/design-windows.md`，任務在 tasks.md 的「Windows 版」。見下面的「Windows 版」一節。
 
 ## 開發流程：SDD（規格驅動）
 
@@ -78,6 +78,7 @@ sqlite3 ~/Library/Application\ Support/Shiyin/shiyin.sqlite # 看資料
 - 建置輸出放到 repo 外（`Directory.Build.props` 的 ArtifactsPath），不要放進專案。
 - 虛擬機（UTM，Windows 11 ARM64，design-windows §15.2）：工具在 `scripts/windows/vm/`（`sync.sh` 同步原始碼到 `C:\src`、`ssh.sh`／`run.sh` 建置和測試、`ctl.sh` 控制通道、`insession.sh`／`uia.sh` 在桌面開 app 和按按鈕、`shot.sh` 截圖），金鑰、IP 在 `~/Library/Caches/ShiyinBuild-win/vm`。使用者在用拾音錄會議時（Mac 的 `audio/recording/` 有檔案）不開、不跑重的工作；`diskguard.sh` 在背景跑（Mac 剩不到 10 GB 就停掉虛擬機），虛擬機裡刪了大檔案後跑 `Optimize-Volume -DriveLetter C -ReTrim` 才會還空間給 Mac。從 SSH 開的 app 不會出現在桌面，要用 `insession.sh`（§15.4）。虛擬機沒有音效裝置，錄音用 `record-sim`。 開虛擬機用 `utmctl start "Shiyin Windows"`（`~/Applications/UTM.app/Contents/MacOS/utmctl`）；UTM 開很久之後 AppleScript 會沒回應（`start` 卡住、-1712 逾時），虛擬機沒在跑的話 `kill` UTM 再 `open -g -a UTM` 就好；開機後約 3 分鐘 SSH 才連得上。2026-10-28 UTM 在背景跑約 5 分鐘就被 macOS 的自動結束關掉兩次（log 有「would be terminated by TAL」、launchd 回報 SIGTERM），虛擬機跟著斷電；要不要關掉 UTM 的自動結束由使用者決定。虛擬機沒有瀏覽器：測企業伺服器的登入用 `ctl enterprise pending` 拿登入頁網址，在 Mac 走完登入後用 `insession.sh` 的 `Start-Process '<shiyin://auth…>'` 交回 app；`uia.sh show <視窗> <名稱>` 把元件捲進畫面再截圖。
 - WinUI 的粗體一律用 `FontWeights.Bold`，不要用 `SemiBold`：微軟正黑體只有 Bold，指定 SemiBold 時中文會被換成新細明體的假粗體，縮小時糊成一團（2026-10-22、2026-11-06 兩次在虛擬機上才看到）。`Border` 的框線畫在內距裡面、會佔掉內容的寬度（SwiftUI 的框線疊在上面不佔），尺寸照 Mac 算的元件要把內距扣掉框線。
+- WinUI 同時只能開一個 `ContentDialog`：已經有一個開著時 `ShowAsync` 丟例外，`_ = Quit()` 這種沒人等的工作會把例外吞掉、按了沒反應（2026-11-11 更新的詢問開著時，系統匣的「結束拾音」沒反應）；跳新的對話框前先收起舊的。`FocusManager.GetFocusedElement(XamlRoot)` 的 XamlRoot 在元件還沒放進視窗時是 null，會丟例外（設定「進階」整頁打不開）。這兩個在 Mac 上的 `dotnet build`、`dotnet test` 都看不出來，要在虛擬機實際點過。系統匣的選單用 `scripts/windows/vm/ps/tray-menu.ps1 [選項]`（在 `insession.sh` 裡跑）按。
 - 有中文的 `.ps1` 存成有 BOM 的 UTF-8：Windows 內建的 PowerShell 5.1 會把沒有 BOM 的檔案當成 Big5，整個腳本解析失敗。
 - PowerShell 傳給外部程式的 `-D名稱=$變數`、`--名稱=$變數` 要整串加雙引號（`"-DFOO=$x"`）：「-」開頭的參數裡的變數不會展開，程式拿到的是 `$x` 這串字（2026-10-22 CI 建 whisper 時，x64 因此去找 Vulkan）。
 - 測安裝檔（design-windows §14）：`pack.ps1` 打包、`Setup.exe --silent` 安裝、`%LOCALAPPDATA%\ShiyinApp\Update.exe --uninstall --silent` 移除；移除後等 20 秒再重裝（Velopack 會延後刪安裝資料夾，會把剛裝好的刪掉）。測 app 內更新用 `pack.ps1 -UpdateTest`（§14.2）。安裝版跟 DEBUG 版共用通知的 AppUserModelID，移除安裝版會把通知中心裡 DEBUG 版的通知一起清掉。
