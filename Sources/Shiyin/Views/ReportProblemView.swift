@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// 回報問題（design §21.9、R19.7）：先讓使用者看會附上的資訊，按「在 GitHub 回報」才打開瀏覽器
+/// 反馈问题（design §21.9、R19.7）：先让用户看会附上的信息，按「在 GitHub 反馈」才打开浏览器
 struct ReportProblemView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismissWindow) private var dismissWindow
@@ -10,8 +10,8 @@ struct ReportProblemView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("回報問題").font(.songti(20))
-            Text("按「在 GitHub 回報」會用瀏覽器打開新的 issue，並帶入下面的內容，你可以在瀏覽器裡修改後再送出。內容只有版本、環境和錯誤的種類，不包含會議內容、檔名或 API key。沒有 GitHub 帳號的話，可以按「複製」用其他方式寄給維護的人。")
+            Text("反馈问题").font(.songti(20))
+            Text("按「在 GitHub 反馈」会用浏览器打开新的 issue，并带入下面的内容，你可以在浏览器里修改后再送出。内容只有版本、环境和错误的种类，不包含会议内容、文件名或 API key。没有 GitHub 账号的话，可以按「复制」用其他方式寄给维护的人。")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             ScrollView {
                 Text(text)
@@ -22,16 +22,16 @@ struct ReportProblemView: View {
             }
             .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
             HStack {
-                if copied { Label("已複製", systemImage: "checkmark").foregroundStyle(.secondary) }
+                if copied { Label("已复制", systemImage: "checkmark").foregroundStyle(.secondary) }
                 Spacer()
-                Button("關閉") { dismissWindow(id: "report") }
+                Button("关闭") { dismissWindow(id: "report") }
                     .keyboardShortcut(.cancelAction)
-                Button("複製") {
+                Button("复制") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(text, forType: .string)
                     copied = true
                 }
-                Button("在 GitHub 回報") {
+                Button("在 GitHub 反馈") {
                     if let url = ProblemReport.url(body: text) { NSWorkspace.shared.open(url) }
                     dismissWindow(id: "report")
                 }

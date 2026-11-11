@@ -8,7 +8,7 @@ struct SubprocessResult {
 
     var succeeded: Bool { reason == .exit && status == 0 }
 
-    /// 錯誤訊息只取 stderr 的結尾，不帶逐字稿內容（design §4.1、§6.2）
+    /// 错误消息只取 stderr 的结尾，不带逐字稿内容（design §4.1、§6.2）
     func stderrTail(_ limit: Int) -> String {
         let trimmed = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.count > limit ? "…" + String(trimmed.suffix(limit)) : trimmed
@@ -20,13 +20,13 @@ enum SubprocessError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .timeout(let minutes): return String(localized: "執行超過 \(minutes) 分鐘，已停止")
+        case .timeout(let minutes): return String(localized: "执行超过 \(minutes) 分钟，已停止")
         }
     }
 }
 
-/// 執行外部程式。一律用參數陣列，不經過 shell（N1）。
-/// stdout 可以逐行回呼（轉錄進度），stderr 全部收集。
+/// 执行外部程序。一律用参数数组，不经过 shell（N1）。
+/// stdout 可以逐行回呼（转录进度），stderr 全部收集。
 final class Subprocess: @unchecked Sendable {
     let process = Process()
     private let lock = NSLock()
@@ -96,7 +96,7 @@ final class Subprocess: @unchecked Sendable {
                 return
             }
             if let input, let inPipe {
-                // 子程序先結束時寫入只回傳錯誤，不送 SIGPIPE（design §20.1）
+                // 子程序先结束时写入只回传错误，不送 SIGPIPE（design §20.1）
                 _ = fcntl(inPipe.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
                 DispatchQueue.global().async {
                     try? inPipe.fileHandleForWriting.write(contentsOf: input)
@@ -113,7 +113,7 @@ final class Subprocess: @unchecked Sendable {
         }
     }
 
-    /// 先送 SIGTERM，3 秒內沒結束就 SIGKILL（design §4）
+    /// 先送 SIGTERM，3 秒内没结束就 SIGKILL（design §4）
     func terminate() {
         guard process.isRunning else { return }
         process.terminate()

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 閱讀用的欄位：靠左、寬度上限約 680 pt
+/// 阅读用的字段：靠左、宽度上限约 680 pt
 struct ReadingColumn<Content: View>: View {
     @Environment(\.snapshotMode) private var snapshotMode
     @Environment(\.textScale) private var scale
@@ -18,7 +18,7 @@ struct ReadingColumn<Content: View>: View {
         VStack(alignment: .leading, spacing: 26) {
             content
         }
-        .contentFont()   // 文字大小（design §38.5）：欄寬跟著放大，一行的字數不變
+        .contentFont()   // 文字大小（design §38.5）：栏宽跟着放大，一行的字数不变
         .frame(maxWidth: 680 * scale, alignment: .leading)
         .padding(.horizontal, 32)
         .padding(.vertical, 24)
@@ -38,8 +38,8 @@ struct NotesSection<Content: View>: View {
     }
 }
 
-/// 一條紀錄：內容加上時間點（R6.4：點時間點就跳到錄音那裡）。
-/// `ref` 給每一條在會議紀錄裡的位置（R41.1）：有對到待確認的題目時，時間點後面顯示標記，點了在下面展開題目就地回答
+/// 一条记录：内容加上时间点（R6.4：点时间点就跳到录音那里）。
+/// `ref` 给每一条在会议记录里的位置（R41.1）：有对到待确认的题目时，时间点后面显示标记，点了在下面展开题目就地回答
 struct ItemList: View {
     @Environment(AppModel.self) private var model
     let items: [MeetingNotes.Item]
@@ -69,8 +69,8 @@ struct ItemList: View {
     }
 }
 
-/// 待確認的標記（R41.1，design §31.2）：這一條紀錄有幾題整理時不確定的地方，琥珀色跟側欄的「待確認 N 題」一樣。
-/// 點了在那一條下面展開題目（R41.2）；同時只展開一條，再點一次收合
+/// 待确认的标记（R41.1，design §31.2）：这一条记录有几题整理时不确定的地方，琥珀色跟侧栏的「待确认 N 题」一样。
+/// 点了在那一条下面展开题目（R41.2）；同时只展开一条，再点一次收合
 struct ReviewMarker: View {
     @Environment(AppModel.self) private var model
     let ref: NoteItemRef
@@ -94,14 +94,14 @@ struct ReviewMarker: View {
                     .background(Color.signal.opacity(0.16), in: Capsule())
             }
             .buttonStyle(.plain)
-            .help(count > 1 ? String(localized: "整理時有 \(count) 題不確定的地方，點了就能回答") : String(localized: "整理時有一題不確定的地方，點了就能回答"))
-            .accessibilityLabel(String(localized: "待確認 \(count) 題"))
+            .help(count > 1 ? String(localized: "整理时有 \(count) 题不确定的地方，点了就能回答") : String(localized: "整理时有一题不确定的地方，点了就能回答"))
+            .accessibilityLabel(String(localized: "待确认 \(count) 题"))
         }
     }
 }
 
-/// 就地回答（R41.2，design §31.2）：展開在那一條紀錄下面，列出對應的題目；回答跟待確認分頁是同一份草稿，
-/// 「送出」的規則也一樣（送目前所有已回答和略過的題目）
+/// 就地回答（R41.2，design §31.2）：展开在那一条记录下面，列出对应的题目；回答跟待确认标签页是同一份草稿，
+/// 「送出」的规则也一样（送目前所有已回答和略过的题目）
 struct InlineReviewCard: View {
     @Environment(AppModel.self) private var model
     let detail: MeetingDetail
@@ -115,13 +115,13 @@ struct InlineReviewCard: View {
                     ReviewQuestionRow(index: index, item: items[index], language: detail.meeting.meetingLanguage, draft: draft)
                 }
                 HStack(spacing: 12) {
-                    Text("只送這一條的題目；有回答的交給整理工具依答案修正，略過的直接移除。")
+                    Text("只送这一条的题目；有回答的交给整理工具依答案修正，略过的直接移除。")
                         .contentFont(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
                     Button("收合") { draft.expanded = nil }
-                    // 只送這一條對到的題目（R41.2），題數也只算這幾題
+                    // 只送这一条对到的题目（R41.2），题数也只算这几题
                     Button(draft.submitTitle(only: shown)) { model.submitReviewDraft(only: shown) }
                         .buttonStyle(.borderedProminent)
                         .disabled(!draft.hasSomethingToSubmit(only: shown) || model.detailStatus?.isActive == true)
@@ -134,7 +134,7 @@ struct InlineReviewCard: View {
     }
 }
 
-/// 沒有會議紀錄時的說明與動作
+/// 没有会议记录时的说明与动作
 struct NotesPlaceholder: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openSettings) private var openSettings
@@ -144,20 +144,20 @@ struct NotesPlaceholder: View {
         let status = model.detailStatus
         VStack(alignment: .leading, spacing: 12) {
             if status == .recording {
-                Text("錄音結束、轉錄完成後，會議紀錄會出現在這裡。").foregroundStyle(.secondary)
+                Text("录音结束、转录完成后，会议记录会出现在这里。").foregroundStyle(.secondary)
             } else if status?.isActive == true {
-                Text("轉錄和整理完成後，會議紀錄會出現在這裡。").foregroundStyle(.secondary)
+                Text("转录和整理完成后，会议记录会出现在这里。").foregroundStyle(.secondary)
             } else if detail.segments.isEmpty && detail.meeting.userNotes.isEmpty {
-                Text("還沒有逐字稿。").foregroundStyle(.secondary)
+                Text("还没有逐字稿。").foregroundStyle(.secondary)
             } else if AppSettings.needsProviderSetup {
-                // 沒選過整理工具、也沒有 claude、codex（R35.2）：說還沒設定，給打開設定的按鈕（整理工具是第一個分頁）
-                Text("還沒設定整理工具。選好之後，就能把逐字稿整理成摘要、決議和待辦；之後的會議轉錄完會自動整理。")
+                // 没选过整理工具、也没有 claude、codex（R35.2）：说还没设置，给打开设置的按钮（整理工具是第一个标签页）
+                Text("还没设置整理工具。选好之后，就能把逐字稿整理成摘要、决议和待办；之后的会议转录完会自动整理。")
                     .foregroundStyle(.secondary)
-                Button("設定整理工具") { openSettings() }
+                Button("设置整理工具") { openSettings() }
             } else if AppSettings.provider != .none, let problem = model.summarizerProblem {
-                // 選了整理工具但還沒準備好（沒登入、沒有 key…，R45.4）：說原因，給修的按鈕
-                // 不加 fixedSize：這裡不在 ScrollView 裡，量最小高度時整個視窗的內容會被往上推（CLAUDE.md）
-                Text("整理工具還沒設定好：\(problem.message)")
+                // 选了整理工具但还没准备好（没登录、没有 key…，R45.4）：说原因，给修的按钮
+                // 不加 fixedSize：这里不在 ScrollView 里，量最小高度时整个窗口的内容会被往上推（CLAUDE.md）
+                Text("整理工具还没设置好：\(problem.message)")
                     .foregroundStyle(.secondary)
                 Button(problem.actionTitle) {
                     switch problem.action {
@@ -167,10 +167,10 @@ struct NotesPlaceholder: View {
                 }
             } else {
                 Text(AppSettings.provider == .none
-                     ? "整理工具目前設定為「不整理」。要產生會議紀錄，請到設定選擇 Claude、Codex 或 API。"
-                     : "這場會議還沒整理成會議紀錄。")
+                     ? "整理工具目前设置为「不整理」。要产生会议记录，请到设置选择 Claude、Codex 或 API。"
+                     : "这场会议还没整理成会议记录。")
                     .foregroundStyle(.secondary)
-                Button("整理成會議紀錄") { model.resummarize() }
+                Button("整理成会议记录") { model.resummarize() }
                     .disabled(AppSettings.provider == .none)
             }
         }
@@ -178,8 +178,8 @@ struct NotesPlaceholder: View {
     }
 }
 
-/// 紀錄分頁（R44.1，design §33.1）：待確認的條、摘要、決議、待辦、未決問題、議題、自訂段落，一頁捲到底（順序同匯出）。
-/// 可以切換成編輯模式（R6.6），一份編輯器編全部；也可以切換成心智圖（R67，design §42.4）
+/// 记录标签页（R44.1，design §33.1）：待确认的条、摘要、决议、待办、未决问题、议题、自订段落，一页卷到底（顺序同导出）。
+/// 可以切换成编辑模式（R6.6），一份编辑器编全部；也可以切换成心智图（R67，design §42.4）
 struct NotesPage: View {
     @Environment(AppModel.self) private var model
     @Environment(\.textScale) private var scale
@@ -192,7 +192,7 @@ struct NotesPage: View {
     var body: some View {
         if let current = editing {
             NotesEditor(notes: Binding(draft: $editing, fallback: current)) { finish($0) }
-                .onDisappear { finish(true, automatically: true) }   // 切到別的分頁、別場會議：自動存，不丟掉打的字
+                .onDisappear { finish(true, automatically: true) }   // 切到别的标签页、别场会议：自动存，不丢掉打的字
         } else if let notes = detail.notes, !notes.isEmpty, notesView == "mindMap" {
             mindMapPage(notes)
         } else if let notes = detail.notes, !notes.isEmpty {
@@ -202,16 +202,16 @@ struct NotesPage: View {
                     NotesSection(title: String(localized: "摘要")) { ItemList(items: notes.summary, detail: detail) { .summary($0) } }
                 }
                 if !notes.decisions.isEmpty {
-                    NotesSection(title: String(localized: "決議")) { ItemList(items: notes.decisions, detail: detail) { .decisions($0) } }
+                    NotesSection(title: String(localized: "决议")) { ItemList(items: notes.decisions, detail: detail) { .decisions($0) } }
                 }
                 if !notes.actionItems.isEmpty {
-                    NotesSection(title: String(localized: "待辦")) { ActionItemsTable(items: notes.actionItems, detail: detail) { .actionItems($0) } }
+                    NotesSection(title: String(localized: "待办")) { ActionItemsTable(items: notes.actionItems, detail: detail) { .actionItems($0) } }
                 }
                 if !notes.openQuestions.isEmpty {
-                    NotesSection(title: String(localized: "未決問題")) { ItemList(items: notes.openQuestions, detail: detail) { .openQuestions($0) } }
+                    NotesSection(title: String(localized: "未决问题")) { ItemList(items: notes.openQuestions, detail: detail) { .openQuestions($0) } }
                 }
                 if !notes.topics.isEmpty {
-                    NotesSection(title: String(localized: "議題")) {
+                    NotesSection(title: String(localized: "议题")) {
                         VStack(alignment: .leading, spacing: 22) {
                             ForEach(Array(notes.topics.enumerated()), id: \.offset) { t, topic in
                                 VStack(alignment: .leading, spacing: 10) {
@@ -241,9 +241,9 @@ struct NotesPage: View {
         }
     }
 
-    /// 提示條和編輯列：條列、心智圖共用
+    /// 提示条和编辑列：条列、心智图共用
     @ViewBuilder private func header(_ notes: MeetingNotes) -> some View {
-        // 加入、移除文件之後還沒重新整理（R61.8）：提示列不跟著文字大小（R59.2）
+        // 加入、移除文档之后还没刷新（R61.8）：提示列不跟着文字大小（R59.2）
         if let id = detail.meeting.id, model.documentsChanged.contains(id) {
             DocumentsBanner().environment(\.textScale, 1)
         }
@@ -254,8 +254,8 @@ struct NotesPage: View {
         }
     }
 
-    /// 心智圖模式（design §42.4）：上面照舊是提示條、編輯列，下面是心智圖；段落名稱跟著介面語言（同條列）。
-    /// 整頁一起上下捲（同條列）：待確認展開時很高，放在捲動外面會把整個視窗的內容往上推（2026-11-05 使用者看到整個視窗空白）
+    /// 心智图模式（design §42.4）：上面照旧是提示条、编辑列，下面是心智图；段落名称跟着界面语言（同条列）。
+    /// 整页一起上下卷（同条列）：待确认展开时很高，放在滚动外面会把整个窗口的内容往上推（2026-11-05 用户看到整个窗口空白）
     private func mindMapPage(_ notes: MeetingNotes) -> some View {
         let layout = MindMap.layout(MindMap.tree(notes: notes, title: detail.meeting.displayTitle, labels: .init(.interface)))
         func page(width: Double) -> some View {
@@ -289,12 +289,12 @@ struct NotesPage: View {
     }
 
     private var templateName: String {
-        String(localized: "範本：") + (model.templates.first { $0.id == detail.meeting.templateId }?.displayName ?? String(localized: "一般會議"))
+        String(localized: "模板：") + (model.templates.first { $0.id == detail.meeting.templateId }?.displayName ?? String(localized: "一般会议"))
     }
 }
 
-/// 紀錄頂部「還有 N 題待確認」（R44.2，design §33.1）：點了在原地展開待確認的內容（同一份 ReviewTab），回答跟就地回答共用草稿；
-/// 展開狀態只記這次選取期間（AppModel.reviewExpanded，換會議收起）
+/// 记录顶部「还有 N 题待确认」（R44.2，design §33.1）：点了在原地展开待确认的内容（同一份 ReviewTab），回答跟就地回答共用草稿；
+/// 展开状态只记这次选中期间（AppModel.reviewExpanded，换会议收起）
 struct ReviewBanner: View {
     @Environment(AppModel.self) private var model
     let detail: MeetingDetail
@@ -306,9 +306,9 @@ struct ReviewBanner: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "questionmark.circle.fill").foregroundStyle(Color.signal)
-                    Text("還有 \(detail.reviewCount) 題待確認").contentFont(.callout, weight: .medium)
+                    Text("还有 \(detail.reviewCount) 题待确认").contentFont(.callout, weight: .medium)
                     Spacer()
-                    Text(model.reviewExpanded ? "收起" : "展開").contentFont(.callout).foregroundStyle(.secondary)
+                    Text(model.reviewExpanded ? "收起" : "展开").contentFont(.callout).foregroundStyle(.secondary)
                     Image(systemName: model.reviewExpanded ? "chevron.up" : "chevron.down").contentFont(.caption).foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 14)
@@ -316,7 +316,7 @@ struct ReviewBanner: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(String(localized: "待確認 \(detail.reviewCount) 題"))
+            .accessibilityLabel(String(localized: "待确认 \(detail.reviewCount) 题"))
             if model.reviewExpanded {
                 Divider()
                 ReviewTab(detail: detail, embedded: true)
@@ -328,43 +328,43 @@ struct ReviewBanner: View {
     }
 }
 
-/// 右上角的「編輯」按鈕；有上一版時旁邊多一顆「復原上一版」（R44.4，原本在「更多」）；左邊是「條列｜心智圖」（R67）
+/// 右上角的「编辑」按钮；有上一版时旁边多一颗「复原上一版」（R44.4，原本在「更多」）；左边是「条列｜心智图」（R67）
 struct EditBar: View {
-    /// list／mindMap；nil 不顯示切換
+    /// list／mindMap；nil 不显示切换
     var viewMode: Binding<String>? = nil
-    /// 轉錄或整理中不能編輯：工作完成時會整份寫回，手動改的會被蓋掉
+    /// 转录或整理中不能编辑：工作完成时会整份写回，手动改的会被盖掉
     var disabled = false
-    /// nil：沒有上一版，不顯示
+    /// nil：没有上一版，不显示
     var onUndo: (() -> Void)? = nil
     let onEdit: () -> Void
 
     var body: some View {
         HStack(spacing: 14) {
             if let viewMode {
-                Picker("顯示方式", selection: viewMode) {
-                    Text("條列").tag("list")
-                    Text("心智圖").tag("mindMap")
+                Picker("显示方式", selection: viewMode) {
+                    Text("条列").tag("list")
+                    Text("心智图").tag("mindMap")
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .fixedSize()
-                .help("把會議紀錄切換成條列或心智圖")
+                .help("把会议记录切换成条列或心智图")
             }
             Spacer()
             if let onUndo {
-                Button("復原上一版", systemImage: "arrow.uturn.backward", action: onUndo)
+                Button("复原上一版", systemImage: "arrow.uturn.backward", action: onUndo)
                     .buttonStyle(.borderless)
                     .foregroundStyle(disabled ? Color.secondary : Color.celadon)
                     .disabled(disabled)
-                    .help("換回上一版會議紀錄（再按一次換回更早的）")
+                    .help("换回上一版会议记录（再按一次换回更早的）")
             }
-            Button("編輯", systemImage: "pencil", action: onEdit)
+            Button("编辑", systemImage: "pencil", action: onEdit)
                 .buttonStyle(.borderless)
                 .foregroundStyle(disabled ? Color.secondary : Color.celadon)
                 .disabled(disabled)
-                .help(disabled ? "正在處理這場會議，完成後才能編輯" : "直接修改會議紀錄，存檔時會留一個版本")
+                .help(disabled ? "正在处理这场会议，完成后才能编辑" : "直接修改会议记录，存档时会留一个版本")
         }
-        .font(.body)   // 按鈕不跟著文字大小（R59.2）
+        .font(.body)   // 按钮不跟着文字大小（R59.2）
         .padding(.bottom, -18)
     }
 }
@@ -378,8 +378,8 @@ struct ActionItemsTable: View {
     var body: some View {
         Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 18, verticalSpacing: 9) {
             GridRow {
-                Text("負責人")
-                Text("事項")
+                Text("负责人")
+                Text("事项")
                 Text("期限")
             }
             .contentFont(.caption)
@@ -414,16 +414,16 @@ struct ActionItemsTable: View {
 }
 
 extension Binding {
-    /// 編輯中的草稿（可能是 nil）給編輯器用：草稿已經是 nil 時讀到 fallback，寫入不理會。
-    /// 不能用 `Binding($editing)`：按「完成」「取消」把草稿設成 nil 時，同一次更新裡編輯器的欄位還會再讀一次，
-    /// 它會強制解開 nil 而閃退（3.2.0 的錯誤，3.2.1 修正）
+    /// 编辑中的草稿（可能是 nil）给编辑器用：草稿已经是 nil 时读到 fallback，写入不理会。
+    /// 不能用 `Binding($editing)`：按「完成」「取消」把草稿设成 nil 时，同一次更新里编辑器的字段还会再读一次，
+    /// 它会强制解开 nil 而闪退（3.2.0 的错误，3.2.1 修正）
     init(draft base: Binding<Value?>, fallback: Value) {
         self.init(get: { base.wrappedValue ?? fallback },
                   set: { if base.wrappedValue != nil { base.wrappedValue = $0 } })
     }
 }
 
-/// 手動編輯會議紀錄（R6.6）：每一條都是可以改的欄位，可以新增、刪除、上下移動；按「完成」才存成新版本
+/// 手动编辑会议记录（R6.6）：每一条都是可以改的字段，可以添加、删除、上下移动；按「完成」才存成新版本
 struct NotesEditor: View {
     @Environment(\.textScale) private var scale
     @Binding var notes: MeetingNotes
@@ -432,7 +432,7 @@ struct NotesEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("編輯會議紀錄").font(.headline)
+                Text("编辑会议记录").font(.headline)
                 Spacer()
                 Button("取消") { onFinish(false) }
                     .keyboardShortcut(.cancelAction)
@@ -445,26 +445,26 @@ struct NotesEditor: View {
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    TextField("標題", text: $notes.title).contentTitleFont(18)
+                    TextField("标题", text: $notes.title).contentTitleFont(18)
                     EditorSection(title: String(localized: "摘要")) { ItemsEditor(items: $notes.summary) }
-                    EditorSection(title: String(localized: "決議")) { ItemsEditor(items: $notes.decisions) }
-                    EditorSection(title: String(localized: "待辦")) { ActionItemsEditor(items: $notes.actionItems) }
-                    EditorSection(title: String(localized: "未決問題")) { ItemsEditor(items: $notes.openQuestions) }
-                    // 議題（原「詳細」分頁的編輯器，R44.1 合併成一份）
-                    EditorSection(title: String(localized: "議題")) {
+                    EditorSection(title: String(localized: "决议")) { ItemsEditor(items: $notes.decisions) }
+                    EditorSection(title: String(localized: "待办")) { ActionItemsEditor(items: $notes.actionItems) }
+                    EditorSection(title: String(localized: "未决问题")) { ItemsEditor(items: $notes.openQuestions) }
+                    // 议题（原「详细」标签页的编辑器，R44.1 合并成一份）
+                    EditorSection(title: String(localized: "议题")) {
                         ForEach(notes.topics.indices, id: \.self) { i in
                             let topic = $notes.topics.safe(i, fallback: .init(title: "", start: "", points: []))
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack {
-                                    TextField("時間", text: topic.start).frame(width: 70 * scale).monospacedDigit()
-                                    TextField("議題", text: topic.title).contentTitleFont(16)
+                                    TextField("时间", text: topic.start).frame(width: 70 * scale).monospacedDigit()
+                                    TextField("议题", text: topic.title).contentTitleFont(16)
                                     Button { if notes.topics.indices.contains(i) { notes.topics.remove(at: i) } } label: { Image(systemName: "trash") }
-                                        .buttonStyle(.borderless).help("刪除這個議題")
+                                        .buttonStyle(.borderless).help("删除这个议题")
                                 }
                                 ItemsEditor(items: topic.points)
                             }
                         }
-                        Button("新增議題", systemImage: "plus") {
+                        Button("添加议题", systemImage: "plus") {
                             notes.topics.append(.init(title: "", start: "", points: []))
                         }
                         .buttonStyle(.borderless)
@@ -475,14 +475,14 @@ struct NotesEditor: View {
                         EditorSection(title: section.wrappedValue.title) { ItemsEditor(items: section.items) }
                     }
                     if !notes.reviewItems.isEmpty {
-                        EditorSection(title: String(localized: "待確認")) {
+                        EditorSection(title: String(localized: "待确认")) {
                             ForEach(Array(notes.reviewItems.enumerated()), id: \.offset) { index, item in
                                 HStack(alignment: .firstTextBaseline) {
                                     Text(item.time).monospacedDigit().foregroundStyle(.secondary)
                                     Text(item.question).meetingText()
                                     Spacer()
                                     Button { if notes.reviewItems.indices.contains(index) { notes.reviewItems.remove(at: index) } } label: { Image(systemName: "trash") }
-                                        .buttonStyle(.borderless).help("刪除這一題")
+                                        .buttonStyle(.borderless).help("删除这一题")
                                 }
                             }
                         }
@@ -520,12 +520,12 @@ private struct ItemsEditor: View {
             ForEach(items.indices, id: \.self) { i in
                 let item = $items.safe(i, fallback: .init(text: ""))
                 HStack(spacing: 6) {
-                    TextField("內容", text: item.text, axis: .vertical).meetingText()
-                    TextField("時間", text: item.time).frame(width: 64 * scale).monospacedDigit()
+                    TextField("内容", text: item.text, axis: .vertical).meetingText()
+                    TextField("时间", text: item.time).frame(width: 64 * scale).monospacedDigit()
                     RowButtons(index: i, count: items.count, move: { $items.move(i, to: $0) }, delete: { $items.remove(i) })
                 }
             }
-            Button("新增一條", systemImage: "plus") { items.append(.init(text: "")) }
+            Button("添加一条", systemImage: "plus") { items.append(.init(text: "")) }
                 .buttonStyle(.borderless)
                 .contentFont(.callout)
         }
@@ -541,14 +541,14 @@ private struct ActionItemsEditor: View {
             ForEach(items.indices, id: \.self) { i in
                 let item = $items.safe(i, fallback: .init(owner: "", task: "", due: ""))
                 HStack(spacing: 6) {
-                    TextField("負責人", text: item.owner).frame(width: 90 * scale)
-                    TextField("事項", text: item.task, axis: .vertical).meetingText()
+                    TextField("负责人", text: item.owner).frame(width: 90 * scale)
+                    TextField("事项", text: item.task, axis: .vertical).meetingText()
                     TextField("yyyy-MM-dd", text: item.due).frame(width: 100 * scale).monospacedDigit()
-                    TextField("時間", text: item.time).frame(width: 64 * scale).monospacedDigit()
+                    TextField("时间", text: item.time).frame(width: 64 * scale).monospacedDigit()
                     RowButtons(index: i, count: items.count, move: { $items.move(i, to: $0) }, delete: { $items.remove(i) })
                 }
             }
-            Button("新增待辦", systemImage: "plus") { items.append(.init(owner: "", task: "", due: "")) }
+            Button("添加待办", systemImage: "plus") { items.append(.init(owner: "", task: "", due: "")) }
                 .buttonStyle(.borderless)
                 .contentFont(.callout)
         }
@@ -565,13 +565,13 @@ private struct RowButtons: View {
         HStack(spacing: 2) {
             Button { move(index - 1) } label: { Image(systemName: "chevron.up") }.disabled(index == 0).help("往上移")
             Button { move(index + 1) } label: { Image(systemName: "chevron.down") }.disabled(index >= count - 1).help("往下移")
-            Button(action: delete) { Image(systemName: "trash") }.help("刪除")
+            Button(action: delete) { Image(systemName: "trash") }.help("删除")
         }
         .buttonStyle(.borderless)
     }
 }
 
-/// 編輯清單用的陣列元素綁定：刪掉一條之後 SwiftUI 可能還會用舊的位置讀寫一次，越界時讀到空值、不寫入，不會閃退
+/// 编辑清单用的数组元素绑定：删掉一条之后 SwiftUI 可能还会用旧的位置读写一次，越界时读到空值、不写入，不会闪退
 extension Binding where Value: MutableCollection & RangeReplaceableCollection, Value.Index == Int {
     func safe(_ index: Int, fallback: Value.Element) -> Binding<Value.Element> {
         Binding<Value.Element>(

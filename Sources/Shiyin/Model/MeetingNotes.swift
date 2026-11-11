@@ -1,7 +1,7 @@
 import Foundation
 
-/// 會議紀錄 v2（design §8.1）：每一條都帶錄音時間點（R6.4）。
-/// 讀取時相容 v1：字串陣列會轉成 `Item(text:, time: "")`。
+/// 会议记录 v2（design §8.1）：每一条都带录音时间点（R6.4）。
+/// 读取时兼容 v1：字符串数组会转成 `Item(text:, time: "")`。
 struct MeetingNotes: Codable, Hashable {
     struct Item: Codable, Hashable {
         var text: String
@@ -71,7 +71,7 @@ struct MeetingNotes: Codable, Hashable {
     struct ReviewItem: Codable, Hashable {
         var time: String
         var question: String
-        /// 能用是或否回答（R32、design §27）：畫面上給「是」「不是」的按鈕
+        /// 能用是或否回答（R32、design §27）：画面上给「是」「不是」的按钮
         var yesNo: Bool
 
         init(time: String, question: String, yesNo: Bool = false) {
@@ -89,7 +89,7 @@ struct MeetingNotes: Codable, Hashable {
 
         private enum CodingKeys: String, CodingKey { case time, question, yesNo }
 
-        /// yesNo 是 false 時不寫：以前的會議紀錄、沒有是非題的會議紀錄存起來跟以前一字不差
+        /// yesNo 是 false 时不写：以前的会议记录、没有是非题的会议记录存起来跟以前一字不差
         func encode(to encoder: Encoder) throws {
             var c = encoder.container(keyedBy: CodingKeys.self)
             try c.encode(time, forKey: .time)
@@ -141,13 +141,19 @@ struct MeetingNotes: Codable, Hashable {
         summary.isEmpty && decisions.isEmpty && actionItems.isEmpty && openQuestions.isEmpty && topics.isEmpty && custom.isEmpty
     }
 
-    /// 全文取代：對每一個字串值做區分大小寫的單純取代
+    /// 全文取代：对每一个字符串值做区分大小写的单纯取代
     func replacing(_ find: String, with replacement: String) -> MeetingNotes {
         mappingText { $0.replacingOccurrences(of: find, with: replacement) }
     }
 
-    /// 說話者改名後，會議紀錄裡的舊名字換成新名字（design §21.6）。
-    /// 舊名字是「說話者 1」這種預設名稱時，後面不能接數字，「說話者 1」不會換到「說話者 10」
+    /// 模型生成的中文记录统一成简体，供界面、心智图和导出共用（design §45.3）。
+    func outputScript(_ language: MeetingLanguage) -> MeetingNotes {
+        guard language.profile.transcription.simplified == true else { return self }
+        return mappingText(language.outputScript)
+    }
+
+    /// 说话者改名后，会议记录里的旧名字换成新名字（design §21.6）。
+    /// 旧名字是「说话者 1」这种默认名称时，后面不能接数字，「说话者 1」不会换到「说话者 10」
     func replacingSpeakerName(_ old: String, with new: String, isDefaultName: Bool) -> MeetingNotes {
         guard isDefaultName, let regex = try? NSRegularExpression(pattern: NSRegularExpression.escapedPattern(for: old) + "(?![0-9])") else {
             return replacing(old, with: new)
@@ -156,7 +162,7 @@ struct MeetingNotes: Codable, Hashable {
         return mappingText { regex.stringByReplacingMatches(in: $0, range: NSRange($0.startIndex..., in: $0), withTemplate: template) }
     }
 
-    /// 每一個文字欄位都套用 transform（時間點不變）
+    /// 每一个文字字段都套用 transform（时间点不变）
     private func mappingText(_ r: (String) -> String) -> MeetingNotes {
         func ri(_ i: Item) -> Item { Item(text: r(i.text), time: i.time) }
         return MeetingNotes(
@@ -170,7 +176,7 @@ struct MeetingNotes: Codable, Hashable {
             reviewItems: reviewItems.map { ReviewItem(time: $0.time, question: r($0.question), yesNo: $0.yesNo) })
     }
 
-    /// 給搜尋索引用的純文字
+    /// 给搜索索引用的纯文字
     var plainText: String {
         var lines = [title]
         lines += summary.map(\.text) + decisions.map(\.text) + openQuestions.map(\.text)
@@ -181,8 +187,8 @@ struct MeetingNotes: Codable, Hashable {
         return lines.filter { !$0.isEmpty }.joined(separator: "\n")
     }
 
-    // 給 Claude --json-schema、Codex --output-schema、OpenAI strict json_schema、Anthropic tool input_schema。
-    // 不用 $ref／$defs：不是每個服務都支援，條目的定義直接展開
+    // 给 Claude --json-schema、Codex --output-schema、OpenAI strict json_schema、Anthropic tool input_schema。
+    // 不用 $ref／$defs：不是每个服务都支持，条目的定义直接展开
     static let jsonSchema: String = {
         let items = #"{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","time"],"properties":{"text":{"type":"string"},"time":{"type":"string"}}}}"#
         return #"{"type":"object","additionalProperties":false,"required":["title","summary","decisions","actionItems","openQuestions","topics","custom","reviewItems"],"properties":{"title":{"type":"string"},"summary":"# + items
@@ -195,15 +201,15 @@ struct MeetingNotes: Codable, Hashable {
     }()
 }
 
-/// 一條紀錄的位置（design §31.1）：待確認的題目對應到哪一條
+/// 一条记录的位置（design §31.1）：待确认的题目对应到哪一条
 enum NoteItemRef: Hashable {
     case summary(Int), decisions(Int), actionItems(Int), openQuestions(Int)
-    /// 第幾個議題的第幾個要點
+    /// 第几个议题的第几个要点
     case topicPoint(Int, Int)
-    /// 第幾個自訂段落的第幾條
+    /// 第几个自订段落的第几条
     case custom(Int, Int)
 
-    /// 標準答案用的名稱和排序（design-windows §4：Windows 的 ReviewLinks 跟這裡比對）
+    /// 标准答案用的名称和排序（design-windows §4：Windows 的 ReviewLinks 跟这里比对）
     var sectionName: String {
         switch self {
         case .summary: return "summary"
@@ -228,9 +234,9 @@ enum NoteItemRef: Hashable {
 }
 
 extension MeetingNotes {
-    /// 待確認的題目對應到紀錄的條目（R41.1，design §31.1）：題目和條目的時間點同一秒的全標；
-    /// 沒有同一秒的，標時間最接近、差距 10 秒以內的一條。對不到的題目不在結果裡（只在待確認分頁）。
-    /// 議題的標題不算條目，只有要點算。載入會議時算一次（`MeetingDetail.reviewLinks`）
+    /// 待确认的题目对应到记录的条目（R41.1，design §31.1）：题目和条目的时间点同一秒的全标；
+    /// 没有同一秒的，标时间最接近、差距 10 秒以内的一条。对不到的题目不在结果里（只在待确认标签页）。
+    /// 议题的标题不算条目，只有要点算。加载会议时算一次（`MeetingDetail.reviewLinks`）
     func reviewLinks() -> [NoteItemRef: [Int]] {
         var entries: [(ref: NoteItemRef, seconds: Double)] = []
         func add(_ items: [Item], _ make: (Int) -> NoteItemRef) {
@@ -262,22 +268,22 @@ extension MeetingNotes {
     }
 }
 
-/// 時間點格式：mm:ss，超過一小時用 h:mm:ss（與逐字稿一致）
+/// 时间点格式：mm:ss，超过一小时用 h:mm:ss（与逐字稿一致）
 enum TimeFormat {
     static func string(_ seconds: Double) -> String {
-        // Int() 遇到不是有限的數字、超過範圍的值會當掉（例如伺服器、模型給的怪時間）：先限在 0～10 億秒，一般的值結果不變
+        // Int() 遇到不是有限的数字、超过范围的值会当掉（例如服务器、模型给的怪时间）：先限在 0～10 亿秒，一般的值结果不变
         let s = seconds.isFinite ? Int(min(max(0, seconds), 1e9)) : 0
         if s >= 3600 { return String(format: "%d:%02d:%02d", s / 3600, s % 3600 / 60, s % 60) }
         return String(format: "%02d:%02d", s / 60, s % 60)
     }
 
-    /// 模型偶爾會照抄逐字稿的寫法，把時間寫成「[03:15]」：去掉前後的括號和空白
+    /// 模型偶尔会照抄逐字稿的写法，把时间写成「[03:15]」：去掉前后的括号和空白
     static func clean(_ text: String) -> String {
         text.trimmingCharacters(in: CharacterSet(charactersIn: "[]()（）【】").union(.whitespacesAndNewlines))  // l10n-skip
     }
 
     static func seconds(_ text: String) -> Double? {
-        // 「03:15–05:20」這種範圍取開頭；全形冒號也接受
+        // 「03:15–05:20」这种范围取开头；全角冒号也接受
         let first = clean(text).replacingOccurrences(of: "：", with: ":")  // l10n-skip
             .split(whereSeparator: { "–—-~〜～ ".contains($0) }).first.map(String.init) ?? ""  // l10n-skip
         let parts = first.split(separator: ":").map { Int($0) }
@@ -285,16 +291,16 @@ enum TimeFormat {
         return Double(parts.compactMap { $0 }.reduce(0) { $0 * 60 + $1 })
     }
 
-    /// 會議長度的口語說法，例如「9 分鐘」「1 小時 5 分鐘」；介面用介面語言，匯出用會議語言
+    /// 会议长度的口语说法，例如「9 分钟」「1 小时 5 分钟」；界面用界面语言，导出用会议语言
     static func duration(_ seconds: Int?, language: MeetingLanguage = .interface) -> String {
         guard let seconds else { return "" }
         let minutes = max(1, Int((Double(seconds) / 60).rounded()))
         let h = minutes / 60, m = minutes % 60
         if minutes >= 60 {
-            return m == 0 ? language.format(zh: "%lld 小時", en: "%lld hr", ja: "%lld 時間", h)
-            : language.format(zh: "%lld 小時 %lld 分鐘", en: "%lld hr %lld min", ja: "%lld 時間 %lld 分", h, m)
+            return m == 0 ? language.format(zh: "%lld 小时", en: "%lld hr", ja: "%lld 時間", h)
+            : language.format(zh: "%lld 小时 %lld 分钟", en: "%lld hr %lld min", ja: "%lld 時間 %lld 分", h, m)
         }
-        return language.format(zh: "%lld 分鐘", en: "%lld min", ja: "%lld 分", minutes)
+        return language.format(zh: "%lld 分钟", en: "%lld min", ja: "%lld 分", minutes)
     }
 
     /// srt 用 00:01:02,345；vtt 用 00:01:02.345
@@ -316,7 +322,7 @@ enum DateText {
     static func string(_ date: Date) -> String { formatter.string(from: date) }
     static func date(_ text: String) -> Date? { formatter.date(from: text) }
 
-    /// 星期幾：中文「星期四」、英文「Thursday」
+    /// 星期几：中文「星期四」、英文「Thursday」
     static func weekday(_ text: String, language: MeetingLanguage = .interface) -> String {
         guard let date = date(text) else { return "" }
         return date.formatted(Date.FormatStyle(locale: language.locale).weekday(.wide))

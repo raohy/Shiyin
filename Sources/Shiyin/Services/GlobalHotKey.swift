@@ -1,9 +1,9 @@
 import Carbon.HIToolbox
 import Foundation
 
-/// 全域快捷鍵（R11.3、R19.5、design §12、§21.10）：在其他 app 裡也能用。
-/// ⌃⌥⌘R 開始或停止錄音；⌃⌥⌘B 錄音中標記重點（只在錄音中註冊，不錄音時不佔用這組按鍵）。
-/// 用 Carbon 的 RegisterEventHotKey，不需要輔助使用權限。
+/// 全域快捷键（R11.3、R19.5、design §12、§21.10）：在其他 app 里也能用。
+/// ⌃⌥⌘R 开始或停止录音；⌃⌥⌘B 录音中标记重点（只在录音中注册，不录音时不占用这组按键）。
+/// 用 Carbon 的 RegisterEventHotKey，不需要辅助功能权限。
 @MainActor
 final class GlobalHotKey {
     static let shared = GlobalHotKey()
@@ -15,7 +15,7 @@ final class GlobalHotKey {
 
     var onPress: (() -> Void)?
     var onBookmark: (() -> Void)?
-    /// 最近一次註冊錄音快捷鍵的結果；被其他 app 佔用時不是 noErr
+    /// 最近一次注册录音快捷键的结果；被其他 app 占用时不是 noErr
     private(set) var status: OSStatus = noErr
     var isRegistered: Bool { hotKeys[Self.recordID] != nil }
     var isBookmarkRegistered: Bool { hotKeys[Self.bookmarkID] != nil }
@@ -32,12 +32,12 @@ final class GlobalHotKey {
         }
     }
 
-    /// 錄音開始時打開、停止時關掉（design §21.10）
+    /// 录音开始时打开、停止时关掉（design §21.10）
     func setBookmarkEnabled(_ enabled: Bool) {
         if enabled { _ = register(Self.bookmarkID, key: kVK_ANSI_B) } else { unregister(Self.bookmarkID) }
     }
 
-    /// 按下快捷鍵；DEBUG 指令也用這個模擬
+    /// 按下快捷键；DEBUG 命令也用这个模拟
     func fire() { onPress?() }
     func fireBookmark() { onBookmark?() }
 
@@ -58,7 +58,7 @@ final class GlobalHotKey {
         }
         let hotKeyID = EventHotKeyID(signature: OSType(0x5348_5949), id: id)   // 'SHYI'
         var ref: EventHotKeyRef?
-        // 獨佔註冊：別的 app 已經獨佔這組按鍵時會失敗（設定裡會顯示），也避免兩個 app 同時被觸發
+        // 独占注册：别的 app 已经独占这组按键时会失败（设置里会显示），也避免两个 app 同时被触发
         let result = RegisterEventHotKey(UInt32(key), UInt32(cmdKey | optionKey | controlKey), hotKeyID,
                                          GetApplicationEventTarget(), OptionBits(kEventHotKeyExclusive), &ref)
         if result == noErr, let ref { hotKeys[id] = ref }

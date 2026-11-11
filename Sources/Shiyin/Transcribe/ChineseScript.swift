@@ -92,4 +92,95 @@ enum ChineseScript {
             return v == "臺" ? "台" : v   // l10n-skip
         })
     }
+
+    // MARK: 繁體轉大陸簡體（design §45、D151）
+
+    /// 轉簡體的兩輪字表：第一輪台灣用詞換成大陸用詞，第二輪繁轉簡；每一輪由左往右找最長的匹配
+    struct SimplifyTables: Sendable {
+        var stages: [(map: [String: String], longest: Int)]
+    }
+
+    nonisolated(unsafe) private static var cachedSimplify: SimplifyTables?
+
+    static func simplifyTables() throws -> SimplifyTables {
+        lock.lock(); defer { lock.unlock() }
+        if let cachedSimplify { return cachedSimplify }
+        let dir = tablesDirectory
+        func rows(_ name: String) throws -> [(String, String)] {
+            let text = try String(contentsOf: dir.appendingPathComponent(name), encoding: .utf8)
+            return text.split(separator: "\n").compactMap { line in
+                guard !line.hasPrefix("#") else { return nil }
+                let parts = line.split(separator: "\t", maxSplits: 1)
+                guard parts.count == 2 else { return nil }
+                return (String(parts[0]), String(parts[1].split(separator: " ").first ?? parts[1]))
+            }
+        }
+        func merge(_ sources: [[(String, String)]]) -> (map: [String: String], longest: Int) {
+            var map: [String: String] = [:]
+            var longest = 1
+            for source in sources {
+                for (key, value) in source where map[key] == nil {
+                    map[key] = value
+                    longest = max(longest, key.count)
+                }
+            }
+            return (map, longest)
+        }
+        let variantsRev = try rows("TWVariants.tsv").filter { $0.0.count == 1 && $0.1.count == 1 }.map { ($0.1, $0.0) }
+        let stage1 = merge([try rows("CNOverrides.tsv"), try rows("TWPhrasesRev.tsv"), try rows("TWVariantsRevPhrases.tsv"), variantsRev])
+        let stage2 = merge([try rows("TSPhrases.tsv"), try rows("TSCharacters.tsv")])
+        // 台灣用詞也可能已經是簡體字（Breeze 看到簡體的提示詞時會輸出「软体」「资料库」）：用詞表多一份簡體的鍵
+        var stage1Both = stage1
+        for (key, value) in stage1.map {
+            let simplifiedKey = convert(key, stage: stage2)
+            if stage1Both.map[simplifiedKey] == nil {
+                stage1Both.map[simplifiedKey] = value
+                stage1Both.longest = max(stage1Both.longest, simplifiedKey.count)
+            }
+        }
+        let result = SimplifyTables(stages: [stage1Both, stage2])
+        cachedSimplify = result
+        return result
+    }
+
+    /// 轉成大陸簡體（含台灣用詞換成大陸用詞）；字表讀不到時原樣回傳，不讓轉錄失敗
+    static func toSimplified(_ text: String) -> String {
+        guard let tables = try? simplifyTables() else { return text }
+        return toSimplified(text, tables: tables)
+    }
+
+    static func toSimplified(_ text: String, tables: SimplifyTables) -> String {
+        tables.stages.reduce(text) { convert($0, stage: $1) }
+    }
+
+    /// 一輪轉換：由左往右找最長的匹配，查不到原樣保留
+    private static func convert(_ text: String, stage: (map: [String: String], longest: Int)) -> String {
+        let chars = Array(text)
+        var out = String()
+        out.reserveCapacity(text.utf8.count)
+        var i = 0
+        while i < chars.count {
+            if isCJK(chars[i]) {
+                var length = min(stage.longest, chars.count - i)
+                var matched = false
+                while length >= 1 {
+                    if let value = stage.map[String(chars[i..<i + length])] {
+                        out += value
+                        i += length
+                        matched = true
+                        break
+                    }
+                    length -= 1
+                }
+                if matched { continue }
+            }
+            out.append(chars[i])
+            i += 1
+        }
+        return out
+    }
+
+    private static func isCJK(_ c: Character) -> Bool {
+        c.unicodeScalars.first.map { (0x3400...0x9FFF).contains($0.value) || (0xF900...0xFAFF).contains($0.value) } == true
+    }
 }

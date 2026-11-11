@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// 一組問答（design §21.8）：meeting_id 是 NULL 時是問所有會議
+/// 一组问答（design §21.8）：meeting_id 是 NULL 时是问所有会议
 struct QuestionRecord: SnakeCaseRecord, Identifiable, Hashable {
     static let databaseTableName = "questions"
     var id: Int64?
@@ -22,14 +22,14 @@ enum AskTarget: Equatable {
     case all
 }
 
-/// 問所有會議的範圍
+/// 问所有会议的范围
 enum AskScope: String, CaseIterable, Identifiable {
     case all, folder, recent
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .all: return String(localized: "所有會議")
-        case .folder: return String(localized: "目前的資料夾")
+        case .all: return String(localized: "所有会议")
+        case .folder: return String(localized: "目前的文件夹")
         case .recent: return String(localized: "最近 30 天")
         }
     }
@@ -63,9 +63,9 @@ extension AppDatabase {
     }
 }
 
-/// 對會議提問（design §21.8、R19.6、D32）：不排進工作佇列，使用者在等；同時只問一題
+/// 对会议提问（design §21.8、R19.6、D32）：不排进工作队列，用户在等；同时只问一题
 extension AppModel {
-    /// 跨會議時最多帶幾場會議、總共多少字
+    /// 跨会议时最多带几场会议、总共多少字
     static let askMeetingLimit = 8
     static let askCharacterLimit = 40_000
 
@@ -82,14 +82,14 @@ extension AppModel {
         if let meetingId { loadMeetingQuestions(meetingId) } else { loadAllQuestions() }
     }
 
-    /// 不能問時的原因（還沒設定整理工具、設定為不整理、正在問別的）
+    /// 不能问时的原因（还没设置整理工具、设置为不整理、正在问别的）
     var askUnavailableReason: String? {
         if AppSettings.provider == .none {
             return AppSettings.needsProviderSetup
-                ? String(localized: "還沒設定整理工具，沒辦法提問；請到設定選擇 Claude、Codex 或 API")
-                : String(localized: "整理工具設定為「不整理」，沒辦法提問；請到設定改成 Claude、Codex 或 API")
+                ? String(localized: "还没设置整理工具，没办法提问；请到设置选择 Claude、Codex 或 API")
+                : String(localized: "整理工具设置为「不整理」，没办法提问；请到设置改成 Claude、Codex 或 API")
         }
-        // 沒登入、沒有 key…（R45.4）
+        // 没登录、没有 key…（R45.4）
         if let problem = AppSettings.summarizerProblem { return problem.message }
         return nil
     }
@@ -99,7 +99,7 @@ extension AppModel {
         askTask?.cancel()
     }
 
-    // MARK: 一場會議
+    // MARK: 一场会议
 
     func askMeeting(_ question: String) {
         let question = question.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -126,7 +126,7 @@ extension AppModel {
         }
     }
 
-    // MARK: 所有會議
+    // MARK: 所有会议
 
     func askAll(_ question: String, scope: AskScope) {
         let question = question.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -136,17 +136,17 @@ extension AppModel {
         let language = MeetingLanguage.interface
         let folder = folderFilter
         run(.all) {
-            // 1. 抽關鍵詞
+            // 1. 抽关键词
             struct Keywords: Decodable { var keywords: [String] }
             let keywords = try await AskPrompt.generate(Keywords.self, provider: provider, model: model, system: AskPrompt.keywordsSystem(language),
                                                         prompt: AskPrompt.keywordsPrompt(language, question: question),
                                                         format: AskPrompt.keywordsFormat, onStart: { self.askProcess = $0 }).keywords
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { $0.count >= 2 }
             try Task.checkCancellation()
-            // 2. 全文搜尋，挑會議和片段
+            // 2. 全文搜索，挑会议和片段
             let blocks = self.askBlocks(keywords: keywords, scope: scope, folder: folder)
             guard !blocks.isEmpty else {
-                let answer = AskPrompt.Answer(answer: String(localized: "找不到跟這個問題有關的會議。可以換個說法，或用會議裡實際講的詞再問一次。"),
+                let answer = AskPrompt.Answer(answer: String(localized: "找不到跟这个问题有关的会议。可以换个说法，或用会议里实际讲的词再问一次。"),
                                               found: false, citations: [], keywords: keywords, meetingIds: [])
                 return QuestionRecord(meetingId: nil, scope: scope.rawValue, question: question, answer: Self.json(answer), provider: provider.rawValue)
             }
@@ -161,7 +161,7 @@ extension AppModel {
         }
     }
 
-    /// 用每個關鍵詞搜尋，依命中數、日期挑最多 8 場會議；每場帶摘要、決議和命中的段落（前後各一段），總長 40,000 字以內
+    /// 用每个关键词搜索，依命中数、日期挑最多 8 场会议；每场带摘要、决议和命中的段落（前后各一段），总长 40,000 字以内
     func askBlocks(keywords: [String], scope: AskScope, folder: String?) -> [AskPrompt.MeetingBlock] {
         var hits: [Int64: [SearchHit]] = [:]
         for keyword in keywords {
@@ -200,7 +200,7 @@ extension AppModel {
             var block = AskPrompt.MeetingBlock(id: id, title: meeting.displayTitle, date: meeting.meetingDate, summary: summary, lines: lines)
             let size = (block.summary + block.lines).reduce(0) { $0 + $1.count }
             if total + size > Self.askCharacterLimit {
-                // 放不下整場：只放到上限為止的段落
+                // 放不下整场：只放到上限为止的段落
                 let room = Self.askCharacterLimit - total - block.summary.reduce(0) { $0 + $1.count }
                 guard room > 200 else { break }
                 var used = 0
@@ -212,7 +212,7 @@ extension AppModel {
         return blocks
     }
 
-    /// 共用的流程：標記正在問、可以取消、存問答、更新畫面
+    /// 共用的流程：标记正在问、可以取消、存问答、更新画面
     private func run(_ target: AskTarget, _ work: @escaping @MainActor () async throws -> QuestionRecord) {
         asking = target
         askTask = Task {
@@ -229,7 +229,7 @@ extension AppModel {
                 if case .meeting(let id) = target { loadMeetingQuestions(id) } else { loadAllQuestions() }
             } catch is CancellationError {
             } catch {
-                // CLI 被結束（按了取消）時也會丟錯誤
+                // CLI 被结束（按了取消）时也会丢错误
                 if !Task.isCancelled { errorMessage = error.localizedDescription }
             }
         }
@@ -241,7 +241,7 @@ extension AppModel {
         return String(decoding: (try? encoder.encode(answer)) ?? Data(), as: UTF8.self)
     }
 
-    /// 點了回答裡的出處：打開那場會議、切到逐字稿、從那個時間點播放
+    /// 点了回答里的出处：打开那场会议、切到逐字稿、从那个时间点播放
     func openCitation(meetingId: Int64, time: String) {
         openMainWindow?()
         showTrash = false

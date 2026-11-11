@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 錄音中的畫面（design §5.4、R2）：即時逐字稿＋我的筆記＋重點
+/// 录音中的画面（design §5.4、R2）：实时逐字稿＋我的笔记＋重点
 struct RecordingPanel: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -14,12 +14,12 @@ struct RecordingPanel: View {
         #endif
         let recorder = model.recorder
         VStack(spacing: 0) {
-            // 計時、音量每 0.05 秒變一次，只讓這一塊重算（design §21.12）
+            // 计时、音量每 0.05 秒变一次，只让这一块重算（design §21.12）
             Isolated { controls(recorder) }
             if let change = recorder.languageSwitch {
-                // 自動偵測換了語言（design §18.8）：可以改回來
+                // 自动检测换了语言（design §18.8）：可以改回来
                 HStack(spacing: 12) {
-                    Label("聽起來是\(change.to.uiName)，即時逐字稿和會議語言已經改成\(change.to.uiName)", systemImage: "globe")
+                    Label("听起来是\(change.to.uiName)，实时逐字稿和会议语言已经改成\(change.to.uiName)", systemImage: "globe")
                     Spacer()
                     Button("改回\(change.from.uiName)") { recorder.switchLanguage(to: change.from) }
                 }
@@ -29,12 +29,12 @@ struct RecordingPanel: View {
                 .background(Color.signal.opacity(0.12))
             }
             if recorder.idlePrompt {
-                // 忘了停止錄音（design §35.2、R48.1）
+                // 忘了停止录音（design §35.2、R48.1）
                 HStack(spacing: 12) {
-                    Label("好像沒人在說話了，要停止錄音嗎？再 15 分鐘沒人說話會自動停止。", systemImage: "moon.zzz")
+                    Label("好像没人在说话了，要停止录音吗？再 15 分钟没人说话会自动停止。", systemImage: "moon.zzz")
                     Spacer()
-                    Button("繼續錄") { recorder.continueAfterIdle() }
-                    Button("停止錄音") { recorder.stop() }
+                    Button("继续录") { recorder.continueAfterIdle() }
+                    Button("停止录音") { recorder.stop() }
                 }
                 .font(.callout)
                 .padding(.horizontal, 16)
@@ -42,17 +42,17 @@ struct RecordingPanel: View {
                 .background(Color.signal.opacity(0.12))
             }
             if let hint = recorder.micHint {
-                // 用藍牙耳機的麥克風錄現場會議（design §38.4、R58.3）
+                // 用蓝牙耳机的麦克风录现场会议（design §38.4、R58.3）
                 HStack(spacing: 12) {
                     Label(hint.text, systemImage: "headphones")
                     Spacer()
                     if let builtIn = hint.builtIn {
                         Button("改用 \(builtIn.name)") { model.switchMicrophone(builtIn.uid) }
                             .buttonStyle(.borderedProminent)
-                            .help("錄音不會中斷，接著用這支麥克風錄；之後的錄音也用這支")
+                            .help("录音不会中断，接着用这支麦克风录；之后的录音也用这支")
                     }
                     Button("知道了") { recorder.dismissMicHint() }
-                        .help("這場錄音不再提示這件事")
+                        .help("这场录音不再提示这件事")
                 }
                 .font(.callout)
                 .controlSize(.small)
@@ -66,7 +66,7 @@ struct RecordingPanel: View {
                     Label(Self.levelHintText(hint), systemImage: hint == .noisy ? "waveform.badge.exclamationmark" : "mic.badge.xmark")
                     Spacer()
                     Button("知道了") { recorder.dismissLevelHint() }
-                        .help("這場錄音不再提示這件事")
+                        .help("这场录音不再提示这件事")
                 }
                 .font(.callout)
                 .padding(.horizontal, 16)
@@ -74,51 +74,54 @@ struct RecordingPanel: View {
                 .background(Color.signal.opacity(0.12))
             }
             Divider()
-            // 不用 HSplitView：它在 NavigationSplitView 裡會把內容撐到視窗的預設寬度，視窗窄的時候左右被切掉
+            // 不用 HSplitView：它在 NavigationSplitView 里会把内容撑到窗口的默认宽度，窗口窄的时候左右被切掉
             HStack(spacing: 0) {
                 Isolated { liveTranscript(recorder) }
                     .frame(minWidth: 300, maxWidth: .infinity)
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("我的筆記").font(.songti(16))
-                    Text("每換一行會自動加上當下的錄音時間；整理時會優先納入這些內容。")
+                    ScrollView { MeetingAssistancePanel(meeting: detail.meeting, recording: true).padding(.bottom, 8) }
+                    Divider()
+                    Text("我的笔记").font(.songti(16))
+                    Text("每换一行会自动加上当下的录音时间；整理时会优先纳入这些内容。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     UserNotesEditor(meetingId: detail.meeting.id!, initial: detail.meeting.userNotes) { recorder.elapsed }
+                        .frame(height: 140)
                 }
                 .padding(16)
-                .frame(width: 300)
+                .frame(width: 340)
             }
         }
     }
 
-    /// 提示的文字在 `Recorder.LevelHint.text`（錄音畫面、選單列、通知共用，R42）
+    /// 提示的文字在 `Recorder.LevelHint.text`（录音画面、菜单列、通知共用，R42）
     static func levelHintText(_ hint: Recorder.LevelHint) -> String { hint.text }
 
     private func controls(_ recorder: Recorder) -> some View {
         HStack(spacing: 14) {
             HStack(spacing: 8) {
                 Circle().fill(recorder.isPaused ? Color.secondary : .red).frame(width: 10, height: 10)
-                Text(recorder.isPaused ? "已暫停" : "錄音中")
+                Text(recorder.isPaused ? "已暂停" : "录音中")
                 RecorderClock(recorder: recorder).foregroundStyle(.secondary)
             }
             .font(.title3)
             if recorder.hasMic {
                 Label { RecorderMeter(recorder: recorder, system: false) } icon: { Image(systemName: "mic") }
-                    .help("麥克風音量")
-                // 正在用哪一支麥克風，點一下可以換（design §38.3、R58.2）；視窗窄的時候先縮這個
+                    .help("麦克风音量")
+                // 正在用哪一支麦克风，点一下可以换（design §38.3、R58.2）；窗口窄的时候先缩这个
                 MicrophoneMenu(recorder: recorder)
                     .frame(maxWidth: 180, alignment: .leading)
                     .layoutPriority(-1)
             }
             if recorder.hasSystem {
                 Label { RecorderMeter(recorder: recorder, system: true) } icon: { Image(systemName: "speaker.wave.2") }
-                    .help("電腦播放的聲音（線上會議的對方）")
+                    .help("电脑播放的声音（在线会议的对方）")
             }
             Spacer(minLength: 0)
-            // 視窗窄的時候（側邊欄打開、視窗寬 960）按鈕只留圖示，說明放在滑鼠提示。
-            // 英文的字比較長，中間多一層：暫停、標記只留圖示，「停止並轉錄」保留文字
+            // 窗口窄的时候（侧边栏打开、窗口宽 960）按钮只留图标，说明放在鼠标提示。
+            // 英文的字比较长，中间多一层：暂停、标记只留图标，「停止并转录」保留文字
             ViewThatFits(in: .horizontal) {
                 actionButtons(recorder).labelStyle(.titleAndIcon)
                 HStack(spacing: 14) {
@@ -152,31 +155,31 @@ struct RecordingPanel: View {
     }
 
     private func pauseButton(_ recorder: Recorder) -> some View {
-        Button(recorder.isPaused ? "繼續" : "暫停", systemImage: recorder.isPaused ? "play.fill" : "pause.fill") {
+        Button(recorder.isPaused ? "继续" : "暂停", systemImage: recorder.isPaused ? "play.fill" : "pause.fill") {
             recorder.isPaused ? recorder.resume() : recorder.pause()
         }
-        .help(recorder.isPaused ? "繼續錄音（⇧⌘P）" : "暫停錄音（⇧⌘P）")
+        .help(recorder.isPaused ? "继续录音（⇧⌘P）" : "暂停录音（⇧⌘P）")
     }
 
     private func bookmarkButton(_ recorder: Recorder) -> some View {
-        Button("標記重點", systemImage: "star") {
+        Button("标记重点", systemImage: "star") {
             model.addBookmark(at: recorder.elapsed, meetingId: detail.meeting.id)
-            model.noticeMessage = String(localized: "已標記 \(TimeFormat.string(recorder.elapsed)) 為重點")
+            model.noticeMessage = String(localized: "已标记 \(TimeFormat.string(recorder.elapsed)) 为重点")
         }
-        .help("標記這個時間點（⌘B），整理時會被當成重點")
+        .help("标记这个时间点（⌘B），整理时会被当成重点")
     }
 
     private func stopButton(_ recorder: Recorder) -> some View {
-        Button("停止並轉錄", systemImage: "stop.fill") { recorder.stop() }
+        Button("停止并转录", systemImage: "stop.fill") { recorder.stop() }
             .buttonStyle(.borderedProminent)
             .tint(.red)
-            .help("停止錄音，開始正式轉錄")
+            .help("停止录音，开始正式转录")
     }
 
     private func warning(_ recorder: Recorder) -> String? {
         if let warning = recorder.deviceWarning { return warning }
         if recorder.hasSystem && recorder.systemSilent {
-            return String(localized: "超過 15 秒沒有收到系統聲音：請確認線上會議有聲音，並在「系統設定 → 隱私權與安全性 → 錄製螢幕與系統錄音」允許拾音")
+            return String(localized: "超过 15 秒没有收到系统声音：请确认在线会议有声音，并在「系统设置 → 隐私与安全性 → 录制屏幕与系统录音」允许拾音")
         }
         return recorder.liveStatus.isEmpty ? nil : recorder.liveStatus
     }
@@ -185,13 +188,13 @@ struct RecordingPanel: View {
         #if DEBUG
         DebugMetrics.bump("liveTranscriptBuild")
         #endif
-        // 每個重點只標在一段上：開始時間不晚於它的最後一段
+        // 每个重点只标在一段上：开始时间不晚于它的最后一段
         let starred = Set(detail.bookmarks.compactMap { mark in recorder.liveLines.last(where: { $0.start <= mark.time })?.id })
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
                     if recorder.liveLines.isEmpty && recorder.volatileText.isEmpty {
-                        Text(AppSettings.liveTranscription ? "開始說話後，逐字稿會即時出現在這裡。" : "即時逐字稿已在設定中關閉，錄音結束後會正式轉錄。")
+                        Text(AppSettings.liveTranscription ? "开始说话后，逐字稿会实时出现在这里。" : "实时逐字稿已在设置中关闭，录音结束后会正式转录。")
                             .foregroundStyle(.secondary)
                     }
                     ForEach(recorder.liveLines) { line in
@@ -205,7 +208,7 @@ struct RecordingPanel: View {
                         }
                         .id(line.id)
                     }
-                    // 還沒定稿的文字一直在變，只讓這一行重算，不拖著整份即時逐字稿（design §21.12）
+                    // 还没定稿的文字一直在变，只让这一行重算，不拖着整份实时逐字稿（design §21.12）
                     Isolated {
                         if !recorder.volatileText.isEmpty {
                             HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -225,8 +228,8 @@ struct RecordingPanel: View {
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            // 使用者往回看時不要自動捲動（R2.2）：看捲動的位置。往上捲（內容沒有變短）就不跟了，回到底部再跟。
-            // 不用「底部的標記出現／消失」改狀態：那是在排版途中改，可能讓排版一直重來（design §25）
+            // 用户往回看时不要自动滚动（R2.2）：看滚动的位置。往上卷（内容没有变短）就不跟了，回到底部再跟。
+            // 不用「底部的标记出现／消失」改状态：那是在排版途中改，可能让排版一直重来（design §25）
             .onScrollGeometryChange(for: LivePosition.self) { geometry in
                 LivePosition(offset: geometry.contentOffset.y, content: geometry.contentSize.height,
                              bottom: geometry.visibleRect.maxY)
@@ -255,7 +258,7 @@ struct RecordingPanel: View {
     }
 }
 
-/// 使用者筆記（R2.3）：換行時自動加上時間點，停下來 0.8 秒後存檔
+/// 用户笔记（R2.3）：换行时自动加上时间点，停下来 0.8 秒后存档
 struct UserNotesEditor: View {
     @Environment(AppModel.self) private var model
     let meetingId: Int64
@@ -296,10 +299,10 @@ struct UserNotesEditor: View {
             }
             .onDisappear {
                 saveTask?.cancel()
-                // 只有使用者改過才存，避免用舊內容蓋掉別處寫進去的筆記
+                // 只有用户改过才存，避免用旧内容盖掉别处写进去的笔记
                 if text != savedText { save() }
             }
-            // 別處改了筆記（例如匯入 Markdown 筆記）：換成新的內容，不然下一次存檔會蓋回舊的
+            // 别处改了笔记（例如导入 Markdown 笔记）：换成新的内容，不然下一次存档会盖回旧的
             .onChange(of: initial) { _, new in
                 guard new != savedText else { return }
                 saveTask?.cancel()
@@ -314,13 +317,13 @@ struct UserNotesEditor: View {
     }
 }
 
-/// 逐字稿頂部的「我的筆記」（R44.3，design §33.1）：預設收起，標籤寫有幾行；展開是錄音中同一個編輯器，播放時換行會加上播放時間。
-/// 展開狀態只記這次選取期間（AppModel.userNotesExpanded，換會議收起）
+/// 逐字稿顶部的「我的笔记」（R44.3，design §33.1）：默认收起，标签写有几行；展开是录音中同一个编辑器，播放时换行会加上播放时间。
+/// 展开状态只记这次选中期间（AppModel.userNotesExpanded，换会议收起）
 struct UserNotesDisclosure: View {
     @Environment(AppModel.self) private var model
     let detail: MeetingDetail
 
-    /// 有字的行數
+    /// 有字的行数
     private var lineCount: Int {
         detail.meeting.userNotes.split(whereSeparator: \.isNewline).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.count
     }
@@ -333,7 +336,7 @@ struct UserNotesDisclosure: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "note.text").foregroundStyle(.secondary)
-                        Text(lineCount > 0 ? String(localized: "我的筆記（\(lineCount) 行）") : String(localized: "寫筆記")).font(.callout)
+                        Text(lineCount > 0 ? String(localized: "我的笔记（\(lineCount) 行）") : String(localized: "写笔记")).font(.callout)
                         Image(systemName: model.userNotesExpanded ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(.secondary)
                         Spacer(minLength: 0)
                     }
@@ -341,7 +344,7 @@ struct UserNotesDisclosure: View {
                 }
                 .buttonStyle(.plain)
                 if !detail.bookmarks.isEmpty {
-                    Menu("重點標記 \(detail.bookmarks.count)") {
+                    Menu("重点标记 \(detail.bookmarks.count)") {
                         ForEach(detail.bookmarks) { bookmark in
                             Button("\(TimeFormat.string(bookmark.time)) \(bookmark.label)") { model.player.seek(to: bookmark.time) }
                         }
@@ -353,8 +356,8 @@ struct UserNotesDisclosure: View {
             .padding(.vertical, 8)
             if model.userNotesExpanded {
                 VStack(alignment: .leading, spacing: 8) {
-                    // 不能加 fixedSize：量最小高度時會用很窄的寬度，算出很高的高度，整個視窗的內容被往上推（2026-11-05 使用者看到）
-                    Text("播放錄音時換行，會自動加上當下的播放時間。整理時 AI 會參考這些筆記；改完之後可以從「更多 → 重新處理」選「重新整理會議紀錄」。")
+                    // 不能加 fixedSize：量最小高度时会用很窄的宽度，算出很高的高度，整个窗口的内容被往上推（2026-11-05 用户看到）
+                    Text("播放录音时换行，会自动加上当下的播放时间。整理时 AI 会参考这些笔记；改完之后可以从「更多 → 重新处理」选「刷新会议记录」。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     UserNotesEditor(meetingId: detail.meeting.id!, initial: detail.meeting.userNotes) {
@@ -371,21 +374,21 @@ struct UserNotesDisclosure: View {
     }
 }
 
-/// 即時逐字稿捲動的位置：捲了多少、內容多高、看得到的底部在哪
+/// 实时逐字稿滚动的位置：卷了多少、内容多高、看得到的底部在哪
 struct LivePosition: Equatable {
     var offset: CGFloat
     var content: CGFloat
     var bottom: CGFloat
 }
 
-/// 錄音的經過時間：在自己的 body 裡讀，整秒變了只重算這一個 Text（design §25）
+/// 录音的经过时间：在自己的 body 里读，整秒变了只重算这一个 Text（design §25）
 struct RecorderClock: View {
     let recorder: Recorder
     var body: some View { Text(TimeFormat.string(Double(recorder.elapsedSeconds))).monospacedDigit() }
 }
 
-/// 錄音的音量條（design §25）：AppKit 的 view 自己定時讀音量，不經過 SwiftUI 的更新。
-/// DEBUG 截圖（ImageRenderer 畫不出 AppKit 的 view）時用 SwiftUI 的 VUMeter
+/// 录音的音量条（design §25）：AppKit 的 view 自己定时读音量，不经过 SwiftUI 的更新。
+/// DEBUG 截屏（ImageRenderer 画不出 AppKit 的 view）时用 SwiftUI 的 VUMeter
 struct RecorderMeter: View {
     @Environment(\.snapshotMode) private var snapshotMode
     let recorder: Recorder
@@ -401,14 +404,14 @@ struct RecorderMeter: View {
     }
 }
 
-/// 讓內容在自己的 body 裡算：裡面讀到、一直在變的資料（計時、音量、播放位置、還沒定稿的文字）
-/// 只會讓這一塊重算，不會拖著外面整個畫面一起重算（design §21.12）
+/// 让内容在自己的 body 里算：里面读到、一直在变的资料（计时、音量、播放位置、还没定稿的文字）
+/// 只会让这一块重算，不会拖着外面整个画面一起重算（design §21.12）
 struct Isolated<Content: View>: View {
     @ViewBuilder let content: () -> Content
     var body: some View { content() }
 }
 
-/// 錄音畫面的麥克風名稱（design §38.3、R58.2）：寫出實際在收音的那一支，點一下從清單換，錄音不中斷
+/// 录音画面的麦克风名称（design §38.3、R58.2）：写出实际在收音的那一支，点一下从清单换，录音不中断
 struct MicrophoneMenu: View {
     @Environment(AppModel.self) private var model
     let recorder: Recorder
@@ -420,7 +423,7 @@ struct MicrophoneMenu: View {
             Button {
                 model.switchMicrophone("")
             } label: {
-                Text(monitor.defaultInput.map { String(localized: "系統預設（\($0.name)）") } ?? String(localized: "系統預設"))
+                Text(monitor.defaultInput.map { String(localized: "系统默认（\($0.name)）") } ?? String(localized: "系统默认"))
             }
             Divider()
             ForEach(monitor.inputs) { device in
@@ -431,10 +434,10 @@ struct MicrophoneMenu: View {
                 }
             }
         } label: {
-            Text(current?.name ?? String(localized: "麥克風")).lineLimit(1).truncationMode(.middle)
+            Text(current?.name ?? String(localized: "麦克风")).lineLimit(1).truncationMode(.middle)
         }
         .menuStyle(.borderlessButton)
-        .help(current.map { String(localized: "正在用「\($0.name)」收音，點一下可以換") } ?? String(localized: "點一下可以換麥克風"))
-        .accessibilityLabel(String(localized: "麥克風：\(current?.name ?? "")"))
+        .help(current.map { String(localized: "正在用「\($0.name)」收音，点一下可以换") } ?? String(localized: "点一下可以换麦克风"))
+        .accessibilityLabel(String(localized: "麦克风：\(current?.name ?? "")"))
     }
 }

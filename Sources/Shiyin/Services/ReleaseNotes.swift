@@ -1,12 +1,12 @@
 import Foundation
 
-/// 更新說明的摘要（R10.6，design §12）：tag 的說明文字是「中文一段、空一行、英文一段」，每段第一行是標題、其餘是「- 」開頭的條目。
-/// 詢問更新的視窗只列介面語言那一段的前幾項，其餘寫「還有 N 項」；完整說明在官網。Windows 的 ReleaseNotes.cs 同一套規則（標準答案 util/release-notes.json）
+/// 更新说明的摘要（R10.6，design §12）：tag 的说明文字是「中文一段、空一行、英文一段」，每段第一行是标题、其余是「- 」开头的条目。
+/// 询问更新的窗口只列界面语言那一段的前几项，其余写「还有 N 项」；完整说明在官网。Windows 的 ReleaseNotes.cs 同一套规则（标准答案 util/release-notes.json）
 enum ReleaseNotes {
-    /// 視窗裡最多列幾項
+    /// 窗口里最多列几项
     static let maxItems = 4
 
-    /// 回傳要列出的條目和沒列的項數；條目不含「- 」。沒有條目的說明（只有一兩行字）就拿標題以外的行
+    /// 回传要列出的条目和没列的项数；条目不含「- 」。没有条目的说明（只有一两行字）就拿标题以外的行
     static func brief(_ notes: String, english: Bool) -> (items: [String], more: Int) {
         let lines = notes.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
         var paragraphs: [[String]] = []
@@ -30,12 +30,13 @@ enum ReleaseNotes {
         return (shown, items.count - shown.count)
     }
 
-    /// 對話框裡的文字：每項前面加「• 」，沒列完的加一行說還有幾項
+    /// 对话框里的文字：每项前面加「• 」，没列完的加一行说还有几项
     static func text(_ notes: String?, english: Bool) -> String {
         guard let notes else { return "" }
         let (items, more) = brief(notes, english: english)
         var out = items.map { "• " + $0 }
-        if more > 0 { out.append(String(localized: "……還有 \(more) 項，完整說明在官網。")) }
-        return out.joined(separator: "\n")
+        if more > 0 { out.append(String(localized: "……还有 \(more) 项，完整说明在官网。")) }
+        let text = out.joined(separator: "\n")
+        return english ? text : ChineseScript.toSimplified(text)
     }
 }

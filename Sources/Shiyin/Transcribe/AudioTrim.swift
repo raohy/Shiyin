@@ -1,8 +1,8 @@
 import AVFoundation
 
-/// 錄音的前段複製成暫存檔（design §35.3）：沒人說話太久而自動停止的錄音，只轉錄到最後說話的地方
+/// 录音的前段复制成暂存档（design §35.3）：没人说话太久而自动停止的录音，只转录到最后说话的地方
 enum AudioTrim {
-    /// 前 seconds 秒寫成 32-bit float 的 WAV（聲道、取樣率不變），放在新的暫存資料夾；錄音本來就沒有比這長時回傳 nil
+    /// 前 seconds 秒写成 32-bit float 的 WAV（声道、采样率不变），放在新的暂存文件夹；录音本来就没有比这长时回传 nil
     static func prefix(of url: URL, seconds: Double) throws -> URL? {
         let input = try AVAudioFile(forReading: url)
         let format = input.processingFormat

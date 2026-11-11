@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 選單列圖示：閒置、錄音中、工作中三種狀態（R13.1）
+/// 菜单列图标：闲置、录音中、工作中三种状态（R13.1）
 struct MenuBarLabel: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
@@ -8,7 +8,7 @@ struct MenuBarLabel: View {
     var body: some View {
         Image(systemName: model.menuBarSymbol)
             .onAppear {
-                // 選單列圖示一直存在，用它提供「重新打開主視窗」的方法
+                // 菜单列图标一直存在，用它提供「重新打开主窗口」的方法
                 let open = openWindow
                 if model.openMainWindow == nil {
                     model.openMainWindow = {
@@ -20,7 +20,7 @@ struct MenuBarLabel: View {
     }
 }
 
-/// 選單內容（R13.2）
+/// 菜单内容（R13.2）
 struct MenuBarContent: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
@@ -32,12 +32,12 @@ struct MenuBarContent: View {
             jobs
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Button("打開拾音") { model.openMainWindow?() }
-                Button("使用說明") {
+                Button("打开拾音") { model.openMainWindow?() }
+                Button("使用说明") {
                     openWindow(id: "guide")
                     NSApp.activate()
                 }
-                Button("結束拾音") { NSApp.terminate(nil) }
+                Button("结束拾音") { NSApp.terminate(nil) }
             }
             .buttonStyle(.plain)
         }
@@ -53,36 +53,36 @@ struct MenuBarContent: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Circle().fill(recorder.isPaused ? Color.secondary : .red).frame(width: 8, height: 8)
-                    Text(recorder.isPaused ? "已暫停" : "錄音中")
+                    Text(recorder.isPaused ? "已暂停" : "录音中")
                     RecorderClock(recorder: recorder).foregroundStyle(.secondary)
                     Spacer()
-                    Button(recorder.isPaused ? "繼續" : "暫停") { recorder.isPaused ? recorder.resume() : recorder.pause() }
+                    Button(recorder.isPaused ? "继续" : "暂停") { recorder.isPaused ? recorder.resume() : recorder.pause() }
                     Button("停止") { recorder.stop() }
                 }
                 if recorder.hasMic {
                     RecorderMeter(recorder: recorder, system: false, segments: 24)
-                    // 正在用哪一支麥克風（design §38.3）
+                    // 正在用哪一支麦克风（design §38.3）
                     if let device = recorder.micDevice {
-                        Text("麥克風：\(device.name)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text("麦克风：\(device.name)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
                 if recorder.hasSystem { RecorderMeter(recorder: recorder, system: true, segments: 24) }
                 if recorder.idlePrompt {
-                    // 忘了停止錄音（R48.1）：同錄音畫面
+                    // 忘了停止录音（R48.1）：同录音画面
                     VStack(alignment: .leading, spacing: 6) {
-                        Label("好像沒人在說話了，要停止錄音嗎？", systemImage: "moon.zzz")
+                        Label("好像没人在说话了，要停止录音吗？", systemImage: "moon.zzz")
                             .font(.caption)
                             .foregroundStyle(Color.signal)
                             .fixedSize(horizontal: false, vertical: true)
                         HStack {
-                            Button("繼續錄") { recorder.continueAfterIdle() }
-                            Button("停止錄音") { recorder.stop() }
+                            Button("继续录") { recorder.continueAfterIdle() }
+                            Button("停止录音") { recorder.stop() }
                         }
                         .font(.caption)
                     }
                 }
                 if let hint = recorder.micHint {
-                    // 用藍牙耳機的麥克風錄現場會議（design §38.4）：同錄音畫面
+                    // 用蓝牙耳机的麦克风录现场会议（design §38.4）：同录音画面
                     VStack(alignment: .leading, spacing: 6) {
                         Label(hint.text, systemImage: "headphones")
                             .font(.caption)
@@ -98,7 +98,7 @@ struct MenuBarContent: View {
                     }
                 }
                 if let hint = recorder.levelHint {
-                    // 收音提醒（R42.2）：跟錄音畫面同一句，「知道了」這場不再提示
+                    // 收音提醒（R42.2）：跟录音画面同一句，「知道了」这场不再提示
                     VStack(alignment: .leading, spacing: 6) {
                         Label(hint.text, systemImage: hint == .noisy ? "waveform.badge.exclamationmark" : "mic.badge.xmark")
                             .font(.caption)
@@ -115,7 +115,7 @@ struct MenuBarContent: View {
             }
         } else {
             Button { model.startRecording() } label: {
-                Label("開始錄音", systemImage: "record.circle")
+                Label("开始录音", systemImage: "record.circle")
             }
         }
     }
@@ -125,7 +125,7 @@ struct MenuBarContent: View {
         VStack(alignment: .leading, spacing: 8) {
             if let t = model.runner.running[.transcribe] {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(String(localized: "\(t.job.kind == .compress ? String(localized: "壓縮錄音") : t.stage.isEmpty ? String(localized: "轉錄") : t.stage)中：\(title(t.job.meetingId))")).lineLimit(1)
+                    Text(String(localized: "\(t.job.kind == .compress ? String(localized: "压缩录音") : t.stage.isEmpty ? String(localized: "转录") : t.stage)中：\(title(t.job.meetingId))")).lineLimit(1)
                     if let p = t.progress {
                         ProgressView(value: p).tint(.signal)
                     } else {
@@ -133,7 +133,7 @@ struct MenuBarContent: View {
                     }
                 }
             }
-            // 整理線、輔助線（逐字稿校正）同時跑（design §21.2）
+            // 整理线、辅助线（逐字稿校正）同时跑（design §21.2）
             ForEach([JobLane.llm, .assist], id: \.self) { lane in
                 if let l = model.runner.running[lane] {
                     HStack(spacing: 8) {
@@ -143,26 +143,26 @@ struct MenuBarContent: View {
                 }
             }
             if model.queuedCount > 0 {
-                Text("排隊中 \(model.queuedCount) 項").foregroundStyle(.secondary)
+                Text("排队中 \(model.queuedCount) 项").foregroundStyle(.secondary)
             }
             if !model.runner.isBusy && model.queuedCount == 0 {
-                Text("目前沒有進行中的工作").foregroundStyle(.secondary)
+                Text("目前没有进行中的工作").foregroundStyle(.secondary)
             }
         }
         .font(.callout)
     }
 
-    /// 整理那條線正在做什麼：整理、依回答修正、檢查可能聽錯的字
+    /// 整理那条线正在做什么：整理、依回答修正、检查可能听错的字
     private func llmStatus(_ kind: JobKind, _ title: String) -> String {
         switch kind {
         case .revise: return String(localized: "依回答修正中：\(title)")
-        case .correct: return String(localized: "檢查可能聽錯的字：\(title)")
-        case .nameSpeakers: return String(localized: "猜說話者：\(title)")
+        case .correct: return String(localized: "检查可能听错的字：\(title)")
+        case .nameSpeakers: return String(localized: "猜说话者：\(title)")
         default: return String(localized: "整理中：\(title)")
         }
     }
 
     private func title(_ meetingId: Int64) -> String {
-        model.meetings.first { $0.id == meetingId }?.meeting.displayTitle ?? String(localized: "會議")
+        model.meetings.first { $0.id == meetingId }?.meeting.displayTitle ?? String(localized: "会议")
     }
 }

@@ -1,6 +1,6 @@
 <img src="../docs/images/icon.png" width="96" alt="Shiyin icon">
 
-[繁體中文](../README.md) | **English** | Website: [shiyin.weibuilds.com](https://shiyin.weibuilds.com/en/)
+[简体中文](../README.md) | **English** | Website: [shiyin.weibuilds.com](https://shiyin.weibuilds.com/en/)
 
 # Shiyin 拾音
 
@@ -8,7 +8,7 @@ A meeting-notes app for macOS. Record a meeting (in person or online) and watch 
 
 - Recording, transcription and speaker identification all run locally; recordings are never uploaded
 - No Python, Homebrew or ffmpeg to install: download the DMG and go
-- Interface in English and Traditional Chinese (follows your macOS language); meetings can be in English, Chinese or Japanese
+- Mac interface in English and Simplified Chinese (follows your macOS language); meetings can be in English, Chinese or Japanese
 - Requires Apple Silicon and macOS 26
 
 ![Meeting notes](../docs/images/en/summary.png)
@@ -35,7 +35,7 @@ A meeting-notes app for macOS. Record a meeting (in person or online) and watch 
   - Shiyin warns you when disk space is low; if the disk fills up, recording stops and everything recorded so far is kept and transcribed
   - If the app crashes or the Mac shuts down, the recording is recovered on next launch
 - **Import**: audio and video (m4a, mp3, wav, aac, flac, caf, aiff, mp4, mov), transcripts (srt, vtt, txt), Markdown notes and whole-meeting packages (.shiyin). Drag into the window, press ⌘O, drop on the Dock icon, or use Open With in Finder
-- **Local transcription**: whisper.cpp + Breeze ASR 25 (MediaTek), with your glossary as the prompt. In Settings you can switch to llama.cpp + Qwen3-ASR 1.7B (an open model by Alibaba that misses fewer words in meetings with many people; its output is converted to Traditional Chinese as used in Taiwan, and it all runs locally). Japanese meetings use Whisper large-v3-turbo (downloaded the first time you transcribe a Japanese meeting). Or use the transcriber built into macOS (no model download and much faster, but it ignores the glossary). Until the model has downloaded, meetings are transcribed with macOS built-in recognition, and you can transcribe them again with one click afterwards. Long recordings are transcribed in parts, so even a 4-hour meeting doesn’t take much memory
+- **Local transcription**: whisper.cpp + Breeze ASR 25 (MediaTek), with your glossary as the prompt. In Settings you can switch to llama.cpp + Qwen3-ASR 1.7B (an open model by Alibaba that misses fewer words in meetings with many people; its Chinese output on Mac is normalized to Simplified Chinese, and it all runs locally). Japanese meetings use Whisper large-v3-turbo (downloaded the first time you transcribe a Japanese meeting). Or use the transcriber built into macOS (no model download and much faster, but it ignores the glossary). Until the model has downloaded, meetings are transcribed with macOS built-in recognition, and you can transcribe them again with one click afterwards. Long recordings are transcribed in parts, so even a 4-hour meeting doesn’t take much memory
 - **Meeting language**: each meeting is English, Chinese or Japanese, and the transcription, the notes and the export headings follow it. Japanese meetings are shown with Japanese glyphs, and PDF and Word exports use Japanese fonts. Set the default in Settings
 - **Language detection**: about 10 seconds into a recording, Shiyin works out whether people are speaking Chinese, English or Japanese. If it’s confident and that differs from the meeting language, it switches the live transcript and the meeting language, and you can switch back from the recording screen
 - **Transcript correction**: after transcription, the summarizer uses your glossary and the context to find words that were probably misheard (homophones, names) and marks them in the transcript. Nothing changes until you click Accept, and you can revert
@@ -311,7 +311,7 @@ Interface strings are written in Traditional Chinese in the code and looked up i
 | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | Transcription (Breeze, Japanese), language detection | MIT |
 | [Breeze ASR 25](https://huggingface.co/MediaTek-Research/Breeze-ASR-25) ([GGML conversion](https://huggingface.co/shdennlin/breeze-asr-25-ggml)) | Transcription model (Traditional Chinese, Chinese–English code-switching) | Apache-2.0 |
 | [Whisper](https://github.com/openai/whisper) large-v3-turbo, base ([GGML conversion](https://huggingface.co/ggerganov/whisper.cpp)) | Japanese transcription, language detection | MIT |
-| [Qwen3-ASR 1.7B](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) ([GGUF conversion](https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF)) | Optional transcription model (Chinese, English; output converted to Traditional Chinese with [OpenCC](https://github.com/BYVoid/OpenCC)’s tables) | Apache-2.0 |
+| [Qwen3-ASR 1.7B](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) ([GGUF conversion](https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF)) | Optional transcription model (Chinese, English; Mac output converted to Simplified Chinese with [OpenCC](https://github.com/BYVoid/OpenCC)’s tables) | Apache-2.0 |
 | [llama.cpp](https://github.com/ggml-org/llama.cpp) | Runs Qwen3-ASR | MIT |
 | [FluidAudio](https://github.com/FluidInference/FluidAudio) | Speaker identification | Apache-2.0 |
 | [GRDB.swift](https://github.com/groue/GRDB.swift) | SQLite database, full-text search | MIT |

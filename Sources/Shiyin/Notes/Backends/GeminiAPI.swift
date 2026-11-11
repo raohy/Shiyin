@@ -1,6 +1,6 @@
 import Foundation
 
-/// Gemini API（design §19.2、D23）：Interactions API；store: false，不讓 Google 保存會議內容
+/// Gemini API（design §19.2、D23）：Interactions API；store: false，不让 Google 保存会议内容
 struct GeminiAPI: LLMBackend {
     let model: String
 
@@ -26,17 +26,17 @@ struct GeminiAPI: LLMBackend {
         let status = object["status"] as? String ?? String(localized: "未知")
         switch status {
         case "completed": break
-        case "incomplete": throw LLMError.failed(String(localized: "回應不完整（可能超過長度上限）"))
-        default: throw LLMError.failed(String(localized: "Gemini 沒有完成整理（status：\(status)）"))
+        case "incomplete": throw LLMError.failed(String(localized: "回应不完整（可能超过长度上限）"))
+        default: throw LLMError.failed(String(localized: "Gemini 没有完成整理（status：\(status)）"))
         }
-        // steps 裡還有思考過程（thought），只取模型的輸出
+        // steps 里还有思考过程（thought），只取模型的输出
         let text = (object["steps"] as? [[String: Any]] ?? [])
             .filter { $0["type"] as? String == "model_output" }
             .flatMap { ($0["content"] as? [[String: Any]]) ?? [] }
             .filter { $0["type"] as? String == "text" }
             .compactMap { $0["text"] as? String }
             .joined()
-        guard !text.isEmpty else { throw LLMError.badOutput(String(localized: "回應裡沒有文字（status：\(status)）")) }
+        guard !text.isEmpty else { throw LLMError.badOutput(String(localized: "回应里没有文字（status：\(status)）")) }
         return Data(text.utf8)
     }
 
@@ -47,7 +47,7 @@ struct GeminiAPI: LLMBackend {
         guard let (data, _) = try? await URLSession.shared.data(for: request),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let list = object["models"] as? [[String: Any]] else { return [] }
-        // 只留能整理文字的 Gemini 模型（design §19.2）：圖片、語音、機器人等模型也支援 generateContent，要再依名稱排除
+        // 只留能整理文字的 Gemini 模型（design §19.2）：图片、语音、机器人等模型也支持 generateContent，要再依名称排除
         let excluded = ["embedding", "tts", "image", "live", "audio", "banana", "robotics", "computer-use", "transcribe",
                         "customtools", "omni"]
         return list.filter { ($0["supportedGenerationMethods"] as? [String] ?? []).contains("generateContent") }

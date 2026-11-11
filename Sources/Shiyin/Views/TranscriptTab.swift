@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 逐字稿分頁（R4）：時間點跳播、播放時高亮跟隨、搜尋、單段編輯、全文取代
+/// 逐字稿标签页（R4）：时间点跳播、播放时高亮跟随、搜索、单段编辑、全文取代
 struct TranscriptTab: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -15,10 +15,10 @@ struct TranscriptTab: View {
     @State private var draftTask: Task<Void, Never>?
     @State private var showReplace = false
     @State private var showCorrectionGroups = false
-    /// 播放中的段落。由 PlaybackFollower 在換段時才更新，播放時間每次變動不會讓整份列表重算（design §21.12）
+    /// 播放中的段落。由 PlaybackFollower 在换段时才更新，播放时间每次变动不会让整份列表重算（design §21.12）
     @State private var currentSegmentId: Int64?
     @State private var speakerFilter: Int?
-    /// 正在改名的說話者和點的那一段：改名視窗掛在點的那一段（逐字稿是延遲建立的，第一段可能還不存在）
+    /// 正在改名的说话者和点的那一段：改名窗口挂在点的那一段（逐字稿是延迟创建的，第一段可能还不存在）
     @State private var renaming: (speaker: Int, segment: Int64)?
     @State private var renameText = ""
     @FocusState private var searchFocused: Bool
@@ -52,7 +52,7 @@ struct TranscriptTab: View {
             PlaybackFollower(detail: detail, current: $currentSegmentId)
             searchBar
             Divider()
-            // 我的筆記收在逐字稿頂部（R44.3，design §33.1）
+            // 我的笔记收在逐字稿顶部（R44.3，design §33.1）
             UserNotesDisclosure(detail: detail)
             Divider()
             if model.canUpgradeTranscript(detail.meeting) && model.detailStatus?.isActive != true {
@@ -68,7 +68,7 @@ struct TranscriptTab: View {
                 Divider()
             }
             if detail.segments.isEmpty {
-                Text(model.detailStatus?.isActive == true ? "轉錄完成後，逐字稿會出現在這裡。" : "沒有逐字稿。")
+                Text(model.detailStatus?.isActive == true ? "转录完成后，逐字稿会出现在这里。" : "没有逐字稿。")
                     .foregroundStyle(.secondary)
                     .padding(32)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -109,7 +109,7 @@ struct TranscriptTab: View {
                         matchCursor = 0
                         if let first = matches.first { proxy.scrollTo(first, anchor: .center) }
                     }
-                    // 單段編輯的草稿（design §21.15、R20.6）：換分頁、換會議、結束拾音都還在
+                    // 单段编辑的草稿（design §21.15、R20.6）：换标签页、换会议、结束拾音都还在
                     .onAppear(perform: restoreEditDraft)
                     .onChange(of: editText) { _, _ in scheduleEditDraft() }
                     .onDisappear {
@@ -128,7 +128,7 @@ struct TranscriptTab: View {
                     #endif
                     .onChange(of: model.highlightSegment, initial: true) { _, id in
                         guard let id else { return }
-                        // 要跳到的段落被說話者篩選藏起來時，先取消篩選
+                        // 要跳到的段落被说话者筛选藏起来时，先取消筛选
                         if !visibleSegments.contains(where: { $0.id == id }) { speakerFilter = nil }
                         Task { @MainActor in
                             try? await Task.sleep(for: .milliseconds(150))
@@ -141,7 +141,7 @@ struct TranscriptTab: View {
         .sheet(isPresented: $showReplace) {
             ReplaceSheet(initialFind: query)
         }
-        // 合併、改說話者後篩選的那位不見了：回到所有說話者
+        // 合并、改说话者后筛选的那位不见了：回到所有说话者
         .onChange(of: detail.speakers.keys.sorted()) { _, keys in
             if let speakerFilter, !keys.contains(speakerFilter) { self.speakerFilter = nil }
         }
@@ -151,7 +151,7 @@ struct TranscriptTab: View {
         HStack(spacing: 10) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("搜尋逐字稿", text: $query)
+                TextField("搜索逐字稿", text: $query)
                     .textFieldStyle(.plain)
                     .focused($searchFocused)
                     .onSubmit { if !matches.isEmpty { matchCursor = (matchCursor + 1) % matches.count } }
@@ -169,58 +169,58 @@ struct TranscriptTab: View {
             .padding(.vertical, 5)
             .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
             .frame(maxWidth: 360)
-            // ⌘F 聚焦搜尋框（design §9.4）
-            Button("搜尋") { searchFocused = true }
+            // ⌘F 聚焦搜索框（design §9.4）
+            Button("搜索") { searchFocused = true }
                 .keyboardShortcut("f")
                 .hidden()
                 .frame(width: 0)
             if !detail.speakers.isEmpty {
-                Picker("說話者", selection: $speakerFilter) {
-                    Text("所有說話者").tag(Int?.none)
+                Picker("说话者", selection: $speakerFilter) {
+                    Text("所有说话者").tag(Int?.none)
                     ForEach(detail.speakers.keys.sorted(), id: \.self) { idx in
                         Text(detail.speakers[idx] ?? detail.meeting.meetingLanguage.defaultSpeaker(idx)).tag(Int?.some(idx))
                     }
                 }
                 .labelsHidden()
                 .frame(width: 150)
-                .help("只看某一位說話者的內容")
+                .help("只看某一位说话者的内容")
             }
             Spacer()
             if detail.segments.contains(where: \.lowConfidence) {
-                Label("琥珀色是辨識信心低的段落", systemImage: "circle.fill")
+                Label("琥珀色是识别信心低的段落", systemImage: "circle.fill")
                     .labelStyle(SmallDotLabelStyle())
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Button("用詞修正…") { showReplace = true }
-                // 轉錄或整理中不能改：工作完成時會整份寫回逐字稿或會議紀錄
+            Button("用词修正…") { showReplace = true }
+                // 转录或整理中不能改：工作完成时会整份写回逐字稿或会议记录
                 .disabled(detail.segments.isEmpty || model.detailStatus?.isActive == true)
-                .help("把逐字稿和會議紀錄裡的同一個詞一起改掉")
+                .help("把逐字稿和会议记录里的同一个词一起改掉")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
     }
 
-    /// 重新轉錄會用的模型（design §41.3）
+    /// 重新转录会用的模型（design §41.3）
     private var upgradeText: String {
         switch ModelStore.transcription(for: detail.meeting.meetingLanguage) {
         case .japanese:
-            return String(localized: "這場會議是在模型下載好之前，用 macOS 內建辨識轉錄的。可以用\(MeetingLanguage.uiNames(model: "turbo"))轉錄模型重新轉錄，通常比較準。")
-        case .qwen: return String(localized: "這場會議是在模型下載好之前，用 macOS 內建辨識轉錄的。可以用 Qwen3-ASR 重新轉錄，通常比較準。")
-        default: return String(localized: "這場會議是在模型下載好之前，用 macOS 內建辨識轉錄的。可以用 Breeze 重新轉錄，通常比較準。")
+            return String(localized: "这场会议是在模型下载好之前，用 macOS 内置识别转录的。可以用\(MeetingLanguage.uiNames(model: "turbo"))转录模型重新转录，通常比较准。")
+        case .qwen: return String(localized: "这场会议是在模型下载好之前，用 macOS 内置识别转录的。可以用 Qwen3-ASR 重新转录，通常比较准。")
+        default: return String(localized: "这场会议是在模型下载好之前，用 macOS 内置识别转录的。可以用 Breeze 重新转录，通常比较准。")
         }
     }
 
-    /// 模型下載好之前用 macOS 內建辨識轉錄的會議（design §21.17）
+    /// 模型下载好之前用 macOS 内置识别转录的会议（design §21.17）
     private var upgradeBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "waveform.badge.magnifyingglass").foregroundStyle(Color.signal)
             Text(upgradeText)
-            // 不能加 fixedSize：在 HStack 裡量最小高度時會用很窄的寬度，算出很高的高度，整個視窗的內容被往上推
+            // 不能加 fixedSize：在 HStack 里量最小高度时会用很窄的宽度，算出很高的高度，整个窗口的内容被往上推
             Spacer()
-            Button("重新轉錄") { model.retranscribe() }
+            Button("重新转录") { model.retranscribe() }
                 .buttonStyle(.borderedProminent)
-                .help("逐字稿裡改過的文字會換成新的逐字稿，說話者的名字會留著")
+                .help("逐字稿里改过的文字会换成新的逐字稿，说话者的名字会留着")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 8)
@@ -229,18 +229,18 @@ struct TranscriptTab: View {
         .background(Color.signal.opacity(0.08))
     }
 
-    /// 說話者可能分得不夠（design §24.5）：說話者辨識的自我檢查覺得可能把不同的人併在一起
+    /// 说话者可能分得不够（design §24.5）：说话者识别的自我检查觉得可能把不同的人并在一起
     private var speakerHintBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "person.2.badge.gearshape").foregroundStyle(Color.signal)
-            Text("說話者可能分得不夠：有些不同的人可能被當成同一位。人多、吵雜或手機放在桌上錄音時常發生，告訴拾音大約幾個人會分得比較準。")
+            Text("说话者可能分得不够：有些不同的人可能被当成同一位。人多、吵杂或手机放在桌上录音时常发生，告诉拾音大约几个人会分得比较准。")
             // 不能加 fixedSize：理由同 upgradeBar
             Spacer()
             Button("不用了") { model.dismissSpeakerHint() }
-                .help("這場會議不再提示")
-            Button("重新辨識說話者…") { model.requestRediarize() }
+                .help("这场会议不再提示")
+            Button("重新识别说话者…") { model.requestRediarize() }
                 .buttonStyle(.borderedProminent)
-                .help("只重新分辨誰在說話，逐字稿的文字不會變")
+                .help("只重新分辨谁在说话，逐字稿的文字不会变")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 8)
@@ -249,27 +249,27 @@ struct TranscriptTab: View {
         .background(Color.signal.opacity(0.08))
     }
 
-    /// 有待確認的校正建議時，顯示在搜尋列下方；可以展開依詞處理（同一個詞的每一處一起接受或忽略）
+    /// 有待确认的校正建议时，显示在搜索列下方；可以展开依词处理（同一个词的每一处一起接受或忽略）
     private var correctionBar: some View {
         let groups = detail.correctionGroups
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: "text.magnifyingglass").foregroundStyle(Color.signal)
-                Text("\(pendingCorrections) 處可能聽錯的字，已標在逐字稿裡")
-                Button(showCorrectionGroups ? "收起" : "依詞處理（\(groups.count) 組）") { showCorrectionGroups.toggle() }
+                Text("\(pendingCorrections) 处可能听错的字，已标在逐字稿里")
+                Button(showCorrectionGroups ? "收起" : "依词处理（\(groups.count) 组）") { showCorrectionGroups.toggle() }
                     .buttonStyle(.link)
-                    .help("同一個詞的每一處一起接受或忽略")
+                    .help("同一个词的每一处一起接受或忽略")
                 Spacer()
                 Button("全部忽略") { model.rejectAllCorrections() }
                 Button("全部接受") { model.acceptAllCorrections() }
                     .buttonStyle(.borderedProminent)
-                    .help("把所有建議套用到逐字稿，之後還能逐條還原")
+                    .help("把所有建议套用到逐字稿，之后还能逐条还原")
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 8)
             if showCorrectionGroups {
                 Divider()
-                // 組數少時照內容的高度，超過 220 才捲動（ScrollView 的理想高度是內容的高度，最多 220）
+                // 组数少时照内容的高度，超过 220 才滚动（ScrollView 的理想高度是内容的高度，最多 220）
                 ScrollView {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(groups, id: \.first!.id) { group in correctionGroupRow(group) }
@@ -287,7 +287,7 @@ struct TranscriptTab: View {
         .background(Color.signal.opacity(0.08))
     }
 
-    /// 一組「原文 → 建議」：點文字跳到第一處
+    /// 一组「原文 → 建议」：点文字跳到第一处
     private func correctionGroupRow(_ group: [Correction]) -> some View {
         let first = group[0]
         let ids = group.compactMap(\.id)
@@ -298,26 +298,26 @@ struct TranscriptTab: View {
                 Text("「\(first.original)」→「\(first.suggestion)」").fontWeight(.medium).meetingText()
             }
             .buttonStyle(.plain)
-            .help("跳到第一處")
-            Text("\(group.count) 處").foregroundStyle(.secondary).monospacedDigit()
+            .help("跳到第一处")
+            Text("\(group.count) 处").foregroundStyle(.secondary).monospacedDigit()
             Text(first.reason).foregroundStyle(.secondary).lineLimit(1)
             Spacer(minLength: 8)
             Button("忽略") { model.rejectCorrections(ids) }
                 .buttonStyle(.link)
-            Button(group.count > 1 ? "接受 \(group.count) 處" : "接受") { model.acceptCorrections(ids) }
+            Button(group.count > 1 ? "接受 \(group.count) 处" : "接受") { model.acceptCorrections(ids) }
                 .buttonStyle(.link)
         }
         .font(.caption)
     }
 
-    /// 一則校正建議：待確認的有接受、忽略；已接受的可以還原
+    /// 一则校正建议：待确认的有接受、忽略；已接受的可以还原
     @ViewBuilder
     private func correctionLine(_ c: Correction) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             if c.status == "accepted" {
                 Text("已改成「\(c.suggestion)」（原本是「\(c.original)」）")
                     .foregroundStyle(.secondary)
-                Button("還原") { if let id = c.id { model.revertCorrection(id) } }
+                Button("还原") { if let id = c.id { model.revertCorrection(id) } }
                     .buttonStyle(.link)
             } else {
                 Text("「\(c.original)」→「\(c.suggestion)」").fontWeight(.medium).meetingText()
@@ -349,7 +349,7 @@ struct TranscriptTab: View {
                 .foregroundStyle(Color.speaker(idx))
                 .frame(width: 72 * scale, alignment: .leading)
                 .lineLimit(1)
-                .help("點一下幫這位說話者改名")
+                .help("点一下帮这位说话者改名")
                 .popover(isPresented: Binding(get: { renaming?.segment == segment.id && segment.id != nil },
                                               set: { if !$0 { renaming = nil } })) {
                     RenameSpeakerForm(name: $renameText, automatic: detail.speakerSources[idx] == "voiceprint",
@@ -368,19 +368,19 @@ struct TranscriptTab: View {
             }
             if editingId == segment.id {
                 VStack(alignment: .trailing, spacing: 6) {
-                    TextField("段落內容", text: $editText, axis: .vertical).meetingText()
+                    TextField("段落内容", text: $editText, axis: .vertical).meetingText()
                         .textFieldStyle(.roundedBorder)
                         .onSubmit { saveEdit(segment) }
                     HStack {
                         Button("取消") { cancelEdit() }
                             .keyboardShortcut(.cancelAction)
-                        Button("儲存") { saveEdit(segment) }
+                        Button("保存") { saveEdit(segment) }
                             .buttonStyle(.borderedProminent)
                     }
                     .controlSize(.small)
                 }
             } else {
-                // 每一段的校正建議（design §17.4）：待確認的標在文字上並列出，已接受的可以還原，已拒絕的不顯示
+                // 每一段的校正建议（design §17.4）：待确认的标在文字上并列出，已接受的可以还原，已拒绝的不显示
                 let corrections = segment.id.flatMap { detail.correctionsBySegment[$0] } ?? []
                 VStack(alignment: .leading, spacing: 4) {
                     Text(highlighted(segment.text, corrections: corrections)).meetingText()
@@ -402,30 +402,30 @@ struct TranscriptTab: View {
             }
         }
         .contextMenu {
-            Button("從這裡播放") { model.player.seek(to: segment.start) }
-            Button("編輯這一段") { startEdit(segment) }
-            Button("拷貝") {
+            Button("从这里播放") { model.player.seek(to: segment.start) }
+            Button("编辑这一段") { startEdit(segment) }
+            Button("拷贝") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(segment.text, forType: .string)
             }
-            // 改這句的說話者（design §24.3、R23.2）
+            // 改这句的说话者（design §24.3、R23.2）
             if let id = segment.id, segment.kind == "final", !detail.speakers.isEmpty {
                 Divider()
-                Menu("這句是誰說的") { speakerChoices(for: [id], current: segment.speaker) }
+                Menu("这句是谁说的") { speakerChoices(for: [id], current: segment.speaker) }
                 let run = detail.speakerRun(around: id)
                 if run.count > 1 {
-                    Menu("這段連續的話是誰說的（\(run.count) 句）") { speakerChoices(for: run, current: segment.speaker) }
+                    Menu("这段连续的话是谁说的（\(run.count) 句）") { speakerChoices(for: run, current: segment.speaker) }
                 }
-                // 復原最近一次說話者的調整（R44.4，原本在「更多」）：有東西可復原才出現
+                // 复原最近一次说话者的调整（R44.4，原本在「更多」）：有东西可复原才出现
                 if let label = detail.speakerUndoLabel {
-                    Button("復原：\(label)") { model.undoSpeakerEdit() }
+                    Button("复原：\(label)") { model.undoSpeakerEdit() }
                 }
             }
         }
-        .help(segment.lowConfidence ? "辨識信心低，建議對照錄音確認" : "")
+        .help(segment.lowConfidence ? "识别信心低，建议对照录音确认" : "")
     }
 
-    /// 除了 idx 以外的說話者（合併、改說話者的選單）
+    /// 除了 idx 以外的说话者（合并、改说话者的菜单）
     private func otherSpeakers(than idx: Int?) -> [(idx: Int, name: String)] {
         detail.speakers.keys.sorted().filter { $0 != idx }.map { ($0, detail.speakerName($0) ?? "") }
     }
@@ -436,12 +436,12 @@ struct TranscriptTab: View {
             Button(speaker.name) { model.reassignSegments(ids, to: speaker.idx) }
         }
         Divider()
-        Button("新的說話者") { model.reassignSegments(ids, to: nil) }
+        Button("新的说话者") { model.reassignSegments(ids, to: nil) }
     }
 
     private func highlighted(_ text: String, corrections: [Correction] = []) -> AttributedString {
         var attributed = AttributedString(text)
-        // 待確認的校正建議：原文加底線和底色
+        // 待确认的校正建议：原文加底线和底色
         for c in corrections where c.status == "pending" {
             if let range = attributed.range(of: c.original) {
                 attributed[range].underlineStyle = .single
@@ -460,10 +460,10 @@ struct TranscriptTab: View {
 
     private func startEdit(_ segment: Segment) {
         if model.detailStatus?.isActive == true {
-            model.noticeMessage = String(localized: "正在處理這場會議，完成後才能編輯逐字稿")
+            model.noticeMessage = String(localized: "正在处理这场会议，完成后才能编辑逐字稿")
             return
         }
-        // 正在改別段的話，那一段的草稿不留（跟按取消一樣）
+        // 正在改别段的话，那一段的草稿不留（跟按取消一样）
         if editingId != nil && editingId != segment.id { cancelEdit() }
         editText = segment.text
         editingId = segment.id
@@ -497,14 +497,14 @@ struct TranscriptTab: View {
         }
     }
 
-    /// 跟原本一樣（剛開始編輯、改回原樣）就不留草稿
+    /// 跟原本一样（刚开始编辑、改回原样）就不留草稿
     private func saveEditDraft() {
         guard let editingId else { return }
         let original = detail.segments.first { $0.id == editingId }?.text
         model.saveDraft(detail.meeting.id!, key: "segment:\(editingId)", text: editText == original ? "" : editText)
     }
 
-    /// 上次沒存的編輯：回到編輯狀態，內容是草稿
+    /// 上次没存的编辑：回到编辑状态，内容是草稿
     private func restoreEditDraft() {
         guard editingId == nil, let draft = model.latestDraft(detail.meeting.id!, prefix: "segment:"),
               let id = Int64(draft.key.dropFirst("segment:".count)),
@@ -517,52 +517,52 @@ struct TranscriptTab: View {
 
 struct RenameSpeakerForm: View {
     @Binding var name: String
-    /// 名字是聲紋自動帶入的：多一個「不是他」（design §21.4）
+    /// 名字是声纹自动带入的：多一个「不是他」（design §21.4）
     var automatic = false
     var onReject: (() -> Void)? = nil
-    /// 「合併到…」（design §24.2）：其他說話者
+    /// 「合并到…」（design §24.2）：其他说话者
     var mergeTargets: [(idx: Int, name: String)] = []
     var onMerge: ((Int) -> Void)? = nil
-    /// 可以復原的說話者調整（R44.4）：有才顯示「復原」
+    /// 可以复原的说话者调整（R44.4）：有才显示「复原」
     var undoLabel: String? = nil
     var onUndo: (() -> Void)? = nil
     let onSave: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("說話者名字").font(.headline)
+            Text("说话者名字").font(.headline)
             TextField("例如：小明", text: $name)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(onSave)
             if automatic {
-                Text("這個名字是拾音認出聲音後自動帶入的。不對的話直接改名，或按「不是他」。")
+                Text("这个名字是拾音认出声音后自动带入的。不对的话直接改名，或按「不是他」。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text("整場逐字稿和之後的會議紀錄都會用這個名字；拾音也會記住這個人的聲音，之後的會議自動帶入。")
+            Text("整场逐字稿和之后的会议记录都会用这个名字；拾音也会记住这个人的声音，之后的会议自动带入。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
                 if automatic, let onReject { Button("不是他", action: onReject) }
                 if !mergeTargets.isEmpty, let onMerge {
-                    Menu("合併到…") {
+                    Menu("合并到…") {
                         ForEach(mergeTargets, id: \.idx) { target in
                             Button(target.name) { onMerge(target.idx) }
                         }
                     }
                     .fixedSize()
-                    .help("同一個人被分成兩位時，把這位說的話全部算到另一位")
+                    .help("同一个人被分成两位时，把这位说的话全部算到另一位")
                 }
                 Spacer()
-                Button("儲存", action: onSave).keyboardShortcut(.defaultAction)
+                Button("保存", action: onSave).keyboardShortcut(.defaultAction)
             }
             if let undoLabel, let onUndo {
-                Button("復原：\(undoLabel)", systemImage: "arrow.uturn.backward", action: onUndo)
+                Button("复原：\(undoLabel)", systemImage: "arrow.uturn.backward", action: onUndo)
                     .buttonStyle(.borderless)
                     .font(.caption)
-                    .help("復原最近一次合併或改句子的說話者")
+                    .help("复原最近一次合并或改句子的说话者")
             }
         }
         .padding(14)
@@ -591,15 +591,15 @@ struct ReplaceSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("用詞修正").font(.title3.weight(.semibold))
-            Text("把逐字稿裡的錯字換成正確寫法，會議紀錄裡同樣的字也會一起改。區分大小寫。")
+            Text("用词修正").font(.title3.weight(.semibold))
+            Text("把逐字稿里的错字换成正确写法，会议记录里同样的字也会一起改。区分大小写。")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Form {
-                TextField("錯誤寫法", text: $find)
-                TextField("正確寫法", text: $replacement)
-                Toggle("把正確寫法加進詞彙表，之後轉錄比較容易一次轉對", isOn: $addToGlossary)
+                TextField("错误写法", text: $find)
+                TextField("正确写法", text: $replacement)
+                Toggle("把正确写法加进词汇表，之后转录比较容易一次转对", isOn: $addToGlossary)
             }
             .formStyle(.columns)
             if let result {
@@ -625,15 +625,15 @@ struct ReplaceSheet: View {
     }
 
     private func resultText(_ r: ReplaceResult) -> String {
-        if r.segmentsChanged == 0 && !r.notesChanged { return String(localized: "沒有找到「\(find)」。") }
+        if r.segmentsChanged == 0 && !r.notesChanged { return String(localized: "没有找到「\(find)」。") }
         var parts: [String] = []
         if r.segmentsChanged > 0 { parts.append(String(localized: "逐字稿改了 \(r.segmentsChanged) 段")) }
-        if r.notesChanged { parts.append(String(localized: "會議紀錄也一起改了（按「編輯」旁的「復原上一版」可以還原）")) }
+        if r.notesChanged { parts.append(String(localized: "会议记录也一起改了（按「编辑」旁的「复原上一版」可以还原）")) }
         return parts.joined(separator: String(localized: "，")) + String(localized: "。")
     }
 }
 
-/// 播放跟隨（design §21.12）：只有這個 view 讀播放時間（每 0.1 秒變一次），算出目前的段落，換段時才更新外面的狀態
+/// 播放跟随（design §21.12）：只有这个 view 读播放时间（每 0.1 秒变一次），算出目前的段落，换段时才更新外面的状态
 private struct PlaybackFollower: View {
     @Environment(AppModel.self) private var model
     let detail: MeetingDetail

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// 匯出對話框（R7）：選項目、格式、選項，再存檔或分享
+/// 导出对话框（R7）：选项目、格式、选项，再存档或分享
 struct ExportSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -12,18 +12,18 @@ struct ExportSheet: View {
     @State private var speakers = true
     @State private var working = false
     @State private var shareAnchor: NSView?
-    /// 打開時那一場會議的資料（design §20.9）：對話框開著時選取的會議換了也不變
+    /// 打开时那一场会议的资料（design §20.9）：对话框开着时选中的会议换了也不变
     @State private var bundle: ExportBundle?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Group {
-                if let meeting = bundle?.meeting { Text("匯出「\(meeting.displayTitle)」") } else { Text("匯出") }
+                if let meeting = bundle?.meeting { Text("导出「\(meeting.displayTitle)」") } else { Text("导出") }
             }
             .font(.title3.weight(.semibold))
             .lineLimit(2)
             Form {
-                Picker("項目", selection: $item) {
+                Picker("项目", selection: $item) {
                     ForEach(ExportItem.allCases) { item in
                         Text(item.label).tag(item)
                             .disabled(item == .audio && bundle?.meeting.hasAudio != true || item == .mindMap && !hasMindMap)
@@ -34,8 +34,8 @@ struct ExportSheet: View {
                 }
                 .disabled(item.formats.count == 1)
                 if item == .transcript {
-                    Toggle("包含時間點", isOn: $times).disabled(format == "srt" || format == "vtt")
-                    Toggle("包含說話者", isOn: $speakers)
+                    Toggle("包含时间点", isOn: $times).disabled(format == "srt" || format == "vtt")
+                    Toggle("包含说话者", isOn: $speakers)
                 }
             }
             .formStyle(.columns)
@@ -47,12 +47,12 @@ struct ExportSheet: View {
                 ShareButton { await exportToTemp() }
                 if working {
                     ProgressView().controlSize(.small)
-                    Text("正在匯出…").foregroundStyle(.secondary)
+                    Text("正在导出…").foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("取消", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button("存檔…") { Task { await save() } }
+                Button("存档…") { Task { await save() } }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
                     .disabled(working)
@@ -61,7 +61,7 @@ struct ExportSheet: View {
         .padding(20)
         .frame(width: 460)
         .onChange(of: item) { _, newValue in format = newValue.formats[0] }
-        // 還沒有會議紀錄（整理中或整理失敗）時，預設改匯出逐字稿（使用者回報：匯出的會議紀錄只有標題）
+        // 还没有会议记录（整理中或整理失败）时，默认改导出逐字稿（用户反馈：导出的会议记录只有标题）
         .onAppear {
             bundle = model.exportMeetingId.flatMap { try? model.exportBundle(meetingId: $0) }
             if !hasNotes { item = .transcript }
@@ -69,20 +69,20 @@ struct ExportSheet: View {
     }
 
     private var hasNotes: Bool { bundle?.notes != nil }
-    /// 心智圖要有內容（design §42.4）
+    /// 心智图要有内容（design §42.4）
     private var hasMindMap: Bool { bundle?.notes.map { !$0.isEmpty } ?? false }
 
     private var hint: String {
         switch item {
         case .notes:
             if !hasNotes {
-                return String(localized: "這場會議還沒有會議紀錄（還在整理或整理失敗），匯出的會議紀錄只會有標題和基本資料。要留下內容，請改匯出逐字稿。")
+                return String(localized: "这场会议还没有会议记录（还在整理或整理失败），导出的会议记录只会有标题和基本资料。要留下内容，请改导出逐字稿。")
             }
-            return String(localized: "PDF 和 docx 的段落標題使用宋體；Markdown 適合貼到 Notion、GitHub。")
-        case .mindMap: return String(localized: "依會議紀錄畫成心智圖。PNG 適合貼到聊天軟體、簡報；SVG 可以再用其他軟體編輯。")
-        case .transcript: return String(localized: "srt、vtt 是字幕格式，可以搭配錄音或影片在播放器裡顯示。")
-        case .audio: return String(localized: "m4a 檔案小、適合分享；wav 是 16 kHz 單聲道，適合給其他轉錄工具使用。")
-        case .package: return String(localized: "包含錄音、逐字稿、說話者、會議紀錄、筆記和重點標記。傳給同事後，對方雙擊就能匯入拾音。")
+            return String(localized: "PDF 和 docx 的段落标题使用宋体；Markdown 适合贴到 Notion、GitHub。")
+        case .mindMap: return String(localized: "依会议记录画成心智图。PNG 适合贴到聊天软件、演示文稿；SVG 可以再用其他软件编辑。")
+        case .transcript: return String(localized: "srt、vtt 是字幕格式，可以搭配录音或视频在播放器里显示。")
+        case .audio: return String(localized: "m4a 文件小、适合分享；wav 是 16 kHz 单声道，适合给其他转录工具使用。")
+        case .package: return String(localized: "包含录音、逐字稿、说话者、会议记录、笔记和重点标记。传给同事后，对方双击就能导入拾音。")
         }
     }
 
@@ -92,7 +92,7 @@ struct ExportSheet: View {
     }
 
     private func formatLabel(_ format: String) -> String {
-        ["md": "Markdown", "pdf": "PDF", "png": String(localized: "PNG 圖片"), "svg": "SVG", "docx": String(localized: "Word（docx）"), "txt": String(localized: "純文字（txt）"), "srt": String(localized: "字幕（srt）"),
+        ["md": "Markdown", "pdf": "PDF", "png": String(localized: "PNG 图片"), "svg": "SVG", "docx": String(localized: "Word（docx）"), "txt": String(localized: "纯文字（txt）"), "srt": String(localized: "字幕（srt）"),
          "vtt": String(localized: "字幕（vtt）"), "m4a": "m4a", "wav": "wav", "shiyin": String(localized: ".shiyin 封包")][format] ?? format
     }
 
@@ -105,7 +105,7 @@ struct ExportSheet: View {
         defer { working = false }
         do {
             try await model.export(item, format: format, times: times, speakers: speakers, meetingId: try meetingId(), to: url)
-            model.noticeMessage = String(localized: "已匯出 \(url.lastPathComponent)")
+            model.noticeMessage = String(localized: "已导出 \(url.lastPathComponent)")
             dismiss()
         } catch {
             model.errorMessage = error.localizedDescription
@@ -125,7 +125,7 @@ struct ExportSheet: View {
     }
 }
 
-/// 分享按鈕（Mail、AirDrop、訊息；R7.5）
+/// 分享按钮（Mail、AirDrop、消息；R7.5）
 struct ShareButton: NSViewRepresentable {
     let makeFile: () async -> URL?
 

@@ -9,6 +9,6 @@ guard !args.isEmpty else {
     exit(1)
 }
 DistributedNotificationCenter.default().postNotificationName(
-    Notification.Name("com.weiwei.shiyin.debug"), object: args.joined(separator: "\u{1F}"),
+    Notification.Name(ProcessInfo.processInfo.environment["SHIYIN_DEBUG_CHANNEL"] ?? "com.weiwei.shiyin.debug"), object: args.joined(separator: "\u{1F}"),
     userInfo: nil, deliverImmediately: true)
 RunLoop.current.run(until: Date().addingTimeInterval(0.2))

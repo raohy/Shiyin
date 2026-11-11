@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 對這場會議提問（design §21.8、R19.6）：回答附上錄音時間點，點了跳過去；問答紀錄留在會議裡
+/// 对这场会议提问（design §21.8、R19.6）：回答附上录音时间点，点了跳过去；问答记录留在会议里
 struct AskTab: View {
     @Environment(AppModel.self) private var model
     @Environment(\.snapshotMode) private var snapshotMode
@@ -13,7 +13,7 @@ struct AskTab: View {
     var body: some View {
         VStack(spacing: 0) {
             if snapshotMode {
-                // 截圖畫不出 ScrollView 的內容（DEBUG 的 snapshot），直接排出來
+                // 截屏画不出 ScrollView 的内容（DEBUG 的 snapshot），直接排出来
                 list
                 Spacer(minLength: 0)
             } else {
@@ -25,7 +25,7 @@ struct AskTab: View {
                 }
             }
             Divider()
-            AskInputBar(question: $question, placeholder: String(localized: "問這場會議，例如：誰負責寄信的部分？"),
+            AskInputBar(question: $question, placeholder: String(localized: "问这场会议，例如：谁负责寄信的部分？"),
                         busy: model.asking != nil, onClear: model.meetingQuestions.isEmpty ? nil : {
                             model.clearQuestions(meetingId: detail.meeting.id)
                         }) {
@@ -38,10 +38,14 @@ struct AskTab: View {
 
     private var list: some View {
         VStack(alignment: .leading, spacing: 18) {
+            if model.meetingAssistance != nil {
+                MeetingAssistancePanel(meeting: detail.meeting, recording: false)
+                Divider()
+            }
             if model.meetingQuestions.isEmpty && !asking {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("問這場會議").font(.songti(18))
-                    Text("例如：「誰負責寄信的部分？」「最後決定的上線日期是哪一天？」回答只根據這場會議的會議紀錄和逐字稿，每一點都附上時間，點了就能聽原話。")
+                    Text("问这场会议").font(.songti(18))
+                    Text("例如：「谁负责寄信的部分？」「最后决定的上线日期是哪一天？」回答只根据这场会议的会议记录和逐字稿，每一点都附上时间，点了就能听原话。")
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -69,7 +73,7 @@ struct AskTab: View {
     }
 }
 
-/// 提問的輸入列（單場和所有會議共用）
+/// 提问的输入列（单场和所有会议共用）
 struct AskInputBar: View {
     @Environment(AppModel.self) private var model
     @Binding var question: String
@@ -88,12 +92,12 @@ struct AskInputBar: View {
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(1...4)
                     .onSubmit(submit)
-                Button("提問", action: submit)
+                Button("提问", action: submit)
                     .buttonStyle(.borderedProminent)
                     .disabled(busy || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.askUnavailableReason != nil)
                 if let onClear {
                     Menu {
-                        Button("清除問答紀錄", role: .destructive, action: onClear)
+                        Button("清除问答记录", role: .destructive, action: onClear)
                     } label: { Image(systemName: "ellipsis.circle") }
                     .menuStyle(.borderlessButton)
                     .menuIndicator(.hidden)
@@ -112,7 +116,7 @@ struct AskInputBar: View {
     }
 }
 
-/// 一組問答：問題、回答、出處（時間點，跨會議時加上會議名稱）
+/// 一组问答：问题、回答、出处（时间点，跨会议时加上会议名称）
 struct QuestionView: View {
     @Environment(AppModel.self) private var model
     let record: QuestionRecord
@@ -125,7 +129,7 @@ struct QuestionView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(record.question).fontWeight(.semibold).textSelection(.enabled)
             if let answer {
-                // 回答常用 **粗體**：解析行內的 Markdown，保留換行和「- 」列點
+                // 回答常用 **粗体**：解析行内的 Markdown，保留换行和「- 」列点
                 Text((try? AttributedString(markdown: answer.answer, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
                      ?? AttributedString(answer.answer))
                     .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
@@ -138,24 +142,24 @@ struct QuestionView: View {
                                     Button {
                                         onMeetingCitation(id, citation.time)
                                     } label: {
-                                        Text("\(meetingTitle?(id) ?? String(localized: "會議")) \(citation.time)")
+                                        Text("\(meetingTitle?(id) ?? String(localized: "会议")) \(citation.time)")
                                             .contentFont(.callout, monospacedDigit: true)
                                             .foregroundStyle(Color.celadon)
                                     }
                                     .buttonStyle(.plain)
-                                    .help("打開這場會議，從 \(citation.time) 開始")
+                                    .help("打开这场会议，从 \(citation.time) 开始")
                                 } else if citation.time.isEmpty {
-                                    // 參考文件的出處（design §39.3）：沒有錄音的時間點，quote 開頭寫了文件名稱和頁數
+                                    // 参考文档的出处（design §39.3）：没有录音的时间点，quote 开头写了文档名称和页数
                                     Image(systemName: "paperclip")
                                         .contentFont(.callout)
                                         .foregroundStyle(.secondary)
-                                        .help("出自這場會議的參考文件")
+                                        .help("出自这场会议的参考文档")
                                 } else {
                                     Button(citation.time) { onCitation(citation.time) }
                                         .buttonStyle(.plain)
                                         .contentFont(.callout, monospacedDigit: true)
                                         .foregroundStyle(Color.celadon)
-                                        .help("從 \(citation.time) 開始播放")
+                                        .help("从 \(citation.time) 开始播放")
                                 }
                                 Text(citation.quote).contentFont(.callout).foregroundStyle(.secondary).lineLimit(2).meetingText()
                             }
@@ -163,7 +167,7 @@ struct QuestionView: View {
                     }
                 }
                 if let ids = answer.meetingIds, record.meetingId == nil {
-                    Text(ids.isEmpty ? String(localized: "沒有找到相關的會議") : String(localized: "參考了 \(ids.count) 場會議"))
+                    Text(ids.isEmpty ? String(localized: "没有找到相关的会议") : String(localized: "参考了 \(ids.count) 场会议"))
                         .contentFont(.caption).foregroundStyle(.tertiary)
                 }
             }
@@ -174,7 +178,7 @@ struct QuestionView: View {
     }
 }
 
-/// 問所有會議（design §21.8）：獨立的視窗，可以一邊看會議一邊問；出處點了打開那場會議
+/// 问所有会议（design §21.8）：独立的窗口，可以一边看会议一边问；出处点了打开那场会议
 struct AskAllView: View {
     @Environment(AppModel.self) private var model
     @State private var question = ""
@@ -183,9 +187,9 @@ struct AskAllView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("問所有會議").font(.songti(20))
+                Text("问所有会议").font(.songti(20))
                 Spacer()
-                Picker("範圍", selection: $scope) {
+                Picker("范围", selection: $scope) {
                     ForEach(AskScope.allCases) { scope in
                         if scope != .folder || model.folderFilter != nil { Text(scope.label).tag(scope) }
                     }
@@ -200,7 +204,7 @@ struct AskAllView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         if model.allQuestions.isEmpty && model.asking != .all {
-                            Text("例如：「上個月跟客戶談過哪些價格？」「寄信的機制最後怎麼決定的？」拾音會先找出相關的會議片段，再請整理工具回答，回答附上是哪一場會議、哪個時間點。")
+                            Text("例如：「上个月跟客户谈过哪些价格？」「寄信的机制最后怎么决定的？」拾音会先找出相关的会议片段，再请整理工具回答，回答附上是哪一场会议、哪个时间点。")
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -213,7 +217,7 @@ struct AskAllView: View {
                         if model.asking == .all {
                             HStack(spacing: 10) {
                                 ProgressView().controlSize(.small)
-                                Text("正在找相關的會議，再用 \(AppSettings.provider.shortLabel) 回答…").foregroundStyle(.secondary)
+                                Text("正在找相关的会议，再用 \(AppSettings.provider.shortLabel) 回答…").foregroundStyle(.secondary)
                                 Button("取消") { model.cancelAsk() }.buttonStyle(.link)
                             }
                         }
@@ -227,7 +231,7 @@ struct AskAllView: View {
                 }
             }
             Divider()
-            AskInputBar(question: $question, placeholder: String(localized: "問所有會議，例如：寄信的機制最後怎麼決定的？"),
+            AskInputBar(question: $question, placeholder: String(localized: "问所有会议，例如：寄信的机制最后怎么决定的？"),
                         busy: model.asking != nil, onClear: model.allQuestions.isEmpty ? nil : { model.clearQuestions(meetingId: nil) }) {
                 model.askAll(question, scope: scope)
                 question = ""

@@ -3,9 +3,9 @@ import Foundation
 import Observation
 import Security
 
-/// app 內更新（R10.6、design §12、D10）：
-/// 讀更新資訊 JSON → 比版本 → 使用者同意後下載 DMG → 驗證 SHA-256 → 取出新 app → 檢查簽章符合目前 app 的
-/// designated requirement → app 結束後由小腳本替換並重新開啟
+/// app 内更新（R10.6、design §12、D10）：
+/// 读更新信息 JSON → 比版本 → 用户同意后下载 DMG → 验证 SHA-256 → 取出新 app → 检查签名符合目前 app 的
+/// designated requirement → app 结束后由小脚本替换并重新打开
 @MainActor
 @Observable
 final class Updater {
@@ -22,11 +22,11 @@ final class Updater {
         var label: String {
             switch self {
             case .idle: return ""
-            case .checking: return String(localized: "正在檢查…")
+            case .checking: return String(localized: "正在检查…")
             case .upToDate: return String(localized: "已是最新版本")
             case .available(let m): return String(localized: "有新版本 \(m.version)")
-            case .downloading: return String(localized: "正在下載更新…")
-            case .installing: return String(localized: "正在準備安裝…")
+            case .downloading: return String(localized: "正在下载更新…")
+            case .installing: return String(localized: "正在准备安装…")
             case .failed(let reason): return reason
             }
         }
@@ -37,15 +37,15 @@ final class Updater {
 
         var errorDescription: String? {
             switch self {
-            case .noURL: return String(localized: "還沒有設定更新網址")
-            case .insecureURL: return String(localized: "更新網址必須是 https")
-            case .http(let code): return String(localized: "更新網址回傳 HTTP \(code)")
-            case .badManifest: return String(localized: "更新資訊的格式不對")
-            case .checksum: return String(localized: "下載的檔案驗證失敗（SHA-256 不符），已刪除")
-            case .noApp: return String(localized: "更新檔裡找不到拾音")
-            case .signature(let reason): return String(localized: "新版的簽章跟目前的拾音不符，拒絕安裝（\(reason)）")
-            case .notNewer: return String(localized: "更新檔的版本沒有比較新")
-            case .busy: return String(localized: "錄音或轉錄、整理進行中，完成後再更新")
+            case .noURL: return String(localized: "还没有设置更新网址")
+            case .insecureURL: return String(localized: "更新网址必须是 https")
+            case .http(let code): return String(localized: "更新网址回传 HTTP \(code)")
+            case .badManifest: return String(localized: "更新信息的格式不对")
+            case .checksum: return String(localized: "下载的文件验证失败（SHA-256 不符），已删除")
+            case .noApp: return String(localized: "更新档里找不到拾音")
+            case .signature(let reason): return String(localized: "新版的签名跟目前的拾音不符，拒绝安装（\(reason)）")
+            case .notNewer: return String(localized: "更新档的版本没有比较新")
+            case .busy: return String(localized: "录音或转录、整理进行中，完成后再更新")
             }
         }
     }
@@ -54,21 +54,21 @@ final class Updater {
     private static let lastCheckedKey = "updateLastChecked"
 
     var state: State = .idle
-    /// 有新版時要問使用者（主視窗會跳出對話框）
+    /// 有新版时要问用户（主窗口会跳出对话框）
     var prompt: Manifest?
 
     static var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
     }
 
-    /// 設定裡填的網址優先，沒填就用建置時寫進 Info.plist 的
+    /// 设置里填的网址优先，没填就用建置时写进 Info.plist 的
     static var feedURLString: String {
         let custom = UserDefaults.standard.string(forKey: urlKey)?.trimmingCharacters(in: .whitespaces) ?? ""
         if !custom.isEmpty { return custom }
         return (Bundle.main.object(forInfoDictionaryKey: "ShiyinUpdateURL") as? String ?? "").trimmingCharacters(in: .whitespaces)
     }
 
-    /// 只接受 https；localhost、127.0.0.1 例外，給測試用
+    /// 只接受 https；localhost、127.0.0.1 例外，给测试用
     static func validated(_ url: URL?) throws -> URL {
         guard let url, let scheme = url.scheme?.lowercased() else { throw UpdateError.noURL }
         if scheme == "https" { return url }
@@ -76,7 +76,7 @@ final class Updater {
         throw UpdateError.insecureURL
     }
 
-    /// 版本號依數字逐段比較，例如 3.0.10 比 3.0.9 新
+    /// 版本号依数字逐段比较，例如 3.0.10 比 3.0.9 新
     static func isNewer(_ candidate: String, than current: String) -> Bool {
         let a = candidate.split(separator: ".").map { Int($0) ?? 0 }
         let b = current.split(separator: ".").map { Int($0) ?? 0 }
@@ -87,9 +87,9 @@ final class Updater {
         return false
     }
 
-    // MARK: 檢查
+    // MARK: 检查
 
-    /// 啟動 30 秒後檢查一次，之後每小時看看距離上次檢查是否超過 24 小時
+    /// 启动 30 秒后检查一次，之后每小时看看距离上次检查是否超过 24 小时
     func scheduleAutomaticChecks() {
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(30))
@@ -124,13 +124,13 @@ final class Updater {
         } catch UpdateError.noURL where !userInitiated {
             state = .idle
         } catch {
-            // 自動檢查失敗不跳視窗打擾使用者，只顯示在設定裡
+            // 自动检查失败不跳窗口打扰用户，只显示在设置里
             state = .failed(error.localizedDescription)
             log.error("update check failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
-    // MARK: 安裝
+    // MARK: 安装
 
     func install(_ manifest: Manifest, model: AppModel) async {
         var workDir: URL?
@@ -159,28 +159,28 @@ final class Updater {
 
             let target = Bundle.main.bundleURL
             guard FileManager.default.isWritableFile(atPath: target.deletingLastPathComponent().path) else {
-                // 一般使用者帳號不能改 /Applications：打開 DMG 讓使用者自己拖
+                // 一般用户账号不能改 /Applications：打开 DMG 让用户自己拖
                 NSWorkspace.shared.open(dmg)
-                state = .failed(String(localized: "沒有權限替換「\(target.deletingLastPathComponent().path)」裡的拾音，已經打開下載好的 DMG，請把拾音拖進「應用程式」取代舊版"))
+                state = .failed(String(localized: "没有权限替换「\(target.deletingLastPathComponent().path)」里的拾音，已经打开下载好的 DMG，请把拾音拖进「应用程序」取代旧版"))
                 return
             }
-            // 下載期間可能開始了錄音或轉錄：結束 app 時會跳確認，取消的話更新就停在一半，所以先擋下來
+            // 下载期间可能开始了录音或转录：结束 app 时会跳确认，取消的话更新就停在一半，所以先挡下来
             guard !model.recorder.isRecording, !model.runner.isBusy else { throw UpdateError.busy }
             let replacement = try Self.launchReplacement(staged: staged, target: target, work: work)
             NSApp.terminate(nil)
-            // 走到這裡表示結束被取消了：停掉替換腳本、清掉下載的檔案，舊版不受影響，可以再按一次
+            // 走到这里表示结束被取消了：停掉替换脚本、清掉下载的文件，旧版不受影响，可以再按一次
             replacement.terminate()
             try? FileManager.default.removeItem(at: work)
-            state = .failed(String(localized: "已取消更新，舊版沒有改動"))
+            state = .failed(String(localized: "已取消更新，旧版没有改动"))
         } catch {
-            // 失敗時把下載和解出來的檔案都刪掉，舊版完全不受影響
+            // 失败时把下载和解出来的文件都删掉，旧版完全不受影响
             if let workDir { try? FileManager.default.removeItem(at: workDir) }
             state = .failed(error.localizedDescription)
-            model.errorMessage = String(localized: "更新失敗：\(error.localizedDescription)")
+            model.errorMessage = String(localized: "更新失败：\(error.localizedDescription)")
         }
     }
 
-    /// 唯讀掛載 DMG，把裡面的拾音複製出來
+    /// 唯读挂载 DMG，把里面的拾音复制出来
     private static func extractApp(from dmg: URL, into work: URL) async throws -> URL {
         let mount = work.appendingPathComponent("mnt", isDirectory: true)
         try FileManager.default.createDirectory(at: mount, withIntermediateDirectories: true)
@@ -204,7 +204,7 @@ final class Updater {
         return staged
     }
 
-    /// 新 app 的簽章要有效，而且符合目前這個 app 的 designated requirement（自簽憑證時等於同一張憑證）
+    /// 新 app 的签名要有效，而且符合目前这个 app 的 designated requirement（自签证书时等于同一张证书）
     static func checkSignature(_ app: URL) throws {
         var selfCode: SecCode?
         var selfStatic: SecStaticCode?
@@ -212,19 +212,19 @@ final class Updater {
         guard SecCodeCopySelf([], &selfCode) == errSecSuccess, let selfCode,
               SecCodeCopyStaticCode(selfCode, [], &selfStatic) == errSecSuccess, let selfStatic,
               SecCodeCopyDesignatedRequirement(selfStatic, [], &requirement) == errSecSuccess, let requirement
-        else { throw UpdateError.signature(String(localized: "讀不到目前 app 的簽章")) }
+        else { throw UpdateError.signature(String(localized: "读不到目前 app 的签名")) }
         var newStatic: SecStaticCode?
         guard SecStaticCodeCreateWithPath(app as CFURL, [], &newStatic) == errSecSuccess, let newStatic else {
-            throw UpdateError.signature(String(localized: "讀不到新版的簽章"))
+            throw UpdateError.signature(String(localized: "读不到新版的签名"))
         }
         let flags = SecCSFlags(rawValue: UInt32(kSecCSCheckAllArchitectures | kSecCSCheckNestedCode | kSecCSStrictValidate))
         let status = SecStaticCodeCheckValidity(newStatic, flags, requirement)
         guard status == errSecSuccess else {
-            throw UpdateError.signature(SecCopyErrorMessageString(status, nil) as String? ?? String(localized: "錯誤代碼 \(status)"))
+            throw UpdateError.signature(SecCopyErrorMessageString(status, nil) as String? ?? String(localized: "错误代码 \(status)"))
         }
     }
 
-    /// 寫一個固定內容的小腳本，路徑用參數傳入：等這個 app 結束 → 舊版改名備份 → 放進新版 → 成功刪備份、失敗還原 → 重新開啟
+    /// 写一个固定内容的小脚本，路径用参数传入：等这个 app 结束 → 旧版改名备份 → 放进新版 → 成功删备份、失败还原 → 重新打开
     @discardableResult
     private static func launchReplacement(staged: URL, target: URL, work: URL) throws -> Process {
         let script = work.appendingPathComponent("replace.sh")

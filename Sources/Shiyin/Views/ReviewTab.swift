@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// 待確認（R6）：每題可以回答或略過，送出後由 LLM 依回答修正。
-/// 最上面是說話者的題目（聲紋沒把握的、AI 猜的，R33、design §27）：送出時直接改名字，不經過整理工具。
-/// 回答存在 `ReviewDraft`（design §31.2），跟紀錄旁的就地回答（R41.2）共用同一份。
-/// 4.1 起嵌在紀錄頂部的「還有 N 題待確認」裡（`embedded`，R44.2）：不自己捲動、不另外留邊
+/// 待确认（R6）：每题可以回答或略过，送出后由 LLM 依回答修正。
+/// 最上面是说话者的题目（声纹没把握的、AI 猜的，R33、design §27）：送出时直接改名字，不经过整理工具。
+/// 回答存在 `ReviewDraft`（design §31.2），跟记录旁的就地回答（R41.2）共用同一份。
+/// 4.1 起嵌在记录顶部的「还有 N 题待确认」里（`embedded`，R44.2）：不自己滚动、不另外留边
 struct ReviewTab: View {
     @Environment(AppModel.self) private var model
     let detail: MeetingDetail
@@ -19,9 +19,9 @@ struct ReviewTab: View {
             NotesPlaceholder(detail: detail)
         } else if items.isEmpty && speakerItems.isEmpty {
             ReadingColumn {
-                Label("沒有待確認的項目", systemImage: "checkmark.circle.fill")
+                Label("没有待确认的项目", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(Color.celadon)
-                Text("會議紀錄裡推測出來的人名、專有名詞、負責人和期限，都已經確認過了。")
+                Text("会议记录里推测出来的人名、专有名词、负责人和期限，都已经确认过了。")
                     .foregroundStyle(.secondary)
             }
         } else if let draft = model.reviewDraft, draft.meetingId == detail.meeting.id {
@@ -52,20 +52,20 @@ struct ReviewTab: View {
         }
     }
 
-    /// 說明、全部略過、說話者的題目、紀錄的題目
+    /// 说明、全部略过、说话者的题目、记录的题目
     @ViewBuilder private func rows(_ draft: ReviewDraft) -> some View {
         let speakerIdxs = speakerItems.map(\.idx)
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(items.contains(where: \.yesNo) || !speakerItems.isEmpty
-                 ? "以下是整理時不確定的地方。按「是」「不是」或直接回答就好；看不懂或不重要的可以略過。"
-                 : "以下是整理時不確定的地方。直接回答就好；看不懂或不重要的可以略過。")
+                 ? "以下是整理时不确定的地方。按「是」「不是」或直接回答就好；看不懂或不重要的可以略过。"
+                 : "以下是整理时不确定的地方。直接回答就好；看不懂或不重要的可以略过。")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
-            // 全部略過（R41.5）：還沒回答的都標成略過，已經有回答的不動
-            Button("全部略過") { draft.skipAllUnanswered(questionCount: items.count, speakers: speakerIdxs) }
+            // 全部略过（R41.5）：还没回答的都标成略过，已经有回答的不动
+            Button("全部略过") { draft.skipAllUnanswered(questionCount: items.count, speakers: speakerIdxs) }
                 .disabled(!draft.hasUnanswered(questionCount: items.count, speakers: speakerIdxs))
-                .help("還沒回答的題目都標成略過，送出後直接移除")
+                .help("还没回答的题目都标成略过，送出后直接移除")
         }
         ForEach(speakerItems, id: \.idx) { item in
             speakerRow(item.idx, item.suggestion, draft: draft)
@@ -75,12 +75,12 @@ struct ReviewTab: View {
         }
     }
 
-    /// 說話者的題目（R33.2）：「『說話者 3』是 weiwei 嗎？」，下面是原因；選「不是」可以挑最像的人或打名字，也可以不填
+    /// 说话者的题目（R33.2）：「『说话者 3』是 weiwei 吗？」，下面是原因；选「不是」可以挑最像的人或打名字，也可以不填
     private func speakerRow(_ idx: Int, _ suggestion: SpeakerNaming.Suggestion, draft: ReviewDraft) -> some View {
         let skipped = draft.speakerSkipped.contains(idx)
         let current = detail.speakers[idx] ?? ""
-        let question = language.format(zh: "「%@」是%@嗎？", en: "Is “%@” %@?", ja: "「%@」は%@ですか？",
-                                       current, suggestion.name)  // l10n-skip：會議語言的題目
+        let question = language.format(zh: "「%@」是%@吗？", en: "Is “%@” %@?", ja: "「%@」は%@ですか？",
+                                       current, suggestion.name)  // l10n-skip：会议语言的题目
         let choice = YesNoAnswer(draft.speakerAnswers[idx] ?? "", language: language) ?? YesNoAnswer(isYes: nil)
         let others = (detail.speakerCandidates[idx] ?? []).filter { $0.caseInsensitiveCompare(suggestion.name) != .orderedSame }
         return VStack(alignment: .leading, spacing: 8) {
@@ -93,7 +93,7 @@ struct ReviewTab: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .foregroundStyle(skipped ? .secondary : .primary)
                     .strikethrough(skipped)
-                // 略過的題目收成一行（R41.5）：只留題目和「取消略過」
+                // 略过的题目收成一行（R41.5）：只留题目和「取消略过」
                 if skipped {
                     Spacer(minLength: 0)
                     SkipButton(skipped: true) { draft.speakerSkipped.remove(idx) }
@@ -126,7 +126,7 @@ struct ReviewTab: View {
                             }
                             .fixedSize()
                         }
-                        TextField("是誰？（可以不填）", text: Binding(get: { choice.correction }, set: { text in
+                        TextField("是谁？（可以不填）", text: Binding(get: { choice.correction }, set: { text in
                             draft.speakerAnswers[idx] = YesNoAnswer(isYes: false, correction: text).text(language)
                         }))
                         .textFieldStyle(.roundedBorder)
@@ -141,15 +141,15 @@ struct ReviewTab: View {
 
     private var footnote: String {
         let provider = AppSettings.provider == .none ? "LLM" : AppSettings.provider.label
-        let speakers = String(localized: "說話者的題目不會送給整理工具，送出後直接換名字。")
+        let speakers = String(localized: "说话者的题目不会送给整理工具，送出后直接换名字。")
         guard !items.isEmpty else { return speakers }
-        let notes = String(localized: "有回答的題目會交給 \(provider) 依答案修正會議紀錄；略過的題目直接移除。改錯了可以按「編輯」旁的「復原上一版」。")
+        let notes = String(localized: "有回答的题目会交给 \(provider) 依答案修正会议记录；略过的题目直接移除。改错了可以按「编辑」旁的「复原上一版」。")
         return speakerItems.isEmpty ? notes : notes + " " + speakers
     }
 }
 
-/// 一題待確認（design §31.2）：待確認分頁和紀錄旁的就地回答共用。
-/// 是非題（R32）給「是」「不是」，選了「不是」才要填正確的答案；舊的草稿認不出來時照舊用輸入框
+/// 一题待确认（design §31.2）：待确认标签页和记录旁的就地回答共用。
+/// 是非题（R32）给「是」「不是」，选了「不是」才要填正确的答案；旧的草稿认不出来时照旧用输入框
 struct ReviewQuestionRow: View {
     let index: Int
     let item: MeetingNotes.ReviewItem
@@ -169,7 +169,7 @@ struct ReviewQuestionRow: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .foregroundStyle(isDismissed ? .secondary : .primary)
                     .strikethrough(isDismissed)
-                // 略過的題目收成一行（R41.5）：只留題號、時間點、題目和「取消略過」
+                // 略过的题目收成一行（R41.5）：只留题号、时间点、题目和「取消略过」
                 if isDismissed {
                     Spacer(minLength: 0)
                     SkipButton(skipped: true) { draft.dismissed.remove(index) }
@@ -185,7 +185,7 @@ struct ReviewQuestionRow: View {
                 }
                 .padding(.leading, 22)
                 if choice.isYes == false {
-                    TextField("正確的是…（可以不填）", text: Binding(get: { choice.correction }, set: { text in
+                    TextField("正确的是…（可以不填）", text: Binding(get: { choice.correction }, set: { text in
                         draft.answers[index] = YesNoAnswer(isYes: false, correction: text).text(language)
                     }))
                     .textFieldStyle(.roundedBorder)
@@ -203,20 +203,20 @@ struct ReviewQuestionRow: View {
     }
 }
 
-/// 「略過」「取消略過」（R41.5）：不用勾選框，按了那題收成一行
+/// 「略过」「取消略过」（R41.5）：不用勾选框，按了那题收成一行
 struct SkipButton: View {
     let skipped: Bool
     let action: () -> Void
 
     var body: some View {
-        Button(skipped ? "取消略過" : "略過", action: action)
+        Button(skipped ? "取消略过" : "略过", action: action)
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
             .fixedSize()
     }
 }
 
-/// 是非題的「是」「不是」（design §27）：選了「是」就清掉填過的答案
+/// 是非题的「是」「不是」（design §27）：选了「是」就清掉填过的答案
 struct YesNoPicker: View {
     let choice: YesNoAnswer
     let language: MeetingLanguage
@@ -237,10 +237,10 @@ struct YesNoPicker: View {
     }
 }
 
-/// 是非題的回答（design §27）：存成會議語言的文字，就是草稿和送給校稿的回答。
+/// 是非题的回答（design §27）：存成会议语言的文字，就是草稿和送给校稿的回答。
 /// 「是」→ 是／Yes／はい；「不是」→ 不是／No／いいえ；不是而且填了答案 →「不是，答案」「No, 答案」「いいえ、答案」
 struct YesNoAnswer: Equatable {
-    /// nil：還沒選
+    /// nil：还没选
     var isYes: Bool?
     var correction = ""
 
@@ -249,7 +249,7 @@ struct YesNoAnswer: Equatable {
         self.correction = correction
     }
 
-    /// 從存起來的文字認回來；空字串是還沒選，認不出來的（例如舊的草稿）回傳 nil
+    /// 从存起来的文字认回来；空字符串是还没选，认不出来的（例如旧的草稿）回传 nil
     init?(_ text: String, language: MeetingLanguage) {
         let yes = Self.yes(language), no = Self.no(language), separator = Self.separator(language)
         if text.isEmpty {

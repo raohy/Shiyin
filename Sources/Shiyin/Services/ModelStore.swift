@@ -2,8 +2,8 @@ import CryptoKit
 import Foundation
 import Observation
 
-/// 轉錄模型的下載、續傳、驗證（design §7、§18.2、R10.3）。Breeze 給中文、英文會議；日文會議用 Whisper large-v3-turbo；
-/// 語言偵測用 Whisper base（design §18.8）。每個模型各自下載、暫停、刪除
+/// 转录模型的下载、续传、验证（design §7、§18.2、R10.3）。Breeze 给中文、英文会议；日文会议用 Whisper large-v3-turbo；
+/// 语言检测用 Whisper base（design §18.8）。每个模型各自下载、暂停、删除
 @MainActor
 @Observable
 final class ModelStore: NSObject {
@@ -35,7 +35,7 @@ final class ModelStore: NSObject {
         }
     }
 
-    /// 社群轉檔的 Breeze ASR 25 GGML q8_0，固定 commit（design §7）
+    /// 社区转档的 Breeze ASR 25 GGML q8_0，固定 commit（design §7）
     nonisolated static let breeze = ModelInfo(
         name: String(localized: "Breeze ASR 25（q8_0）"),
         filename: "breeze-asr-25-q8_0.bin",
@@ -43,23 +43,23 @@ final class ModelStore: NSObject {
         size: 1_656_129_691,
         sha256: "d4b187c40ffbf1f620734b77821e2ca8a97c8ecf5754d02b2a175069348cafcf")
 
-    /// whisper.cpp 官方轉檔的 Whisper large-v3-turbo q5_0，固定 commit（design §18.2、D19）
+    /// whisper.cpp 官方转档的 Whisper large-v3-turbo q5_0，固定 commit（design §18.2、D19）
     nonisolated static let japanese = ModelInfo(
-        name: String(localized: "\(MeetingLanguage.uiNames(model: "turbo"))轉錄模型 Whisper large-v3-turbo（q5_0）"),
+        name: String(localized: "\(MeetingLanguage.uiNames(model: "turbo"))转录模型 Whisper large-v3-turbo（q5_0）"),
         filename: "ggml-large-v3-turbo-q5_0.bin",
         url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q5_0.bin")!,
         size: 574_041_195,
         sha256: "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2")
 
-    /// 語言偵測用的 Whisper base q5_1（design §18.8、D21）
+    /// 语言检测用的 Whisper base q5_1（design §18.8、D21）
     nonisolated static let languageDetection = ModelInfo(
-        name: String(localized: "語言偵測模型 Whisper base（q5_1）"),
+        name: String(localized: "语言检测模型 Whisper base（q5_1）"),
         filename: "ggml-base-q5_1.bin",
         url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base-q5_1.bin")!,
         size: 59_707_625,
         sha256: "422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898")
 
-    /// llama.cpp 官方轉檔的 Qwen3-ASR 1.7B q8_0 和它的音訊編碼器（mmproj），固定 commit（design §32.3、D105）
+    /// llama.cpp 官方转档的 Qwen3-ASR 1.7B q8_0 和它的音频编码器（mmproj），固定 commit（design §32.3、D105）
     nonisolated static let qwen = ModelInfo(
         name: String(localized: "Qwen3-ASR 1.7B（q8_0）"),
         filename: "qwen3-asr-1.7b-q8_0.gguf",
@@ -68,7 +68,7 @@ final class ModelStore: NSObject {
         sha256: "58e22d0532d4eacaf034cfac17a6fed159f37c41390c710186783be439d1fc57")
 
     nonisolated static let qwenEncoder = ModelInfo(
-        name: String(localized: "Qwen3-ASR 音訊編碼器（q8_0）"),
+        name: String(localized: "Qwen3-ASR 音频编码器（q8_0）"),
         filename: "qwen3-asr-1.7b-mmproj-q8_0.gguf",
         url: URL(string: "https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/36a678687ba7d07a74ca70ccb0e36902e005fb80/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf")!,
         size: 355_709_344,
@@ -84,8 +84,8 @@ final class ModelStore: NSObject {
         }
     }
 
-    /// 正式轉錄用哪個模型（design §32.3、§41.3）：語言檔的 transcription.model；engineSetting 的語言（中文、英文）依設定用
-    /// Breeze（預設）或 Qwen3-ASR。`.japanese` 就是 Whisper large-v3-turbo（日文以外的語言也用）
+    /// 正式转录用哪个模型（design §32.3、§41.3）：语言档的 transcription.model；engineSetting 的语言（中文、英文）依设置用
+    /// Breeze（默认）或 Qwen3-ASR。`.japanese` 就是 Whisper large-v3-turbo（日文以外的语言也用）
     nonisolated static func transcription(for language: MeetingLanguage) -> Model {
         let t = language.profile.transcription
         switch t.model {
@@ -95,17 +95,17 @@ final class ModelStore: NSObject {
         }
     }
 
-    /// 這個模型要的檔案：Qwen3-ASR 是語言模型加音訊編碼器兩個檔，一起下載、一起算裝好
+    /// 这个模型要的文件：Qwen3-ASR 是语言模型加音频编码器两个档，一起下载、一起算装好
     nonisolated static func files(of model: Model) -> [Model] { model == .qwen ? [.qwen, .qwenEncoder] : [model] }
 
     nonisolated static func path(_ model: Model) -> URL { Paths.modelsDir.appendingPathComponent(info(model).filename) }
 
-    /// 這個模型的檔案都下載好了（下載完、驗證過才會出現在這個路徑）
+    /// 这个模型的文件都下载好了（下载完、验证过才会出现在这个路径）
     nonisolated static func isDownloaded(_ model: Model) -> Bool {
         files(of: model).allSatisfy { FileManager.default.fileExists(atPath: path($0).path) }
     }
 
-    /// 這個語言的轉錄模型下載好了沒
+    /// 这个语言的转录模型下载好了没
     nonisolated static func hasTranscriptionModel(for language: MeetingLanguage) -> Bool { isDownloaded(transcription(for: language)) }
     nonisolated static var breezePath: URL { path(.breeze) }
     nonisolated private static func resumeDataPath(_ model: Model) -> URL {
@@ -113,7 +113,7 @@ final class ModelStore: NSObject {
     }
 
     #if DEBUG
-    /// 只在 DEBUG：改從別的網址下載，測下載出錯（shiyinctl modelurl）
+    /// 只在 DEBUG：改从别的网址下载，测下载出错（shiyinctl modelurl）
     @ObservationIgnored var debugURLs: [Model: URL] = [:]
     #endif
 
@@ -128,18 +128,18 @@ final class ModelStore: NSObject {
         refresh()
     }
 
-    /// Breeze 的狀態（中文、英文會議）
+    /// Breeze 的状态（中文、英文会议）
     var state: State { state(.breeze) }
     var isReady: Bool { isInstalled(.breeze) }
 
     func state(_ model: Model) -> State { states[model] ?? .missing }
     func isInstalled(_ model: Model) -> Bool { state(model) == .installed }
-    /// 這個語言的轉錄模型（Qwen3-ASR 的兩個檔都要）裝好了
+    /// 这个语言的转录模型（Qwen3-ASR 的两个档都要）装好了
     func isInstalled(transcriptionFor language: MeetingLanguage) -> Bool {
         Self.files(of: Self.transcription(for: language)).allSatisfy { isInstalled($0) }
     }
 
-    /// 多個檔的模型合成一列顯示（設定頁、引導）：都裝好才算裝好；有一個失敗就顯示失敗；任一個在下載就顯示下載中（位元組加總）
+    /// 多个档的模型合成一列显示（设置页、引导）：都装好才算装好；有一个失败就显示失败；任一个在下载就显示下载中（字节加总）
     func combinedState(_ model: Model) -> State {
         let files = Self.files(of: model)
         if files.count == 1 { return state(model) }
@@ -165,7 +165,7 @@ final class ModelStore: NSObject {
     func startAll(_ model: Model) { for file in Self.files(of: model) { start(file) } }
     func pauseAll(_ model: Model) { for file in Self.files(of: model) { pause(file) } }
     func deleteAll(_ model: Model) { for file in Self.files(of: model) { delete(file) } }
-    /// 這個語言的轉錄模型還沒下載過就開始下載（Qwen3-ASR 兩個檔一起）
+    /// 这个语言的转录模型还没下载过就开始下载（Qwen3-ASR 两个档一起）
     func autoStartTranscription(for language: MeetingLanguage) {
         for file in Self.files(of: Self.transcription(for: language)) { autoStart(file) }
     }
@@ -179,7 +179,7 @@ final class ModelStore: NSObject {
             } else if fm.fileExists(atPath: Self.resumeDataPath(model).path) {
                 states[model] = .paused(received: 0, total: info.size)
             } else if case .failed = state(model) {
-                // 保留錯誤訊息，使用者按「繼續下載」才重來
+                // 保留错误消息，用户按「继续下载」才重来
             } else {
                 states[model] = .missing
             }
@@ -187,7 +187,7 @@ final class ModelStore: NSObject {
         if !diarizerState.isBusy { diarizerState = Diarizer.isInstalled ? .installed : .missing }
     }
 
-    // MARK: 下載
+    // MARK: 下载
 
     func start(_ model: Model = .breeze) {
         guard !state(model).isBusy, state(model) != .installed else { return }
@@ -209,7 +209,7 @@ final class ModelStore: NSObject {
         log.info("model download started: \(model.rawValue, privacy: .public)")
     }
 
-    /// 需要時自動下載（日文會議第一次轉錄）：只在還沒下載過時開始，使用者暫停或下載失敗就不自動重來
+    /// 需要时自动下载（日文会议第一次转录）：只在还没下载过时开始，用户暂停或下载失败就不自动重来
     func autoStart(_ model: Model) {
         if state(model) == .missing { start(model) }
     }
@@ -233,7 +233,7 @@ final class ModelStore: NSObject {
         states[model] = .missing
     }
 
-    // MARK: 說話者辨識模型（由 FluidAudio 下載，見 design §6.3）
+    // MARK: 说话者识别模型（由 FluidAudio 下载，见 design §6.3）
 
     func prepareDiarizer() {
         guard !diarizerState.isBusy else { return }
@@ -264,25 +264,25 @@ final class ModelStore: NSObject {
                         log.info("model installed: \(model.rawValue, privacy: .public)")
                         AppModel.shared.runner.wake()
                     } catch {
-                        self.states[model] = .failed(String(localized: "無法存放模型：\(error.localizedDescription)"))
+                        self.states[model] = .failed(String(localized: "无法存放模型：\(error.localizedDescription)"))
                     }
                 case .success(false):
                     try? FileManager.default.removeItem(at: downloadedFile)
                     try? FileManager.default.removeItem(at: Self.resumeDataPath(model))
-                    self.states[model] = .failed(String(localized: "下載的模型檔驗證失敗（SHA-256 不符），請重新下載"))
+                    self.states[model] = .failed(String(localized: "下载的模型档验证失败（SHA-256 不符），请重新下载"))
                 case .failure(let error):
-                    self.states[model] = .failed(String(localized: "驗證模型失敗：\(error.localizedDescription)"))
+                    self.states[model] = .failed(String(localized: "验证模型失败：\(error.localizedDescription)"))
                 }
             }
         }
     }
 
-    /// 串流計算 SHA-256，不一次讀進整個模型檔
+    /// 串流计算 SHA-256，不一次读进整个模型档
     nonisolated static func verify(_ file: URL, model: Model = .breeze) throws -> Bool {
         try sha256(file) == info(model).sha256
     }
 
-    /// 檔案的 SHA-256（小寫十六進位）；更新器驗證下載的 DMG 也用這個
+    /// 文件的 SHA-256（小写十六进位）；更新器验证下载的 DMG 也用这个
     nonisolated static func sha256(_ file: URL) throws -> String {
         let handle = try FileHandle(forReadingFrom: file)
         defer { try? handle.close() }
@@ -311,23 +311,23 @@ extension ModelStore: URLSessionDownloadDelegate {
 
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         let model = Self.model(of: downloadTask)
-        // 伺服器回傳錯誤頁（404、500…）也會「下載完成」，不要拿去驗 SHA-256（會誤報成檔案損壞）
+        // 服务器回传错误页（404、500…）也会「下载完成」，不要拿去验 SHA-256（会误报成文件损坏）
         let code = (downloadTask.response as? HTTPURLResponse)?.statusCode ?? 200
         guard code == 200 || code == 206 else {
             MainActor.assumeIsolated {
                 try? FileManager.default.removeItem(at: Self.resumeDataPath(model))
                 tasks[model] = nil
-                states[model] = .failed(String(localized: "下載失敗：伺服器回傳 HTTP \(code)，請稍後再試"))
+                states[model] = .failed(String(localized: "下载失败：服务器回传 HTTP \(code)，请稍后再试"))
             }
             return
         }
-        // location 在這個方法結束後就會被刪掉，先搬到 tmp
+        // location 在这个方法结束后就会被删掉，先搬到 tmp
         let kept = Paths.tmpDir.appendingPathComponent("model-\(UUID().uuidString).bin")
         do {
             try FileManager.default.moveItem(at: location, to: kept)
             MainActor.assumeIsolated { finish(model, downloadedFile: kept) }
         } catch {
-            MainActor.assumeIsolated { states[model] = .failed(String(localized: "無法存放下載的檔案：\(error.localizedDescription)")) }
+            MainActor.assumeIsolated { states[model] = .failed(String(localized: "无法存放下载的文件：\(error.localizedDescription)")) }
         }
     }
 
@@ -336,15 +336,15 @@ extension ModelStore: URLSessionDownloadDelegate {
         let model = Self.model(of: task)
         let resume = error.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
         MainActor.assumeIsolated {
-            if error.code == NSURLErrorCancelled { return }  // 暫停或刪除
-            // 沒有新的續傳資料就丟掉舊的：舊的可能已經不能用，留著的話每次「繼續下載」都會一樣失敗
+            if error.code == NSURLErrorCancelled { return }  // 暂停或删除
+            // 没有新的续传资料就丢掉旧的：旧的可能已经不能用，留着的话每次「继续下载」都会一样失败
             if let resume { try? resume.write(to: Self.resumeDataPath(model)) } else { try? FileManager.default.removeItem(at: Self.resumeDataPath(model)) }
             tasks[model] = nil
-            // 系統的錯誤說明本身可能已經有句號
+            // 系统的错误说明本身可能已经有句号
             let reason = error.localizedDescription.trimmingCharacters(in: CharacterSet(charactersIn: "。. "))  // l10n-skip
             states[model] = .failed(resume != nil
-                ? String(localized: "下載中斷：\(reason)。按「繼續下載」會從中斷的地方接著下載")
-                : String(localized: "下載中斷：\(reason)。按「繼續下載」會重新下載"))
+                ? String(localized: "下载中断：\(reason)。按「继续下载」会从中断的地方接着下载")
+                : String(localized: "下载中断：\(reason)。按「继续下载」会重新下载"))
         }
     }
 }

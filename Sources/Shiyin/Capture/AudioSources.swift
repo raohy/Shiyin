@@ -3,16 +3,16 @@ import CoreAudio
 import Foundation
 import Observation
 
-/// 所有音源輸出的統一格式：16 kHz、單聲道、Float32（design §5.1）
+/// 所有音源输出的统一格式：16 kHz、单声道、Float32（design §5.1）
 enum CaptureFormat {
     static let sampleRate: Double = 16_000
     static let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false)!
 }
 
-/// 音源：把收到的音訊轉成 16 kHz 單聲道後交給 `onSamples`。callback 在音訊執行緒上，不能做重的事。
+/// 音源：把收到的音频转成 16 kHz 单声道后交给 `onSamples`。callback 在音频线程上，不能做重的事。
 protocol AudioSource: AnyObject {
     var onSamples: (([Float]) -> Void)? { get set }
-    /// 音源發現裝置變了（design §20.2），任何執行緒都可能呼叫；Recorder 收到後會 `restart()`
+    /// 音源发现设备变了（design §20.2），任何线程都可能调用；Recorder 收到后会 `restart()`
     var onInterruption: (() -> Void)? { get set }
     func start() throws
     func stop()
@@ -26,15 +26,15 @@ extension AudioSource {
     }
 }
 
-/// 麥克風那一聲道的音源（design §38.3）：可以換裝置，看得到實際在收音的是哪一支
+/// 麦克风那一声道的音源（design §38.3）：可以换设备，看得到实际在收音的是哪一支
 protocol MicrophoneInput: AudioSource {
-    /// 指定的輸入裝置 UID，空字串是系統預設；改了之後 `restart()` 才生效
+    /// 指定的输入设备 UID，空字符串是系统默认；改了之后 `restart()` 才生效
     var deviceUID: String { get set }
-    /// 實際在收音的裝置（指定的不在時是系統預設）；`start()` 成功後才有
+    /// 实际在收音的设备（指定的不在时是系统默认）；`start()` 成功后才有
     var current: AudioDevices.Device? { get }
 }
 
-/// 把任意格式的 buffer 持續轉成 16 kHz 單聲道（保留重取樣的狀態，適合串流）
+/// 把任意格式的 buffer 持续转成 16 kHz 单声道（保留重采样的状态，适合串流）
 final class StreamConverter {
     private let converter: AVAudioConverter
 
@@ -64,7 +64,7 @@ final class StreamConverter {
     }
 }
 
-/// 麥克風（AVAudioEngine）。可以指定輸入裝置的 UID，空字串表示系統預設。
+/// 麦克风（AVAudioEngine）。可以指定输入设备的 UID，空字符串表示系统默认。
 final class MicrophoneSource: MicrophoneInput {
     var onSamples: (([Float]) -> Void)?
     var onInterruption: (() -> Void)?
@@ -77,7 +77,7 @@ final class MicrophoneSource: MicrophoneInput {
         self.deviceUID = deviceUID
     }
 
-    /// 每次開始都用新的 engine：重新開始時重讀輸入格式；指定的裝置不在了，新的 engine 就跟著系統預設（design §20.2）
+    /// 每次开始都用新的 engine：重新开始时重读输入格式；指定的设备不在了，新的 engine 就跟着系统默认（design §20.2）
     func start() throws {
         engine = AVAudioEngine()
         let input = engine.inputNode
@@ -92,7 +92,7 @@ final class MicrophoneSource: MicrophoneInput {
             let samples = converter.convert(buffer)
             if !samples.isEmpty { self?.onSamples?(samples) }
         }
-        // 接上或拔掉耳機、藍牙換協定、取樣率改變時，engine 會自己停下來並送出這個通知
+        // 接上或拔掉耳机、蓝牙换协定、采样率改变时，engine 会自己停下来并送出这个通知
         observer = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil) { [weak self] _ in
             self?.onInterruption?()
         }
@@ -114,7 +114,7 @@ final class MicrophoneSource: MicrophoneInput {
     }
 }
 
-/// 電腦播放的聲音（Core Audio process tap，macOS 14.4+，design §5.1）
+/// 电脑播放的声音（Core Audio process tap，macOS 14.4+，design §5.1）
 final class SystemAudioSource: AudioSource {
     var onSamples: (([Float]) -> Void)?
     var onInterruption: (() -> Void)?
@@ -128,17 +128,17 @@ final class SystemAudioSource: AudioSource {
         mElement: kAudioObjectPropertyElementMain)
 
     func start() throws {
-        // 排除自己（播放錄音時不要錄進去）
+        // 排除自己（播放录音时不要录进去）
         let own = AudioDevices.processObject(pid: ProcessInfo.processInfo.processIdentifier)
         let description = CATapDescription(stereoGlobalTapButExcludeProcesses: own.map { [$0] } ?? [])
         description.uuid = UUID()
         description.muteBehavior = .unmuted
         description.isPrivate = true
-        try check(AudioHardwareCreateProcessTap(description, &tapID), String(localized: "建立系統聲音擷取"))
+        try check(AudioHardwareCreateProcessTap(description, &tapID), String(localized: "创建系统声音截取"))
 
         guard let outputUID = AudioDevices.defaultOutputUID() else { throw CaptureError.noOutputDevice }
         let aggregate: [String: Any] = [
-            kAudioAggregateDeviceNameKey: String(localized: "拾音系統聲音"),
+            kAudioAggregateDeviceNameKey: String(localized: "拾音系统声音"),
             kAudioAggregateDeviceUIDKey: UUID().uuidString,
             kAudioAggregateDeviceMainSubDeviceKey: outputUID,
             kAudioAggregateDeviceIsPrivateKey: true,
@@ -148,13 +148,13 @@ final class SystemAudioSource: AudioSource {
             kAudioAggregateDeviceTapListKey: [[kAudioSubTapDriftCompensationKey: true,
                                                kAudioSubTapUIDKey: description.uuid.uuidString]],
         ]
-        try check(AudioHardwareCreateAggregateDevice(aggregate as CFDictionary, &aggregateID), String(localized: "建立聚合裝置"))
+        try check(AudioHardwareCreateAggregateDevice(aggregate as CFDictionary, &aggregateID), String(localized: "创建聚合设备"))
 
         var asbd = AudioStreamBasicDescription()
         var size = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
         var address = AudioObjectPropertyAddress(mSelector: kAudioTapPropertyFormat, mScope: kAudioObjectPropertyScopeGlobal,
                                                  mElement: kAudioObjectPropertyElementMain)
-        try check(AudioObjectGetPropertyData(tapID, &address, 0, nil, &size, &asbd), String(localized: "讀取系統聲音格式"))
+        try check(AudioObjectGetPropertyData(tapID, &address, 0, nil, &size, &asbd), String(localized: "读取系统声音格式"))
         guard let format = AVAudioFormat(streamDescription: &asbd), let converter = StreamConverter(from: format) else {
             throw CaptureError.unsupportedFormat
         }
@@ -162,16 +162,16 @@ final class SystemAudioSource: AudioSource {
             guard let buffer = AVAudioPCMBuffer(pcmFormat: format, bufferListNoCopy: input, deallocator: nil) else { return }
             let samples = converter.convert(buffer)
             if !samples.isEmpty { self?.onSamples?(samples) }
-        }, String(localized: "建立系統聲音的 IO"))
-        try check(AudioDeviceStart(aggregateID, procID), String(localized: "開始擷取系統聲音"))
-        // 預設輸出換了（接上耳機、換成藍牙喇叭）：聚合裝置還綁著舊的輸出，要用新的重建（design §20.2）
+        }, String(localized: "创建系统声音的 IO"))
+        try check(AudioDeviceStart(aggregateID, procID), String(localized: "开始截取系统声音"))
+        // 默认输出换了（接上耳机、换成蓝牙喇叭）：聚合设备还绑着旧的输出，要用新的重建（design §20.2）
         let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in self?.onInterruption?() }
         if AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &Self.defaultOutputAddress, queue, listener) == noErr {
             outputListener = listener
         }
     }
 
-    /// 一定要依序清乾淨，否則 HAL 可能卡住（design §5.1）
+    /// 一定要依序清干净，否则 HAL 可能卡住（design §5.1）
     func stop() {
         if let outputListener {
             AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &Self.defaultOutputAddress, queue, outputListener)
@@ -199,17 +199,17 @@ final class SystemAudioSource: AudioSource {
 }
 
 #if DEBUG
-/// 只在 DEBUG：用音訊檔模擬音源，speed 是播放倍速（驗證錄音流程用，見 design §13 of v2）
+/// 只在 DEBUG：用音频档模拟音源，speed 是播放倍速（验证录音流程用，见 design §13 of v2）
 final class FileSource: MicrophoneInput {
     var onSamples: (([Float]) -> Void)?
     var onInterruption: (() -> Void)?
-    /// 模擬錄音的麥克風（design §38.7）：照 `MicrophoneMonitor` 的清單（含 `fakemic` 的假裝置）決定是哪一支
+    /// 模拟录音的麦克风（design §38.7）：照 `MicrophoneMonitor` 的清单（含 `fakemic` 的假设备）决定是哪一支
     var deviceUID = ""
     private(set) var current: AudioDevices.Device?
-    /// 模擬「麥克風＋電腦聲音」時，同一段音訊在同一個迴圈裡也送給第二個聲道。
-    /// 兩個聲道各開一個 FileSource 的話，高倍速時兩邊的速度會不一樣，造成真實裝置不會有的「晚到」
+    /// 模拟「麦克风＋电脑声音」时，同一段音频在同一个循环里也送给第二个声道。
+    /// 两个声道各开一个 FileSource 的话，高倍速时两边的速度会不一样，造成真实设备不会有的「晚到」
     var mirror: MirroredSource?
-    /// 檔案送完了：之後沒有資料是正常的，不是裝置停了
+    /// 文件送完了：之后没有资料是正常的，不是设备停了
     var onEnded: (() -> Void)?
     private let url: URL
     private let speed: Double
@@ -217,14 +217,14 @@ final class FileSource: MicrophoneInput {
     private let lock = NSLock()
     private var samples: [Float]?
     private var position = 0
-    private var stalledUntil: [Int: Double] = [:]   // 聲道 → 恢復送資料的時間（systemUptime）
+    private var stalledUntil: [Int: Double] = [:]   // 声道 → 恢复送资料的时间（systemUptime）
 
     init(url: URL, speed: Double) {
         self.url = url
         self.speed = speed
     }
 
-    /// 從上次停下的位置接著送，所以 restart()（stop 再 start）等於繼續送
+    /// 从上次停下的位置接着送，所以 restart()（stop 再 start）等于继续送
     func start() throws {
         let uid = deviceUID
         current = MainActor.assumeIsolated { MicrophoneMonitor.shared.resolve(uid) }
@@ -247,9 +247,9 @@ final class FileSource: MicrophoneInput {
                 }
                 let end = min(samples.count, start + chunk)
                 let chunk = Array(samples[start..<end])
-                // 先記下位置再送：restart() 時新的 task 不會重送同一段
+                // 先记下位置再送：restart() 时新的 task 不会重送同一段
                 self.lock.withLock { self.position = end }
-                // 停住的聲道照樣往前走（時間在過），只是沒有送出資料，跟真的裝置停了一樣
+                // 停住的声道照样往前走（时间在过），只是没有送出资料，跟真的设备停了一样
                 if !stalled.contains(0) { self.onSamples?(chunk) }
                 if !stalled.contains(1) { self.mirror?.onSamples?(chunk) }
                 try? await Task.sleep(for: .seconds(0.1 / speed))
@@ -262,13 +262,13 @@ final class FileSource: MicrophoneInput {
         task = nil
     }
 
-    /// recordstall：這個聲道停止送資料幾秒（nil 是馬上恢復）。restart() 不會提早恢復，模擬裝置真的停了（design §20.2）
+    /// recordstall：这个声道停止送资料几秒（nil 是马上恢复）。restart() 不会提早恢复，模拟设备真的停了（design §20.2）
     func stall(channel: Int, seconds: Double?) {
         lock.withLock { stalledUntil[channel] = seconds.map { ProcessInfo.processInfo.systemUptime + $0 } }
     }
 }
 
-/// 只負責接收 FileSource 轉送的音訊，自己不產生資料
+/// 只负责接收 FileSource 转送的音频，自己不产生资料
 final class MirroredSource: AudioSource {
     var onSamples: (([Float]) -> Void)?
     var onInterruption: (() -> Void)?
@@ -285,32 +285,32 @@ enum CaptureError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .noInput: return String(localized: "找不到可以用的麥克風")
-        case .noOutputDevice: return String(localized: "找不到輸出裝置，沒辦法擷取系統聲音")
-        case .unsupportedFormat: return String(localized: "不支援這個音訊格式")
-        case .coreAudio(let step, let status): return String(localized: "\(step)失敗（錯誤代碼 \(status)）。請確認已允許拾音「錄製系統音訊」")
+        case .noInput: return String(localized: "找不到可以用的麦克风")
+        case .noOutputDevice: return String(localized: "找不到输出设备，没办法截取系统声音")
+        case .unsupportedFormat: return String(localized: "不支持这个音频格式")
+        case .coreAudio(let step, let status): return String(localized: "\(step)失败（错误代码 \(status)）。请确认已允许拾音「录制系统音频」")
         }
     }
 }
 
-/// Core Audio 裝置查詢
+/// Core Audio 设备查询
 enum AudioDevices {
     struct Device: Identifiable, Hashable {
         var id: String { uid }
         var uid: String
         var name: String
-        /// 連接方式（`kAudioDevicePropertyTransportType`）：藍牙、內建、USB…
+        /// 连接方式（`kAudioDevicePropertyTransportType`）：蓝牙、内置、USB…
         var transport: UInt32 = 0
-        /// 輸入的 data source（`kAudioDevicePropertyDataSource`）：內建的麥克風是 imic，耳機孔的「外接麥克風」是 emic
+        /// 输入的 data source（`kAudioDevicePropertyDataSource`）：内置的麦克风是 imic，耳机孔的「外接麦克风」是 emic
         var dataSource: UInt32 = 0
 
         var isBluetooth: Bool { transport == kAudioDeviceTransportTypeBluetooth || transport == kAudioDeviceTransportTypeBluetoothLE }
-        /// 這台 Mac 本身的麥克風。耳機孔的輸入連接方式也是內建，要用 data source 排除（2026-11-02：插著有線耳機時，
-        /// 藍牙提示的按鈕變成「改用 外接麥克風」）
+        /// 这台 Mac 本身的麦克风。耳机孔的输入连接方式也是内置，要用 data source 排除（2026-11-02：插着有线耳机时，
+        /// 蓝牙提示的按钮变成「改用 外接麦克风」）
         var isBuiltIn: Bool { transport == kAudioDeviceTransportTypeBuiltIn && dataSource != AudioDevices.externalMicSource }
     }
 
-    /// 四字碼 emic（外接麥克風）
+    /// 四字码 emic（外接麦克风）
     static let externalMicSource: UInt32 = 0x656D_6963
 
     static func inputDevices() -> [Device] {
@@ -333,7 +333,7 @@ enum AudioDevices {
         return Device(uid: uid, name: name, transport: transport, dataSource: source)
     }
 
-    /// 系統預設的輸入裝置
+    /// 系统默认的输入设备
     static func defaultInput() -> Device? {
         var id = AudioDeviceID(0)
         var size = UInt32(MemoryLayout<AudioDeviceID>.size)
@@ -394,8 +394,8 @@ enum AudioDevices {
     }
 }
 
-/// 這台電腦的麥克風清單和系統預設（design §38.1）：接上、拔掉裝置或系統換了預設就更新。
-/// 錄音按鈕的選單、錄音畫面、設定頁共用
+/// 这台电脑的麦克风清单和系统默认（design §38.1）：接上、拔掉设备或系统换了默认就更新。
+/// 录音按钮的菜单、录音画面、设置页共用
 @MainActor @Observable
 final class MicrophoneMonitor {
     static let shared = MicrophoneMonitor()
@@ -403,7 +403,7 @@ final class MicrophoneMonitor {
     private(set) var inputs: [AudioDevices.Device] = []
     private(set) var defaultInput: AudioDevices.Device?
     #if DEBUG
-    /// shiyinctl fakemic：假的麥克風（只在記憶體，模擬錄音用，design §38.7）；`fakeDefault` 是假裝的系統預設
+    /// shiyinctl fakemic：假的麦克风（只在内存，模拟录音用，design §38.7）；`fakeDefault` 是假装的系统默认
     var fakes: [AudioDevices.Device] = [] { didSet { refresh() } }
     var fakeDefault: String? { didSet { refresh() } }
     #endif
@@ -419,7 +419,7 @@ final class MicrophoneMonitor {
         }
     }
 
-    /// 值真的變了才設（design §25）
+    /// 值真的变了才设（design §25）
     func refresh() {
         var list = AudioDevices.inputDevices()
         var preset = AudioDevices.defaultInput()
@@ -431,11 +431,11 @@ final class MicrophoneMonitor {
         if preset != defaultInput { defaultInput = preset }
     }
 
-    /// 這個設定實際會用哪一支：指定的在就用它，不在或沒指定就是系統預設
+    /// 这个设置实际会用哪一支：指定的在就用它，不在或没指定就是系统默认
     func resolve(_ uid: String) -> AudioDevices.Device? {
         (uid.isEmpty ? nil : inputs.first { $0.uid == uid }) ?? defaultInput
     }
 
-    /// 選單的 `.id`：清單或預設變了就換一個新的選單（工具列的選單建立一次就不更新）
+    /// 菜单的 `.id`：清单或默认变了就换一个新的菜单（工具列的菜单创建一次就不更新）
     var signature: String { inputs.map(\.uid).joined(separator: ",") + "|" + (defaultInput?.uid ?? "") }
 }

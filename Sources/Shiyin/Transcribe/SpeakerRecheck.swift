@@ -3,18 +3,18 @@ import FluidAudio
 import Foundation
 import os
 
-/// 短句的說話者再確認（R34、design §6.3.2、D92）：說話者辨識有時把很短的一句併進旁邊那個人（換人點放早或放晚了一兩秒）。
-/// 分好說話者之後，4 秒以內的句子各自算一次聲紋（帶著前後文：10 秒的窗、遮罩只標這一句），跟每位說話者的聲音
-/// （他最長的 20 句的平均）比；明顯比較像另一位（相似度高出 0.15 以上）就改成那一位。
-/// 聲紋模型用 FluidAudio 的 wespeaker_v2（約 8 MB，第一次用時下載）。模型一次有三個欄位，但三個欄位共用第一個欄位的聲音
-/// （設計給同一個 10 秒窗裡的三個人），所以一次算一句：17 分鐘的錄音約 8 秒（M3 Pro）
+/// 短句的说话者再确认（R34、design §6.3.2、D92）：说话者识别有时把很短的一句并进旁边那个人（换人点放早或放晚了一两秒）。
+/// 分好说话者之后，4 秒以内的句子各自算一次声纹（带着前后文：10 秒的窗、遮罩只标这一句），跟每位说话者的声音
+/// （他最长的 20 句的平均）比；明显比较像另一位（相似度高出 0.15 以上）就改成那一位。
+/// 声纹模型用 FluidAudio 的 wespeaker_v2（约 8 MB，第一次用时下载）。模型一次有三个字段，但三个字段共用第一个字段的声音
+/// （设计给同一个 10 秒窗里的三个人），所以一次算一句：17 分钟的录音约 8 秒（M3 Pro）
 enum SpeakerRecheck {
     static let margin = 0.15
-    /// 太短的聲音不夠判斷
+    /// 太短的声音不够判断
     static let minSeconds = 0.5
-    /// 長句說話者辨識本來就準，只查短的
+    /// 长句说话者识别本来就准，只查短的
     static let maxSeconds = 4.0
-    /// 每位說話者的聲音：3 秒以上、最長的 20 句
+    /// 每位说话者的声音：3 秒以上、最长的 20 句
     static let anchorSeconds = 3.0
     static let anchorCount = 20
 
@@ -23,10 +23,10 @@ enum SpeakerRecheck {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var model: MLModel?
 
-    /// FluidAudio 下載到「這個資料夾的上一層／speaker-diarization」，跟說話者辨識的模型同一個資料夾（檔名不同，不會互相蓋掉）
+    /// FluidAudio 下载到「这个文件夹的上一层／speaker-diarization」，跟说话者识别的模型同一个文件夹（文件名不同，不会互相盖掉）
     static var modelsDirectory: URL { Paths.modelsDir.appendingPathComponent("fluidaudio/speaker-diarization", isDirectory: true) }
 
-    /// 模型不在就下載並編譯
+    /// 模型不在就下载并编译
     static func prepare() async throws -> MLModel {
         if let model = lock.withLock({ model }) { return model }
         let models = try await DiarizerModels.downloadIfNeeded(to: modelsDirectory)
@@ -34,11 +34,11 @@ enum SpeakerRecheck {
         return models.embeddingModel
     }
 
-    /// 回傳改過的說話者（跟 segments 對應）。locked：使用者改過說話者的句子，不動
+    /// 回传改过的说话者（跟 segments 对应）。locked：用户改过说话者的句子，不动
     static func refine(_ segments: [TranscribedSegment], speakers: [Int?], samples: [Float],
                        locked: Set<Int> = []) async throws -> [Int?] {
         #if DEBUG
-        // -debugNoRecheck YES：不做這一步，跟改之前比
+        // -debugNoRecheck YES：不做这一步，跟改之前比
         if UserDefaults.standard.bool(forKey: "debugNoRecheck") { return speakers }
         #endif
         func seconds(_ i: Int) -> Double { segments[i].end - segments[i].start }
@@ -50,7 +50,7 @@ enum SpeakerRecheck {
             if let speaker = speakers[i] { anchors[speaker, default: []].append(i) }
         }
         anchors = anchors.mapValues { Array($0.sorted { seconds($0) > seconds($1) }.prefix(anchorCount)) }
-        // 只有一位說話者有長句：沒得比
+        // 只有一位说话者有长句：没得比
         guard !check.isEmpty, anchors.count >= 2 else { return speakers }
         let needed = Array(Set(check).union(anchors.values.joined())).sorted()
         let model = try await prepare()
@@ -79,7 +79,7 @@ enum SpeakerRecheck {
         return refined
     }
 
-    /// 每一段一個 256 維、長度 1 的聲紋。模型一次吃三個 10 秒的窗（[3, 160000] 的聲音、[3, 589] 的遮罩）
+    /// 每一段一个 256 维、长度 1 的声纹。模型一次吃三个 10 秒的窗（[3, 160000] 的声音、[3, 589] 的遮罩）
     static func embed(_ spans: [(start: Double, end: Double)], samples: [Float], model: MLModel, perCall: Int = 1) throws -> [[Float]] {
         let frames = model.modelDescription.inputDescriptionsByName["mask"]?.multiArrayConstraint?.shape.last?.intValue ?? 589
         let rate = AudioDecoder.sampleRate
@@ -95,7 +95,7 @@ enum SpeakerRecheck {
             let count = min(perCall, spans.count - batch)
             for slot in 0..<count {
                 let span = spans[batch + slot]
-                // 窗的中心對著這一段；錄音不到 10 秒的部分補 0
+                // 窗的中心对着这一段；录音不到 10 秒的部分补 0
                 let center = (span.start + span.end) / 2
                 let start = max(0, min(Int((center - 5) * rate), samples.count - windowSamples))
                 let end = min(samples.count, start + windowSamples)

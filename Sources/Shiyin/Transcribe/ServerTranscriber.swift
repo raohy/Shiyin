@@ -1,29 +1,29 @@
 import CryptoKit
 import Foundation
 
-/// 轉錄交給企業伺服器時，畫面上進度後面的說明（排隊第幾、為什麼在等）；有值就顯示「改在這台電腦轉錄」（R50.3、R50.5）
+/// 转录交给企业服务器时，画面上进度后面的说明（排队第几、为什么在等）；有值就显示「改在这台电脑转录」（R50.3、R50.5）
 struct ServerNote: Equatable {
     var text: String
-    /// 在等伺服器（連不上、登入失效）：不顯示百分比
+    /// 在等服务器（连不上、登录失效）：不显示百分比
     var waiting = false
 }
 
-/// 用企業伺服器轉錄（design §36.3、R50）：寫成 16-bit WAV → 建工作 → 分塊上傳（可以接著傳）→ 等結果 → 刪掉伺服器上的工作。
-/// 說話者辨識、聲紋在 Mac 本機做（D122），這裡只拿逐字稿的段落。
-/// 連不上、伺服器忙、登入失效時不算失敗：一直等、自動再試（R50.5、R49.4），使用者可以按「改在這台電腦轉錄」
+/// 用企业服务器转录（design §36.3、R50）：写成 16-bit WAV → 建工作 → 分块上传（可以接着传）→ 等结果 → 删掉服务器上的工作。
+/// 说话者识别、声纹在 Mac 本机做（D122），这里只拿逐字稿的段落。
+/// 连不上、服务器忙、登录失效时不算失败：一直等、自动再试（R50.5、R49.4），用户可以按「改在这台电脑转录」
 @MainActor
 struct ServerTranscriber {
     struct Remote {
         var segments: [TranscribedSegment]
         var seams: [Double]
-        /// 伺服器用的引擎：breeze、qwen、japanese（寫進 transcribed_with）
+        /// 服务器用的引擎：breeze、qwen、japanese（写进 transcribed_with）
         var engine: String
     }
 
-    /// 使用者按了「改在這台電腦轉錄」
+    /// 用户按了「改在这台电脑转录」
     struct SwitchToLocal: Error {}
 
-    /// 伺服器轉錄失敗（例如錄音太長）：不是暫時的問題，工作算失敗
+    /// 服务器转录失败（例如录音太长）：不是暂时的问题，工作算失败
     struct Failed: LocalizedError {
         var message: String
         var errorDescription: String? { message }
@@ -31,23 +31,23 @@ struct ServerTranscriber {
 
     var options: TranscriptionOptions
     var stage: (String) -> Void
-    /// 0～1：上傳 0～0.1、伺服器轉錄 0.1～0.9（之後的 0.9～1 是本機的說話者辨識）
+    /// 0～1：上传 0～0.1、服务器转录 0.1～0.9（之后的 0.9～1 是本机的说话者识别）
     var progress: @Sendable (Double) -> Void
     var shouldContinue: () -> Bool
     var switchToLocal: () -> Bool
-    /// 伺服器的狀態（nil：伺服器的部分做完了）
+    /// 服务器的状态（nil：服务器的部分做完了）
     var onServer: (ServerNote?) -> Void
-    /// 伺服器的工作 id 換了（建立、完成、重建）：JobRunner 記進工作的 payload，app 重開時接著做
+    /// 服务器的工作 id 换了（创建、完成、重建）：JobRunner 记进工作的 payload，app 重开时接着做
     var onRemoteId: (String?) -> Void
 
     static let chunkSize = 8 * 1024 * 1024
-    /// 伺服器給的時間的上限（design §36.2）：一天的錄音再多一成（24 × 3600 × 1.1 秒）。超過的段落、接縫不收（太大的值換成 Int 會當掉）
+    /// 服务器给的时间的上限（design §36.2）：一天的录音再多一成（24 × 3600 × 1.1 秒）。超过的段落、接缝不收（太大的值换成 Int 会当掉）
     nonisolated static let maxSeconds: Double = 95_040
     private var server: EnterpriseServer { .shared }
 
     // MARK: WAV
 
-    /// 16 kHz、16-bit、單聲道的 WAV（伺服器只收這種，D120）；邊換算邊寫，不在記憶體多留一份
+    /// 16 kHz、16-bit、单声道的 WAV（服务器只收这种，D120）；边换算边写，不在内存多留一份
     nonisolated static func writeWAV(_ samples: [Float], to url: URL) throws -> (bytes: Int64, sha256: String) {
         let dataBytes = samples.count * 2
         var header = Data()
@@ -84,7 +84,7 @@ struct ServerTranscriber {
 
     // MARK: 流程
 
-    /// 回傳 nil 表示被取消（伺服器上的工作也刪掉）
+    /// 回传 nil 表示被取消（服务器上的工作也删掉）
     func transcribe(wav: URL, bytes: Int64, sha256: String, remoteId: String?) async throws -> Remote? {
         var id = remoteId
         var waited = 0
@@ -104,9 +104,9 @@ struct ServerTranscriber {
                 switch state.status {
                 case "uploading":
                     if try await upload(id!, wav: wav, bytes: bytes) == false {
-                        // 伺服器說收到的檔案不對，從頭再傳；連續兩次就放棄
+                        // 服务器说收到的文件不对，从头再传；连续两次就放弃
                         rejectedUploads += 1
-                        if rejectedUploads > 2 { throw Failed(message: String(localized: "錄音一直沒辦法完整傳到企業伺服器")) }
+                        if rejectedUploads > 2 { throw Failed(message: String(localized: "录音一直没办法完整传到企业服务器")) }
                     }
                 case "queued", "running":
                     report(state)
@@ -121,9 +121,9 @@ struct ServerTranscriber {
                     await delete(id)
                     onRemoteId(nil)
                     if state.errorKind == "empty" { throw WhisperError.empty }
-                    throw Failed(message: state.errorMessage ?? String(localized: "企業伺服器轉錄失敗"))
+                    throw Failed(message: state.errorMessage ?? String(localized: "企业服务器转录失败"))
                 default:
-                    // 取消、過期（伺服器清掉了）：重新建一個工作，從頭上傳
+                    // 取消、过期（服务器清掉了）：重新建一个工作，从头上传
                     id = nil
                     onRemoteId(nil)
                 }
@@ -148,37 +148,37 @@ struct ServerTranscriber {
         }
     }
 
-    /// 等伺服器（R50.5）：30 秒、1 分鐘、2 分鐘…最長 5 分鐘再試；登入失效時等使用者重新登入（每 5 秒看一次）
+    /// 等服务器（R50.5）：30 秒、1 分钟、2 分钟…最长 5 分钟再试；登录失效时等用户重新登录（每 5 秒看一次）
     private func waitForServer(_ failure: EnterpriseServer.Failure, attempt: Int) async throws {
         let setup = failure.isSetupProblem
         let seconds = setup ? 5 : min(300, 30 * (1 << min(attempt - 1, 4)))
         let text: String
         if setup { text = failure.errorDescription ?? "" }
-        else if case .server(let kind, _) = failure { text = kind == "busy" ? String(localized: "等企業伺服器：伺服器忙，\(seconds) 秒後再試")
-                                                                            : String(localized: "等企業伺服器：伺服器出錯，\(seconds) 秒後再試") }
-        else { text = String(localized: "等企業伺服器：連不上，\(seconds) 秒後再試") }
+        else if case .server(let kind, _) = failure { text = kind == "busy" ? String(localized: "等企业服务器：服务器忙，\(seconds) 秒后再试")
+                                                                            : String(localized: "等企业服务器：服务器出错，\(seconds) 秒后再试") }
+        else { text = String(localized: "等企业服务器：连不上，\(seconds) 秒后再试") }
         onServer(ServerNote(text: text, waiting: true))
-        stage(String(localized: "等企業伺服器"))
+        stage(String(localized: "等企业服务器"))
         log.info("waiting for enterprise server: \(failure.isSetupProblem ? "login" : "unreachable", privacy: .public)")
         for _ in 0..<seconds {
             try await Task.sleep(for: .seconds(1))
             guard shouldContinue() else { return }
             if switchToLocal() { return }
-            // 重新登入了就馬上再試
+            // 重新登录了就马上再试
             if setup && server.isSignedIn { return }
         }
     }
 
-    /// 階段的文字會接「中 N%」（「企業伺服器轉錄中 42%」），排隊第幾放在後面的說明
+    /// 阶段的文字会接「中 N%」（「企业服务器转录中 42%」），排队第几放在后面的说明
     private func report(_ state: JobState) {
         if state.status == "queued" {
-            stage(String(localized: "企業伺服器排隊"))
-            if state.stage == "waiting_models" { onServer(ServerNote(text: String(localized: "伺服器正在準備模型"))) }
-            else if let ahead = state.queueAhead, ahead > 0 { onServer(ServerNote(text: String(localized: "前面還有 \(ahead) 場"))) }
+            stage(String(localized: "企业服务器排队"))
+            if state.stage == "waiting_models" { onServer(ServerNote(text: String(localized: "服务器正在准备模型"))) }
+            else if let ahead = state.queueAhead, ahead > 0 { onServer(ServerNote(text: String(localized: "前面还有 \(ahead) 场"))) }
             else { onServer(ServerNote(text: "")) }
             progress(0.1)
         } else {
-            stage(String(localized: "企業伺服器轉錄"))
+            stage(String(localized: "企业服务器转录"))
             onServer(ServerNote(text: ""))
             progress(0.1 + 0.8 * (state.progress ?? 0))
         }
@@ -195,7 +195,7 @@ struct ServerTranscriber {
         var errorMessage: String?
     }
 
-    /// 建工作時送的 settings（M§36.2；標準答案 server/settings.json）：說話者在本機辨識（D122），分聲道不送（伺服器收的是混好的單聲道）
+    /// 建工作时送的 settings（M§36.2；标准答案 server/settings.json）：说话者在本机识别（D122），分声道不送（服务器收的是混好的单声道）
     nonisolated static func settings(language: MeetingLanguage, glossary: [String], audioSource: String, minSpeakers: Int?) -> [String: Any] {
         var settings: [String: Any] = ["language": language.rawValue, "glossary": glossary, "diarize": false,
                                        "splitChannels": false, "audioSource": audioSource]
@@ -221,21 +221,21 @@ struct ServerTranscriber {
         guard response.statusCode == 200, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let status = json["status"] as? String else { throw EnterpriseServer.failure(data, response) }
         let error = json["error"] as? [String: Any]
-        // 進度限在 0～1：畫面拿來算百分比（Int 換不了的值會當掉）
+        // 进度限在 0～1：画面拿来算百分比（Int 换不了的值会当掉）
         let progress = (json["progress"] as? Double).map { $0.isFinite ? min(1, max(0, $0)) : 0 }
         return JobState(status: status, queueAhead: json["queueAhead"] as? Int, stage: json["stage"] as? String,
                       progress: progress, errorKind: error?["kind"] as? String, errorMessage: error?["message"] as? String)
     }
 
-    /// 從伺服器收到的地方接著傳（HEAD 問位置），一次 8 MB。回傳 false 表示伺服器說檔案不對、要從頭傳。
-    /// 伺服器給的位置不合理（負的、比檔案大）就從頭傳；位置一直不往前就算失敗，不會一直重送（design §36.2）
+    /// 从服务器收到的地方接着传（HEAD 问位置），一次 8 MB。回传 false 表示服务器说文件不对、要从头传。
+    /// 服务器给的位置不合理（负的、比文件大）就从头传；位置一直不往前就算失败，不会一直重送（design §36.2）
     private func upload(_ id: String, wav: URL, bytes: Int64) async throws -> Bool {
         let (_, head) = try await server.call("HEAD", "api/v1/transcriptions/\(id)/audio", timeout: 30)
         guard head.statusCode == 200 else { throw EnterpriseServer.Failure.server(kind: "not_found", message: "") }
         var offset = Self.offset(head, bytes: bytes) ?? 0
         let file = try FileHandle(forReadingFrom: wav)
         defer { try? file.close() }
-        stage(String(localized: "上傳錄音"))
+        stage(String(localized: "上传录音"))
         let chunks = Int((bytes + Int64(Self.chunkSize) - 1) / Int64(Self.chunkSize))
         var sent = 0
         var stalled = 0
@@ -244,7 +244,7 @@ struct ServerTranscriber {
             sent += 1
             if stalled >= 3 || sent > chunks * 2 + 3 {
                 log.error("enterprise upload offset not advancing")
-                throw Failed(message: String(localized: "錄音一直沒辦法完整傳到企業伺服器"))
+                throw Failed(message: String(localized: "录音一直没办法完整传到企业服务器"))
             }
             try file.seek(toOffset: UInt64(offset))
             let chunk = try file.read(upToCount: Self.chunkSize) ?? Data()
@@ -270,7 +270,7 @@ struct ServerTranscriber {
         return true
     }
 
-    /// 伺服器回的 Upload-Offset：沒有、不是數字是 nil；負的、比檔案大當成 0（從頭傳）
+    /// 服务器回的 Upload-Offset：没有、不是数字是 nil；负的、比文件大当成 0（从头传）
     private static func offset(_ response: HTTPURLResponse, bytes: Int64) -> Int64? {
         guard let value = response.value(forHTTPHeaderField: "Upload-Offset").flatMap({ Int64($0) }) else { return nil }
         return (0...bytes).contains(value) ? value : 0
@@ -283,9 +283,9 @@ struct ServerTranscriber {
         return try Self.parse(json)
     }
 
-    /// 伺服器的結果換成段落（M§36.2；標準答案 server/result.json）：少了開始、結束、文字的段落略過；一段都沒有是「沒有辨識出文字」。
-    /// 時間不合理的段落也略過（不是有限的數字、開始是負的、結束比開始早、超過 maxSeconds），接縫只留 0～maxSeconds（同 Windows）。
-    /// 說話者在本機辨識，結果裡的 speaker、voices 不用
+    /// 服务器的结果换成段落（M§36.2；标准答案 server/result.json）：少了开始、结束、文字的段落略过；一段都没有是「没有识别出文字」。
+    /// 时间不合理的段落也略过（不是有限的数字、开始是负的、结束比开始早、超过 maxSeconds），接缝只留 0～maxSeconds（同 Windows）。
+    /// 说话者在本机识别，结果里的 speaker、voices 不用
     nonisolated static func parse(_ json: [String: Any]) throws -> Remote {
         let items = json["segments"] as? [[String: Any]] ?? []
         let segments = items.compactMap { item -> TranscribedSegment? in

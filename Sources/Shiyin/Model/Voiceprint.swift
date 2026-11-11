@@ -1,6 +1,6 @@
 import Foundation
 
-/// 聲紋（design §21.4）：說話者辨識給的 256 維向量，存成 Float32 little endian
+/// 声纹（design §21.4）：说话者识别给的 256 维向量，存成 Float32 little endian
 enum Voiceprint {
     static func data(_ vector: [Float]) -> Data {
         vector.withUnsafeBufferPointer { Data(buffer: $0) }

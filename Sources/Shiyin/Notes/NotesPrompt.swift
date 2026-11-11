@@ -1,6 +1,6 @@
 import Foundation
 
-/// 校稿時使用者的一題回答
+/// 校稿时用户的一题回答
 struct ReviewAnswer: Codable, Hashable {
     var time: String
     var question: String
@@ -15,14 +15,15 @@ struct NotesContext {
     var bookmarks: [Bookmark]
     var glossary: [String]
     var template: TemplateDefinition
-    /// 會議參考資料（design §39.3、R61.5）；沒有文件時提示詞跟以前一字不差
+    /// 会议参考资料（design §39.3、R61.5）；没有文档时提示词跟以前一字不差
     var documents: [DocumentText] = []
+    var assistance: String = ""
 }
 
-/// 整理與校稿的提示詞（design §8.3），規則沿用第二版；依會議語言分成中文、英文、日文三份（design §16.5、§18.4）
+/// 整理与校稿的提示词（design §8.3），规则沿用第二版；依会议语言分成中文、英文、日文三份（design §16.5、§18.4）
 enum NotesPrompt {
-    /// documents：有參考文件時接上文件的規則（design §39.3、D133）。語言的兩級（design §41.2、D140、D141）：
-    /// 共用別的語言那份的精調語言（粵語）最後接一段逐字稿的說明；一般語言（韓文）用英文那份、改成用那個語言寫
+    /// documents：有参考文档时接上文档的规则（design §39.3、D133）。语言的两级（design §41.2、D140、D141）：
+    /// 共用别的语言那份的精调语言（粤语）最后接一段逐字稿的说明；一般语言（韩文）用英文那份、改成用那个语言写
     static func system(_ language: MeetingLanguage, documents: Bool = false) -> String {
         var text = language.prompt(zh: systemChinese, en: systemEnglish, ja: systemJapanese)
         if language.profile.tier == .general, let name = language.profile.outputName {
@@ -39,20 +40,20 @@ enum NotesPrompt {
     }
 
     static let systemChinese = """
-    你是會議紀錄整理者。根據使用者提供的會議逐字稿，整理成結構化的會議紀錄，一律使用繁體中文（台灣用語）。
+    你是会议记录整理者。根据用户提供的会议逐字稿，整理成结构化的会议记录，一律使用简体中文（大陆用语）。
 
-    規則：
-    1. 只根據逐字稿與使用者筆記撰寫，不要補充沒有提到的資訊。
-    2. 逐字稿來自語音辨識，英文術語、人名、縮寫常被聽錯（同一個詞可能出現好幾種寫法）。請依上下文和詞彙表推斷正確寫法，但凡是推斷出來的專有名詞、人名，一定要列進 reviewItems 讓使用者確認。
-    3. 每一條紀錄（summary、decisions、actionItems、openQuestions、topics 的 points、custom 的 items）都要填 time：該內容在逐字稿中出現的時間點，寫成 mm:ss（例如 03:15，超過一小時寫 1:03:15），不要加括號。綜合多處的內容，填最主要的那一處。
-    4. 逐字稿每行標有說話者。actionItems 的 owner 只填明確提到的負責人，優先使用說話者的名字；不明確就留空字串並列進 reviewItems。
-    5. actionItems 的 due 依提示中的「會議日期」換算成 yyyy-MM-dd（例如「下週三」要依會議日期和星期幾推算，星期幾要算對）；沒提到期限就留空字串，提到但不明確就留空並列進 reviewItems。
-    6. reviewItems 最多 8 題，相近的問題要合併；只問會影響紀錄正確性的地方：專有名詞、人名、負責人、期限、方案內容。每題的 time 填相關段落的時間點。能用「是」或「不是」回答的題目（例如「負責人是小田切嗎？」）寫成是非題，yesNo 填 true；要使用者說出答案的（例如「這個系統的正確名稱是什麼？」）yesNo 填 false。
-    7. 「使用者筆記」與「重點標記」代表使用者自己認為重要的內容，必須納入紀錄；筆記裡逐字稿沒有的資訊也可以寫入，但不要改變原意。
-    8. 依「範本」只產生指定的段落，沒指定的段落給空陣列。custom 依範本的自訂段落順序產生，title 用範本給的段落名稱。
-    9. topics 依議題分段，start 填該議題開始的時間點。
-    10. title：提示中有「現有標題」就原樣回傳；沒有就依內容取一個 20 字以內的標題。
-    11. 時間點格式一律是 mm:ss，超過一小時用 h:mm:ss，與逐字稿相同。沒有時間資訊時填空字串。
+    规则：
+    1. 只根据逐字稿与用户笔记撰写，不要补充没有提到的信息。
+    2. 逐字稿来自语音识别，英文术语、人名、缩写常被听错（同一个词可能出现好几种写法）。请依上下文和词汇表推断正确写法，但凡是推断出来的专有名词、人名，一定要列进 reviewItems 让用户确认。
+    3. 每一条记录（summary、decisions、actionItems、openQuestions、topics 的 points、custom 的 items）都要填 time：该内容在逐字稿中出现的时间点，写成 mm:ss（例如 03:15，超过一小时写 1:03:15），不要加括号。综合多处的内容，填最主要的那一处。
+    4. 逐字稿每行标有说话者。actionItems 的 owner 只填明确提到的负责人，优先使用说话者的名字；不明确就留空字符串并列进 reviewItems。
+    5. actionItems 的 due 依提示中的「会议日期」换算成 yyyy-MM-dd（例如「下周三」要依会议日期和星期几推算，星期几要算对）；没提到期限就留空字符串，提到但不明确就留空并列进 reviewItems。
+    6. reviewItems 最多 8 题，相近的问题要合并；只问会影响记录正确性的地方：专有名词、人名、负责人、期限、方案内容。每题的 time 填相关段落的时间点。能用「是」或「不是」回答的题目（例如「负责人是小田切吗？」）写成是非题，yesNo 填 true；要用户说出答案的（例如「这个系统的正确名称是什么？」）yesNo 填 false。
+    7. 「用户笔记」与「重点标记」代表用户自己认为重要的内容，必须纳入记录；笔记里逐字稿没有的信息也可以写入，但不要改变原意。
+    8. 依「模板」只产生指定的段落，没指定的段落给空数组。custom 依模板的自订段落顺序产生，title 用模板给的段落名称。
+    9. topics 依议题分段，start 填该议题开始的时间点。
+    10. title：提示中有「现有标题」就原样回传；没有就依内容取一个 20 字以内的标题。
+    11. 时间点格式一律是 mm:ss，超过一小时用 h:mm:ss，与逐字稿相同。没有时间信息时填空字符串。
     """
 
     static let systemEnglish = """
@@ -90,25 +91,25 @@ enum NotesPrompt {
     12. 文体は簡潔な常体（である調）か体言止めにする。
     """
 
-    /// 提示詞裡的欄位名稱
+    /// 提示词里的字段名称
     private struct Labels {
         var meetingDate, existingTitle, participants, notProvided, glossary, none, template, sections, custom, extra: String
         var userNotes, bookmarks, transcript, currentNotes, answers, answer, reviseInstructions, listSeparator, colon: String
         var section: (String, String) -> String
 
         static let zh = Labels(
-            meetingDate: "會議日期", existingTitle: "現有標題", participants: "與會者", notProvided: "未提供",
-            glossary: "詞彙表（正確寫法）", none: "無", template: "範本", sections: "要產生的段落",
-            custom: "自訂段落（放在 custom，依序）", extra: "額外指示",
-            userNotes: "使用者筆記（[時間] 是做筆記時的錄音時間）", bookmarks: "重點標記",
-            transcript: "逐字稿（[時間] 說話者：內容，標 (?) 的是辨識信心低的段落）",
-            currentNotes: "目前的會議紀錄（JSON）", answers: "使用者對待確認題目的回答", answer: "回答",
+            meetingDate: "会议日期", existingTitle: "现有标题", participants: "与会者", notProvided: "未提供",
+            glossary: "词汇表（正确写法）", none: "无", template: "模板", sections: "要产生的段落",
+            custom: "自订段落（放在 custom，依序）", extra: "额外指示",
+            userNotes: "用户笔记（[时间] 是做笔记时的录音时间）", bookmarks: "重点标记",
+            transcript: "逐字稿（[时间] 说话者：内容，标 (?) 的是识别信心低的段落）",
+            currentNotes: "目前的会议记录（JSON）", answers: "用户对待确认题目的回答", answer: "回答",
             reviseInstructions: """
 
-            請依使用者的回答修正會議紀錄後，回傳完整的會議紀錄：
-            - 依回答修正所有相關內容（摘要、決議、待辦、未決問題、議題、自訂段落、標題都要一併檢查），時間點維持不變。
-            - 已回答的題目從 reviewItems 移除；目前會議紀錄裡沒被回答的題目原樣保留。
-            - 除非回答本身帶出新的疑點，否則不要新增題目。
+            请依用户的回答修正会议记录后，回传完整的会议记录：
+            - 依回答修正所有相关内容（摘要、决议、待办、未决问题、议题、自订段落、标题都要一并检查），时间点维持不变。
+            - 已回答的题目从 reviewItems 移除；目前会议记录里没被回答的题目原样保留。
+            - 除非回答本身带出新的疑点，否则不要添加题目。
             """,
             listSeparator: "、", colon: "：",
             section: { id, label in "\(id)（\(label)）" })
@@ -182,6 +183,10 @@ enum NotesPrompt {
             lines.append("")
             lines.append("\(l.userNotes)\(l.colon)")
             lines.append(notes)
+        }
+        if !c.assistance.isEmpty {
+            lines.append("")
+            lines.append(c.assistance)
         }
         if !c.bookmarks.isEmpty {
             lines.append("")

@@ -1,7 +1,7 @@
 #include "qwen_shim.h"
-// llama.cpp 的薄層（design §32.2、D106）：把 Qwen3-ASR 的一段音訊轉成文字。提示詞是 GGUF 裡的 ChatML 樣板：
-// system = 詞彙表、user = 音訊、assistant 先填「language X<asr_text>」強制語言（Qwen3-ASR 官方的做法）。
-// 每段開始前清掉 KV cache；greedy 取樣，重試時才加重複懲罰和溫度（§32.4）。
+// llama.cpp 的薄层（design §32.2、D106）：把 Qwen3-ASR 的一段音频转成文字。提示词是 GGUF 里的 ChatML 样板：
+// system = 词汇表、user = 音频、assistant 先填「language X<asr_text>」强制语言（Qwen3-ASR 官方的做法）。
+// 每段开始前清掉 KV cache；greedy 采样，重试时才加重复惩罚和温度（§32.4）。
 #include <llama/llama.h>
 #include <llama/mtmd.h>
 #include <llama/mtmd-helper.h>
@@ -83,7 +83,7 @@ int32_t qwen_transcribe(qwen_engine *e, const float *samples, int32_t n_samples,
     if (n_tokens_out) *n_tokens_out = 0;
     qwen_params p = params ? *params : qwen_params_default();
 
-    // 提示詞：ChatML（GGUF 裡的樣板）；system = context，user = 音訊，assistant 先填語言前綴（Qwen3-ASR 的輸出格式）
+    // 提示词：ChatML（GGUF 里的样板）；system = context，user = 音频，assistant 先填语言前缀（Qwen3-ASR 的输出格式）
     const char *marker = mtmd_default_marker();
     const char *context = p.context ? p.context : "";
     size_t cap = strlen(context) + strlen(marker) + strlen(p.language) + 160;

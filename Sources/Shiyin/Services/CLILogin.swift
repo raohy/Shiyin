@@ -1,20 +1,20 @@
 import AppKit
 import Foundation
 
-/// Claude Code、Codex 的登入狀態與重新登入（3.1.2，使用者回報：登入過期時只看到英文錯誤，不知道怎麼辦）
+/// Claude Code、Codex 的登录状态与重新登录（3.1.2，用户反馈：登录过期时只看到英文错误，不知道怎么办）
 @MainActor
 enum CLILogin {
     struct Status: Equatable {
         var loggedIn: Bool
-        /// 已登入時的說明，例如「someone@example.com（Max 方案）」或「Logged in using ChatGPT」
+        /// 已登录时的说明，例如「someone@example.com（Max 方案）」或「Logged in using ChatGPT」
         var detail: String
     }
 
-    /// 查登入狀態，不會送出請求、不消耗額度。找不到指令或看不懂輸出時回傳 nil。
-    /// 注意：「登入過期、刷新失敗」時這裡可能還是顯示已登入，要實際送出請求才知道（設定裡的「測試整理工具」）
+    /// 查登录状态，不会送出请求、不消耗额度。找不到命令或看不懂输出时回传 nil。
+    /// 注意：「登录过期、刷新失败」时这里可能还是显示已登录，要实际送出请求才知道（设置里的「测试整理工具」）
     static func status(_ provider: LLMProvider) async -> Status? {
         #if DEBUG
-        // -debugCLILogin no：當成沒登入，不執行 CLI（design §34.6）
+        // -debugCLILogin no：当成没登录，不执行 CLI（design §34.6）
         if UserDefaults.standard.string(forKey: "debugCLILogin") == "no", provider == .claude || provider == .codex {
             return Status(loggedIn: false, detail: "")
         }
@@ -31,10 +31,10 @@ enum CLILogin {
             }
             return Status(loggedIn: loggedIn, detail: detail)
         case .codex:
-            // 桌面版附的 codex 也一樣問它自己（跟 CLI 共用 ~/.codex，拾音不讀登入資料，R55.2）
+            // 桌面版附的 codex 也一样问它自己（跟 CLI 共用 ~/.codex，拾音不读登录资料，R55.2）
             guard let tool = Paths.locateTool("codex"),
                   let output = await run(tool.url, ["login", "status"], environment: tool.environment) else { return nil }
-            // codex 把狀態印在 stdout 或 stderr，兩個都看
+            // codex 把状态印在 stdout 或 stderr，两个都看
             let line = (output.stdout + "\n" + output.stderr).split(separator: "\n").first { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
                 .map(String.init) ?? ""
             let loggedIn = line.localizedCaseInsensitiveContains("logged in") && !line.localizedCaseInsensitiveContains("not logged in")
@@ -44,7 +44,7 @@ enum CLILogin {
         }
     }
 
-    /// 查登入狀態並記進快取（design §34.1）；看不出來時快取是 nil，當作準備好
+    /// 查登录状态并记进缓存（design §34.1）；看不出来时缓存是 nil，当作准备好
     @discardableResult
     static func refresh(_ provider: LLMProvider) async -> Status? {
         let status = await status(provider)
@@ -52,26 +52,26 @@ enum CLILogin {
         return status
     }
 
-    /// 目前的整理工具是 claude、codex 時，距離上次查超過 60 秒才再查（app 啟動、回到前景）
+    /// 目前的整理工具是 claude、codex 时，距离上次查超过 60 秒才再查（app 启动、回到前景）
     static func refreshIfStale() async {
         let provider = AppSettings.provider
         guard provider == .claude || provider == .codex, CLILoginCache.isStale(provider, after: 60) else { return }
         await refresh(provider)
     }
 
-    /// 打開「終端機」執行登入指令（會開瀏覽器登入頁）。用 .command 檔案打開，不需要自動化權限
+    /// 打开「终端」执行登录命令（会开浏览器登录页）。用 .command 文件打开，不需要自动化权限
     static func openLogin(_ provider: LLMProvider) {
         let tool = provider == .codex ? "codex" : "claude"
         guard let location = Paths.locateTool(tool) else { return }
-        // 桌面版附的 codex：打開那個 app 登入（R55.3），不開終端機
+        // 桌面版附的 codex：打开那个 app 登录（R55.3），不开终端
         if let app = location.appURL {
             NSWorkspace.shared.open(app)
             return
         }
         let exe = location.url
         let arguments = provider == .codex ? "login" : "auth login"
-        let intro = String(localized: "拾音：正在打開瀏覽器登入 \(provider.shortLabel)。登入完成後，回到拾音按「重試」或「測試整理工具」。")
-        let done = String(localized: "完成後可以關掉這個視窗。")
+        let intro = String(localized: "拾音：正在打开浏览器登录 \(provider.shortLabel)。登录完成后，回到拾音按「重试」或「测试整理工具」。")
+        let done = String(localized: "完成后可以关掉这个窗口。")
         let script = """
             #!/bin/zsh
             clear
@@ -95,7 +95,7 @@ enum CLILogin {
         "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
-    /// 用桌面版附的 codex 時是 app 的名稱（例如 ChatGPT），使用者自己裝的是 nil（R55.3）
+    /// 用桌面版附的 codex 时是 app 的名称（例如 ChatGPT），用户自己装的是 nil（R55.3）
     nonisolated static func desktopApp(_ provider: LLMProvider) -> String? {
         provider == .codex ? Paths.locateTool("codex")?.desktopApp : nil
     }

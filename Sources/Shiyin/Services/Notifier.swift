@@ -1,32 +1,32 @@
 import Foundation
 import UserNotifications
 
-/// 系統通知（design §10、R12）。沒有授權就不發，其他功能不受影響。
+/// 系统通知（design §10、R12）。没有授权就不发，其他功能不受影响。
 @MainActor
 final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     var onOpen: ((Int64) -> Void)?
-    /// 偵測到會議的通知按鈕（design §21.7）：動作（start、mute、stop、continue）、哪個 app
+    /// 检测到会议的通知按钮（design §21.7）：动作（start、mute、stop、continue）、哪个 app
     var onMeetingAction: ((String, String) -> Void)?
-    /// 忘了停止錄音的通知按鈕（design §35.2）：stop、continue
+    /// 忘了停止录音的通知按钮（design §35.2）：stop、continue
     var onIdleAction: ((String) -> Void)?
     #if DEBUG
-    /// 驗證用：最近要發的通知內容（沒有通知權限時也記錄）
+    /// 验证用：最近要发的通知内容（没有通知权限时也记录）
     private(set) var recent: [[String: Any]] = []
     #endif
 
     func activate() {
         UNUserNotificationCenter.current().delegate = self
         let start = UNNotificationCategory(identifier: "MEETING_START", actions: [
-            UNNotificationAction(identifier: "start", title: String(localized: "開始錄音"), options: []),
-            UNNotificationAction(identifier: "mute", title: String(localized: "不要再提醒這個 app"), options: []),
+            UNNotificationAction(identifier: "start", title: String(localized: "开始录音"), options: []),
+            UNNotificationAction(identifier: "mute", title: String(localized: "不要再提醒这个 app"), options: []),
         ], intentIdentifiers: [])
         let stop = UNNotificationCategory(identifier: "MEETING_STOP", actions: [
-            UNNotificationAction(identifier: "stop", title: String(localized: "停止並轉錄"), options: []),
-            UNNotificationAction(identifier: "continue", title: String(localized: "繼續錄"), options: []),
+            UNNotificationAction(identifier: "stop", title: String(localized: "停止并转录"), options: []),
+            UNNotificationAction(identifier: "continue", title: String(localized: "继续录"), options: []),
         ], intentIdentifiers: [])
         let idle = UNNotificationCategory(identifier: "IDLE_PROMPT", actions: [
-            UNNotificationAction(identifier: "stop", title: String(localized: "停止錄音"), options: []),
-            UNNotificationAction(identifier: "continue", title: String(localized: "繼續錄"), options: []),
+            UNNotificationAction(identifier: "stop", title: String(localized: "停止录音"), options: []),
+            UNNotificationAction(identifier: "continue", title: String(localized: "继续录"), options: []),
         ], intentIdentifiers: [])
         UNUserNotificationCenter.current().setNotificationCategories([start, stop, idle])
     }
@@ -36,18 +36,18 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         return status == .authorized || status == .provisional
     }
 
-    /// 偵測到會議（design §21.7）
+    /// 检测到会议（design §21.7）
     func meetingPrompt(_ prompt: MeetingDetector.Prompt) {
         let content = UNMutableNotificationContent()
         switch prompt {
         case .start(let app):
-            content.title = String(localized: "\(app.name) 正在開會")
-            content.body = String(localized: "要開始錄音嗎？")
+            content.title = String(localized: "\(app.name) 正在开会")
+            content.body = String(localized: "要开始录音吗？")
             content.categoryIdentifier = "MEETING_START"
             content.userInfo = ["bundle": app.bundleID]
         case .stop(let app):
-            content.title = String(localized: "會議好像結束了")
-            content.body = String(localized: "要停止錄音並轉錄嗎？")
+            content.title = String(localized: "会议好像结束了")
+            content.body = String(localized: "要停止录音并转录吗？")
             content.categoryIdentifier = "MEETING_STOP"
             content.userInfo = ["bundle": app.bundleID]
         }
@@ -55,8 +55,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         post(content)
     }
 
-    /// 收音提醒（R42.1、design §31.5）：內容跟錄音畫面同一句，點了打開錄音中的會議
-    /// `kind` 是提示的種類（silent、quiet、noisy、bluetooth），只給 DEBUG 的紀錄
+    /// 收音提醒（R42.1、design §31.5）：内容跟录音画面同一句，点了打开录音中的会议
+    /// `kind` 是提示的种类（silent、quiet、noisy、bluetooth），只给 DEBUG 的记录
     func levelHint(_ text: String, kind: String, meetingId: Int64) {
         let content = UNMutableNotificationContent()
         content.title = String(localized: "收音提醒")
@@ -70,11 +70,11 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         post(content)
     }
 
-    /// 錄音中很久沒人說話（R48.1）：按鈕「停止錄音」「繼續錄」，點通知本身打開錄音中的會議
+    /// 录音中很久没人说话（R48.1）：按钮「停止录音」「继续录」，点通知本身打开录音中的会议
     func idlePrompt(meetingId: Int64) {
         let content = UNMutableNotificationContent()
-        content.title = String(localized: "好像沒人在說話了")
-        content.body = String(localized: "要停止錄音嗎？再 15 分鐘沒人說話會自動停止。")
+        content.title = String(localized: "好像没人在说话了")
+        content.body = String(localized: "要停止录音吗？再 15 分钟没人说话会自动停止。")
         content.categoryIdentifier = "IDLE_PROMPT"
         content.sound = .default
         content.userInfo = ["meetingId": NSNumber(value: meetingId), "idle": true]
@@ -84,11 +84,11 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         post(content)
     }
 
-    /// 沒人說話太久，自動停止了（R48.2）：點了打開那場會議
+    /// 没人说话太久，自动停止了（R48.2）：点了打开那场会议
     func idleStopped(meetingId: Int64, title: String) {
         let content = UNMutableNotificationContent()
-        content.title = String(localized: "已自動停止錄音")
-        content.body = String(localized: "\(title)：30 分鐘沒有人說話")
+        content.title = String(localized: "已自动停止录音")
+        content.body = String(localized: "\(title)：30 分钟没有人说话")
         content.sound = .default
         content.userInfo = ["meetingId": NSNumber(value: meetingId)]
         #if DEBUG
@@ -101,21 +101,21 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let content = UNMutableNotificationContent()
         let title = meeting.displayTitle
         if let error {
-            content.title = job.kind == .transcribe ? String(localized: "轉錄失敗") : String(localized: "整理失敗")
-            // 只取第一行（design §40.2）：額度用完的第二行是 CLI 的原文，放不下就不要擠進來
+            content.title = job.kind == .transcribe ? String(localized: "转录失败") : String(localized: "整理失败")
+            // 只取第一行（design §40.2）：额度用完的第二行是 CLI 的原文，放不下就不要挤进来
             let firstLine = error.localizedDescription.split(whereSeparator: \.isNewline).first.map(String.init) ?? error.localizedDescription
             content.body = String(localized: "\(title)：\(String(firstLine.prefix(60)))")
         } else if job.kind == .transcribe {
-            content.title = String(localized: "轉錄完成")
+            content.title = String(localized: "转录完成")
             content.body = title
         } else if job.kind == .summarize, let payload = job.payload,
                   (try? JSONDecoder().decode(SummarizePayload.self, from: Data(payload.utf8)))?.draft == true {
-            content.title = String(localized: "會議紀錄草稿好了")
-            content.body = String(localized: "\(title)（正式轉錄完成後會自動更新）")
+            content.title = String(localized: "会议记录草稿好了")
+            content.body = String(localized: "\(title)（正式转录完成后会自动更新）")
         } else {
             let count = meeting.decodedNotes?.reviewItems.count ?? 0
-            content.title = String(localized: "會議紀錄整理好了")
-            content.body = count > 0 ? String(localized: "\(title)，有 \(count) 題待確認") : title
+            content.title = String(localized: "会议记录整理好了")
+            content.body = count > 0 ? String(localized: "\(title)，有 \(count) 题待确认") : title
         }
         content.sound = .default
         content.userInfo = ["meetingId": NSNumber(value: meeting.id ?? 0)]

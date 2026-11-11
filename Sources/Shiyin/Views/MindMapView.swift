@@ -1,25 +1,25 @@
 import AppKit
 import SwiftUI
 
-/// 心智圖（design §42.4、R67）：用 MindMap.layout 的座標畫；連線畫在 Canvas，節點是一般的文字。
-/// 匯出（exporting）時白底、淺色的調色盤、時間是一般的字；畫面上跟著深色模式，時間點了播放
+/// 心智图（design §42.4、R67）：用 MindMap.layout 的座标画；连接画在 Canvas，节点是一般的文字。
+/// 导出（exporting）时白底、浅色的调色盘、时间是一般的字；画面上跟着深色模式，时间点了播放
 struct MindMapView: View {
     @Environment(\.snapshotMode) private var snapshotMode
     @Environment(\.textScale) private var textScale
     @Environment(\.colorScheme) private var colorScheme
     let layout: MindMap.Layout
     let language: MeetingLanguage
-    /// 畫面上可以用的寬度（外面那層量的；放在上下捲的頁面裡，不能自己用 GeometryReader 量高度）
+    /// 画面上可以用的宽度（外面那层量的；放在上下卷的页面里，不能自己用 GeometryReader 量高度）
     var availableWidth: Double = 0
     var exporting = false
-    /// 點時間點（畫面上、有錄音時才有）
+    /// 点时间点（画面上、有录音时才有）
     var onSeek: ((Double) -> Void)? = nil
 
     var body: some View {
         if exporting || snapshotMode {
             canvas
         } else {
-            // 比畫面寬時縮小到放得下（最小 0.6 倍），再乘上文字大小（⌘＋／⌘－）；還是比畫面寬時左右捲，上下跟著整頁捲
+            // 比画面宽时缩小到放得下（最小 0.6 倍），再乘上文字大小（⌘＋／⌘－）；还是比画面宽时左右卷，上下跟着整页卷
             let fit = max(0.6, min(1, (availableWidth - 16) / layout.width))
             let zoom = fit * textScale
             ScrollView(.horizontal) {
@@ -90,13 +90,13 @@ private struct MindMapNode: View {
 
     @ViewBuilder private var time: some View {
         if !box.time.isEmpty {
-            // 估的寬度比真的字窄一點時寧可超出到間距裡，不要變成「00:…」
+            // 估的宽度比真的字窄一点时宁可超出到间距里，不要变成「00:…」
             let label = Text(box.time).font(.system(size: MindMap.timeSize).monospacedDigit()).lineLimit(1).fixedSize()
             Group {
                 if let onSeek, let seconds {
                     Button { onSeek(seconds) } label: { label.foregroundStyle(Color.celadon) }
                         .buttonStyle(.plain)
-                        .help("從這裡播放")
+                        .help("从这里播放")
                 } else {
                     label.foregroundStyle(exporting ? Color(hex: MindMap.secondaryColor) : Color.secondary)
                 }
@@ -141,7 +141,7 @@ extension Color {
     }
 }
 
-/// 匯出、複製心智圖（design §42.4）：跟畫面同一個 MindMapView，匯出模式
+/// 导出、复制心智图（design §42.4）：跟画面同一个 MindMapView，导出模式
 @MainActor
 enum MindMapExport {
     static func layout(_ b: ExportBundle) -> MindMap.Layout? {
@@ -172,6 +172,6 @@ enum MindMapExport {
             context.closePDF()
             failed = false
         }
-        if failed { throw ExportError.failed(String(localized: "沒辦法建立 PDF")) }
+        if failed { throw ExportError.failed(String(localized: "没办法创建 PDF")) }
     }
 }

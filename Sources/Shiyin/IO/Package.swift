@@ -1,6 +1,6 @@
 import Foundation
 
-/// 整場會議封包 .shiyin（design §10、R7.4、R3.3）：zip 裡有 manifest、會議、逐字稿、錄音
+/// 整场会议封包 .shiyin（design §10、R7.4、R3.3）：zip 里有 manifest、会议、逐字稿、录音
 enum MeetingPackage {
     static let formatVersion = 1
 
@@ -21,9 +21,9 @@ enum MeetingPackage {
         var templateId: String
         var userNotes: String
         var channels: String
-        /// 資料夾名稱（R9.2）；舊封包沒有這個欄位
+        /// 文件夹名称（R9.2）；旧封包没有这个字段
         var folder: String?
-        /// 會議語言（design §16.3）；舊封包沒有這個欄位，當成中文
+        /// 会议语言（design §16.3）；旧封包没有这个字段，当成中文
         var language: String?
         var notes: MeetingNotes?
         var notesBy: String?
@@ -34,17 +34,17 @@ enum MeetingPackage {
     struct SpeakerJSON: Codable { var idx: Int; var name: String }
     struct BookmarkJSON: Codable { var time: Double; var label: String }
     struct SegmentJSON: Codable { var start: Double; var end: Double; var text: String; var lowConfidence: Bool; var speaker: Int? }
-    /// 參考文件（design §39.5）：documents.json 的一項，file 是封包裡原始檔的位置
+    /// 参考文档（design §39.5）：documents.json 的一项，file 是封包里源文件的位置
     struct DocumentJSON: Codable { var name: String; var file: String; var kind: String; var pages: [String]; var ocr: Bool }
 
-    /// documents.json 的內容：原始檔放 documents/<序號>-<檔名>，序號從 1
+    /// documents.json 的内容：源文件放 documents/<序号>-<文件名>，序号从 1
     static func documentEntries(_ documents: [MeetingDocument]) -> [DocumentJSON] {
         documents.enumerated().map { i, d in
             DocumentJSON(name: d.name, file: "documents/\(i + 1)-\(d.name)", kind: d.kind, pages: d.pageTexts, ocr: d.ocr)
         }
     }
 
-    /// 封包裡文件的位置只能是 documents/<一般的檔名>：封包可能來自別人，不能指到別的地方
+    /// 封包里文档的位置只能是 documents/<一般的文件名>：封包可能来自别人，不能指到别的地方
     static func isSafeDocumentPath(_ file: String) -> Bool {
         let parts = file.split(separator: "/", omittingEmptySubsequences: false)
         guard parts.count == 2, parts[0] == "documents" else { return false }
@@ -56,8 +56,8 @@ enum MeetingPackage {
         case invalid(String), tooNew(Int)
         var errorDescription: String? {
             switch self {
-            case .invalid(let reason): return String(localized: "這不是有效的拾音封包：\(reason)")
-            case .tooNew(let v): return String(localized: "這個封包是新版拾音匯出的（格式 \(v)），請先更新拾音再匯入")
+            case .invalid(let reason): return String(localized: "这不是有效的拾音封包：\(reason)")
+            case .tooNew(let v): return String(localized: "这个封包是新版拾音导出的（格式 \(v)），请先更新拾音再导入")
             }
         }
     }
@@ -85,7 +85,7 @@ enum MeetingPackage {
             .write(to: dir.appendingPathComponent("meeting.json"))
         try encoder.encode(b.segments.map { SegmentJSON(start: $0.start, end: $0.end, text: $0.text, lowConfidence: $0.lowConfidence, speaker: $0.speaker) })
             .write(to: dir.appendingPathComponent("transcript.json"))
-        // 參考文件：原始檔不在了的那份不放（不然匯入時會被當成壞掉的封包）
+        // 参考文档：源文件不在了的那份不放（不然导入时会被当成坏掉的封包）
         let documents = b.documents.filter { FileManager.default.fileExists(atPath: $0.fileURL.path) }
         if !documents.isEmpty {
             try FileManager.default.createDirectory(at: dir.appendingPathComponent("documents"), withIntermediateDirectories: true)
@@ -99,7 +99,7 @@ enum MeetingPackage {
         try ditto(["-c", "-k", "--norsrc", "--noextattr", "--noqtn", dir.path, url.path])
     }
 
-    /// folder：封包沒帶資料夾時放進的資料夾（目前正在看的那個）。在背景執行（design §21.13）
+    /// folder：封包没带文件夹时放进的文件夹（目前正在看的那个）。在背景执行（design §21.13）
     static func importPackage(_ url: URL, db: AppDatabase, folder: String = "") throws -> Meeting {
         let accessing = url.startAccessingSecurityScopedResource()
         defer { if accessing { url.stopAccessingSecurityScopedResource() } }
@@ -112,26 +112,26 @@ enum MeetingPackage {
         guard manifest.format <= formatVersion else { throw PackageError.tooNew(manifest.format) }
         guard let meetingData = try? Data(contentsOf: dir.appendingPathComponent("meeting.json")),
               let info = try? decoder.decode(MeetingJSON.self, from: meetingData) else { throw PackageError.invalid(String(localized: "缺少 meeting.json")) }
-        // transcript.json 存在卻讀不出來就報錯，不要當成沒有逐字稿（design §20.10、R18.10）
+        // transcript.json 存在却读不出来就报错，不要当成没有逐字稿（design §20.10、R18.10）
         let transcriptURL = dir.appendingPathComponent("transcript.json")
         var segments: [SegmentJSON] = []
         if FileManager.default.fileExists(atPath: transcriptURL.path) {
             guard let data = try? Data(contentsOf: transcriptURL), let decoded = try? decoder.decode([SegmentJSON].self, from: data) else {
-                throw PackageError.invalid(String(localized: "transcript.json 讀不出來"))
+                throw PackageError.invalid(String(localized: "transcript.json 读不出来"))
             }
             segments = decoded
         }
-        // 錄音檔只接受封包裡的一般檔案：封包可能來自別人，路徑或符號連結可以指到這台電腦上的任何檔案
+        // 录音档只接受封包里的一般文件：封包可能来自别人，路径或符号链接可以指到这台电脑上的任何文件
         var audioName: String?
         if let audio = manifest.audio {
             let name = (audio as NSString).lastPathComponent
             let values = try? dir.appendingPathComponent(name).resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
             guard name == audio, !name.isEmpty, !name.hasPrefix("."), values?.isRegularFile == true, values?.isSymbolicLink != true else {
-                throw PackageError.invalid(String(localized: "封包裡的錄音檔不正確"))
+                throw PackageError.invalid(String(localized: "封包里的录音档不正确"))
             }
             audioName = name
         }
-        // 參考文件（design §39.5）：先全部檢查過，再建立會議
+        // 参考文档（design §39.5）：先全部检查过，再创建会议
         var documents: [DocumentJSON] = []
         let documentsURL = dir.appendingPathComponent("documents.json")
         if FileManager.default.fileExists(atPath: documentsURL.path) {
@@ -141,7 +141,7 @@ enum MeetingPackage {
                       return DocumentKind(rawValue: entry.kind) != nil && isSafeDocumentPath(entry.file)
                           && values?.isRegularFile == true && values?.isSymbolicLink != true
                   })
-            else { throw PackageError.invalid(String(localized: "封包裡的文件不正確")) }
+            else { throw PackageError.invalid(String(localized: "封包里的文档不正确")) }
             documents = decoded
         }
 
@@ -163,7 +163,7 @@ enum MeetingPackage {
             }, duration: info.durationSeconds ?? 0, speakerCount: 0)
             for speaker in info.speakers { try db.renameSpeaker(id, idx: speaker.idx, name: speaker.name) }
             for bookmark in info.bookmarks { try db.addBookmark(id, time: bookmark.time, label: bookmark.label) }
-            if let notes = info.notes { try db.saveNotes(id, notes: notes, by: info.notesBy, reason: String(localized: "匯入")) }
+            if let notes = info.notes { try db.saveNotes(id, notes: notes, by: info.notesBy, reason: String(localized: "导入")) }
             try db.updateUserNotes(id, info.userNotes)
             for entry in documents {
                 _ = try DocumentStore.save(dir.appendingPathComponent(entry.file), name: entry.name, kind: DocumentKind(rawValue: entry.kind)!,
@@ -185,11 +185,11 @@ enum MeetingPackage {
         process.standardError = FileHandle.nullDevice
         try process.run()
         process.waitUntilExit()
-        guard process.terminationStatus == 0 else { throw PackageError.invalid(String(localized: "壓縮檔讀寫失敗")) }
+        guard process.terminationStatus == 0 else { throw PackageError.invalid(String(localized: "压缩档读写失败")) }
     }
 }
 
-/// 匯入逐字稿（srt、vtt、txt，R3.4）
+/// 导入逐字稿（srt、vtt、txt，R3.4）
 enum TranscriptImporter {
     struct Parsed { var segments: [(start: Double, end: Double, text: String)] }
 
@@ -198,7 +198,7 @@ enum TranscriptImporter {
             let lines = text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
             return Parsed(segments: lines.map { (0, 0, $0) })
         }
-        // srt／vtt：時間碼行之後到空行之前是文字
+        // srt／vtt：时间码行之后到空行之前是文字
         var segments: [(Double, Double, String)] = []
         let blocks = text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n\n")
         for block in blocks {

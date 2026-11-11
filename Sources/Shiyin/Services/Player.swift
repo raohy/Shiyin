@@ -1,7 +1,7 @@
 import AVFoundation
 import Observation
 
-/// 播放錄音、時間點跳播（R4.2、R5.3）
+/// 播放录音、时间点跳播（R4.2、R5.3）
 @MainActor
 @Observable
 final class Player {
@@ -21,7 +21,7 @@ final class Player {
         unload()
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         let item = AVPlayerItem(url: url)
-        item.audioTimePitchAlgorithm = .timeDomain   // 變速時人聲不變調
+        item.audioTimePitchAlgorithm = .timeDomain   // 变速时人声不变调
         let player = AVPlayer(playerItem: item)
         player.defaultRate = rate
         self.player = player

@@ -1,7 +1,7 @@
 import Foundation
 
 // claude / codex CLI（沿用第二版，design §8.4）。
-// 工作目錄是一個空的暫存資料夾：不會讀到任何專案的 CLAUDE.md，用完就刪
+// 工作目录是一个空的暂存文件夹：不会读到任何项目的 CLAUDE.md，用完就删
 
 struct ClaudeCLI: LLMBackend {
     let model: String
@@ -11,7 +11,7 @@ struct ClaudeCLI: LLMBackend {
         guard let exe = Paths.findTool("claude") else { throw LLMError.notInstalled("claude") }
         let dir = try Paths.makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }
-        // 不能加 --bare：--bare 不讀 OAuth 登入資訊
+        // 不能加 --bare：--bare 不读 OAuth 登录信息
         var args = ["-p", "--output-format", "json", "--tools", "", "--no-session-persistence", "--strict-mcp-config",
                     "--system-prompt", system, "--json-schema", format.schema]
         if !model.isEmpty { args += ["--model", model] }
@@ -24,7 +24,7 @@ struct ClaudeCLI: LLMBackend {
             let detail = result.stderrTail(500)
             if LLMError.isLoginProblem(detail + text) { throw LLMError.notLoggedIn("claude") }
             if LLMError.isLimitProblem(detail + text) { throw LLMError.cliLimited(.claude, output: detail + "\n" + text) }
-            throw LLMError.failed(detail.isEmpty ? String(localized: "claude 沒有回傳結果（結束代碼 \(result.status)）") : detail)
+            throw LLMError.failed(detail.isEmpty ? String(localized: "claude 没有回传结果（结束代码 \(result.status)）") : detail)
         }
         if (object["is_error"] as? Bool) == true || object["structured_output"] == nil {
             let message = (object["result"] as? String) ?? result.stderrTail(500)
@@ -55,16 +55,16 @@ struct CodexCLI: LLMBackend {
         args.append("-")
         let process = Subprocess(tool.url, args, environment: tool.environment, directory: dir)
         onStart(process)
-        // Codex 沒有獨立的系統提示詞參數，放在使用者提示詞前面
+        // Codex 没有独立的系统提示词参数，放在用户提示词前面
         let result = try await process.run(input: Data((system + "\n\n" + prompt).utf8), timeout: LLMClient.timeout)
         guard result.succeeded, let data = try? Data(contentsOf: output), !data.isEmpty else {
             let detail = result.stderrTail(500)
             if LLMError.isLoginProblem(detail) { throw LLMError.notLoggedIn("codex") }
             if LLMError.isLimitProblem(detail) { throw LLMError.cliLimited(.codex, output: detail) }
-            let message = detail.isEmpty ? String(localized: "codex 沒有回傳結果（結束代碼 \(result.status)）") : detail
-            // 桌面版附的 codex 出錯：建議另外裝 CLI（R55.4）
+            let message = detail.isEmpty ? String(localized: "codex 没有回传结果（结束代码 \(result.status)）") : detail
+            // 桌面版附的 codex 出错：建议另外装 CLI（R55.4）
             if let app = tool.desktopApp {
-                throw LLMError.failed(message + "\n" + String(localized: "這是 \(app) 附的 codex，也可以另外安裝 Codex CLI（npm install -g @openai/codex）再試。"))
+                throw LLMError.failed(message + "\n" + String(localized: "这是 \(app) 附的 codex，也可以另外安装 Codex CLI（npm install -g @openai/codex）再试。"))
             }
             throw LLMError.failed(message)
         }

@@ -1,5 +1,5 @@
 {
- "comment": "會議語言的做法（design §41.1、D139）：Mac、Windows 共用。中文、英文、日文的值是 4.3.0 以前寫死在程式裡的字，改了要重跑標準答案。陣列的順序是選單的順序。",
+ "comment": "会议语言的做法（design §41.1、D139）：Mac、Windows 共用。中文、英文、日文的值是 4.3.0 以前写死在程序里的字，改了要重跑标准答案。数组的顺序是菜单的顺序。 中文、粤语的结果转大陆简体（design §45、D151）。",
  "languages": [
   {
    "code": "zh",
@@ -10,9 +10,9 @@
    },
    "tier": "tuned",
    "base": "zh",
-   "locale": "zh_TW",
+   "locale": "zh_CN",
    "live": {
-    "mac": "zh_TW",
+    "mac": "zh_CN",
     "windows": "zh",
     "windowsConvert": "s2twp"
    },
@@ -21,23 +21,24 @@
     "engineSetting": true,
     "whisper": "zh",
     "qwen": "Chinese",
-    "traditional": true
+    "traditional": false,
+    "simplified": true
    },
    "spaced": false,
    "whisperPrompt": {
-    "base": "以下是繁體中文的工作會議錄音，會夾雜英文專有名詞。",
-    "glossary": "詞彙：%@。",
+    "base": "以下是简体中文的工作会议录音，会夹杂英文专有名词。",
+    "glossary": "词汇：%@。",
     "separator": "、",
     "limit": 150,
-    "natural": "好，那我們開始今天的會議。",
-    "naturalList": "好，那我們開始今天的會議，先看一下 %@ 這幾個部分的進度。"
+    "natural": "好，那我们开始今天的会议。",
+    "naturalList": "好，那我们开始今天的会议，先看一下 %@ 这几个部分的进度。"
    },
    "detect": "zh",
    "family": "zh",
    "ocr": {
     "mac": [
-     "zh-Hant",
      "zh-Hans",
+     "zh-Hant",
      "en-US"
     ],
     "windows": [
@@ -52,14 +53,14 @@
     "windowsUserProfile": false
    },
    "fonts": {
-    "typesetting": "zh-Hant",
-    "lang": "zh-Hant",
-    "titleMac": "Songti TC",
+    "typesetting": "zh-Hans",
+    "lang": "zh-Hans",
+    "titleMac": "Songti SC",
     "titleWindows": "PMingLiU, Microsoft JhengHei UI",
     "contentWindows": "zh-TW",
     "htmlMac": {
-     "body": "\"PingFang TC\", -apple-system, sans-serif",
-     "heading": "\"Songti TC\", serif"
+     "body": "\"PingFang SC\", -apple-system, sans-serif",
+     "heading": "\"Songti SC\", serif"
     },
     "htmlWindows": {
      "body": "\"Microsoft JhengHei\", \"Segoe UI\", sans-serif",
@@ -70,7 +71,7 @@
      "heading": "PMingLiU"
     }
    },
-   "speaker": "說話者 %lld"
+   "speaker": "说话者 %lld"
   },
   {
    "code": "en",
@@ -204,16 +205,16 @@
   },
   {
    "code": "yue",
-   "name": "廣東話",
+   "name": "广东话",
    "uiName": {
-    "zh": "廣東話",
+    "zh": "广东话",
     "en": "Cantonese"
    },
    "tier": "tuned",
    "base": "zh",
    "transcriptNote": {
-    "notes": "注意：逐字稿是粵語（廣東話）的口語，常見「係」「唔」「咗」「嘅」「佢哋」「喺」這些字。會議紀錄要寫成繁體中文的書面語，不要照抄口語；人名、專有名詞照逐字稿的寫法。",
-    "correction": "注意：逐字稿是粵語（廣東話）的口語，「係」「唔」「咗」「嘅」「佢哋」「喺」「冇」是正確的寫法，不要改成普通話。"
+    "notes": "注意：逐字稿是粤语（广东话）的口语，常见「系」「唔」「咗」「嘅」「佢哋」「喺」这些字。会议记录要写成简体中文的书面语，不要照抄口语；人名、专有名词照逐字稿的写法。",
+    "correction": "注意：逐字稿是粤语（广东话）的口语，「系」「唔」「咗」「嘅」「佢哋」「喺」「冇」是正确的写法，不要改成普通话。"
    },
    "locale": "zh_HK",
    "live": {
@@ -226,7 +227,8 @@
     "engineSetting": false,
     "whisper": "yue",
     "qwen": "Cantonese",
-    "traditional": true
+    "traditional": true,
+    "simplified": true
    },
    "scriptFixes": [
     {
@@ -294,8 +296,8 @@
    ],
    "spaced": false,
    "whisperPrompt": {
-    "base": "以下係廣東話嘅工作會議錄音，會夾雜英文專有名詞。",
-    "glossary": "詞彙：%@。",
+    "base": "以下系广东话嘅工作会议录音，会夹杂英文专有名词。",
+    "glossary": "词汇：%@。",
     "separator": "、",
     "limit": 150,
     "natural": null,
@@ -307,6 +309,7 @@
     "mac": [
      "zh-Hant",
      "yue-Hant",
+     "zh-Hans",
      "en-US"
     ],
     "windows": [
@@ -319,14 +322,14 @@
     "windowsUserProfile": false
    },
    "fonts": {
-    "typesetting": "zh-Hant",
-    "lang": "zh-Hant",
-    "titleMac": "Songti TC",
+    "typesetting": "zh-Hans",
+    "lang": "zh-Hans",
+    "titleMac": "Songti SC",
     "titleWindows": "PMingLiU, Microsoft JhengHei UI",
     "contentWindows": "zh-TW",
     "htmlMac": {
-     "body": "\"PingFang TC\", -apple-system, sans-serif",
-     "heading": "\"Songti TC\", serif"
+     "body": "\"PingFang SC\", -apple-system, sans-serif",
+     "heading": "\"Songti SC\", serif"
     },
     "htmlWindows": {
      "body": "\"Microsoft JhengHei\", \"Segoe UI\", sans-serif",
@@ -337,13 +340,13 @@
      "heading": "PMingLiU"
     }
    },
-   "speaker": "說話者 %lld"
+   "speaker": "说话者 %lld"
   },
   {
    "code": "ko",
    "name": "한국어",
    "uiName": {
-    "zh": "韓文",
+    "zh": "韩文",
     "en": "Korean"
    },
    "tier": "general",

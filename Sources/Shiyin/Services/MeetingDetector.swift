@@ -2,12 +2,12 @@ import AppKit
 import CoreAudio
 import SwiftUI
 
-/// 偵測線上會議（design §21.7、R19.4、D31）：已知的會議 app 開始用麥克風、拾音沒在錄音時提醒開始；
-/// 錄音期間用過麥克風的會議 app 都停了，提醒停止。只提醒，不自動開始或停止
+/// 检测在线会议（design §21.7、R19.4、D31）：已知的会议 app 开始用麦克风、拾音没在录音时提醒开始；
+/// 录音期间用过麦克风的会议 app 都停了，提醒停止。只提醒，不自动开始或停止
 @MainActor
 final class MeetingDetector {
     struct MeetingApp: Equatable {
-        var bundleID: String      // 已知名單裡的 ID（helper 程序也歸到主程式）
+        var bundleID: String      // 已知名单里的 ID（helper 程序也归到主程序）
         var name: String
     }
 
@@ -16,20 +16,20 @@ final class MeetingDetector {
         case stop(MeetingApp)
     }
 
-    /// 已知的會議 app
+    /// 已知的会议 app
     static let meetingApps: [String: String] = [
         "us.zoom.xos": "Zoom", "com.microsoft.teams2": "Microsoft Teams", "com.microsoft.teams": "Microsoft Teams",
         "Cisco-Systems.Spark": "Webex", "com.cisco.webexmeetingsapp": "Webex", "com.apple.FaceTime": "FaceTime",
         "com.tinyspeck.slackmacgap": "Slack", "jp.naver.line.mac": "LINE", "com.hnc.Discord": "Discord",
     ]
-    /// 瀏覽器：可能在開 Google Meet
+    /// 浏览器：可能在开 Google Meet
     static let browsers: [String: String] = [
         "com.google.Chrome": "Chrome", "com.apple.Safari": "Safari", "com.microsoft.edgemac": "Edge",
         "company.thebrowser.Browser": "Arc", "org.mozilla.firefox": "Firefox", "com.brave.Browser": "Brave",
     ]
     static let mutedKey = "meetingDetectionMuted"
 
-    /// 要提醒時呼叫（AppModel 決定用通知還是浮動視窗）
+    /// 要提醒时调用（AppModel 决定用通知还是浮动窗口）
     var onPrompt: ((Prompt) -> Void)?
     var isRecording: () -> Bool = { false }
 
@@ -40,7 +40,7 @@ final class MeetingDetector {
     private var usedDuringRecording: Set<String> = []
     private var stopPrompted = false
     #if DEBUG
-    /// shiyinctl meetingapp：模擬某個 app 開始、停止用麥克風
+    /// shiyinctl meetingapp：模拟某个 app 开始、停止用麦克风
     var simulated: [String: Bool] = [:]
     #endif
 
@@ -81,7 +81,7 @@ final class MeetingDetector {
                 inactiveSince[bundle] = nil
                 if activeSince[bundle] == nil { activeSince[bundle] = now }
                 if recording { usedDuringRecording.insert(bundle) }
-                // 持續用麥克風 5 秒、這次通話還沒提醒過、沒有選「不要再提醒」
+                // 持续用麦克风 5 秒、这次通话还没提醒过、没有选「不要再提醒」
                 if !recording, !promptedThisCall.contains(bundle), !Self.muted.contains(bundle),
                    now.timeIntervalSince(activeSince[bundle]!) >= 5 {
                     promptedThisCall.insert(bundle)
@@ -89,7 +89,7 @@ final class MeetingDetector {
                     onPrompt?(.start(MeetingApp(bundleID: bundle, name: Self.displayName(bundle))))
                 }
             } else {
-                // 停止用麥克風 10 秒才算這次通話結束
+                // 停止用麦克风 10 秒才算这次通话结束
                 if inactiveSince[bundle] == nil { inactiveSince[bundle] = now }
                 if now.timeIntervalSince(inactiveSince[bundle]!) >= 10 {
                     activeSince[bundle] = nil
@@ -99,7 +99,7 @@ final class MeetingDetector {
             }
         }
         if recording {
-            // 錄音期間用過麥克風的會議 app 都停了 10 秒：會議好像結束了
+            // 录音期间用过麦克风的会议 app 都停了 10 秒：会议好像结束了
             if !stopPrompted, let any = usedDuringRecording.first, usedDuringRecording.allSatisfy({ activeSince[$0] == nil }) {
                 stopPrompted = true
                 log.info("meeting apps stopped using the microphone")
@@ -111,7 +111,7 @@ final class MeetingDetector {
         }
     }
 
-    /// 正在用麥克風的已知會議 app（拾音自己、系統程序不算）
+    /// 正在用麦克风的已知会议 app（拾音自己、系统程序不算）
     private func currentMeetingApps() -> Set<String> {
         var result = Set<String>()
         for object in Self.processObjects() {
@@ -119,7 +119,7 @@ final class MeetingDetector {
             if let known = Self.known(bundle) { result.insert(known) }
         }
         #if DEBUG
-        // 模擬的 app 也經過同一套對照（helper 程序歸到主程式）
+        // 模拟的 app 也经过同一套对照（helper 程序归到主程序）
         for (bundle, on) in simulated {
             guard let known = Self.known(bundle) else { continue }
             if on { result.insert(known) } else { result.remove(known) }
@@ -128,13 +128,13 @@ final class MeetingDetector {
         return result
     }
 
-    /// 已知名單裡的 ID：完全相同，或是它的 helper（前綴相同，例如 com.google.Chrome.helper）
+    /// 已知名单里的 ID：完全相同，或是它的 helper（前缀相同，例如 com.google.Chrome.helper）
     static func known(_ bundle: String) -> String? {
         let all = Array(meetingApps.keys) + Array(browsers.keys)
         return all.first { bundle == $0 || bundle.hasPrefix($0 + ".") }
     }
 
-    // MARK: Core Audio 的程序物件（macOS 14.2+，不需要權限）
+    // MARK: Core Audio 的程序对象（macOS 14.2+，不需要权限）
 
     private static func processObjects() -> [AudioObjectID] {
         var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyProcessObjectList,
@@ -165,18 +165,18 @@ final class MeetingDetector {
     }
 }
 
-/// 沒有通知權限時的提醒：不搶焦點的小浮動視窗，右上角，30 秒後自己收起（design §21.7）
+/// 没有通知权限时的提醒：不抢焦点的小浮动窗口，右上角，30 秒后自己收起（design §21.7）
 @MainActor
 final class MeetingPromptPanel {
     static let shared = MeetingPromptPanel()
     private var panel: NSPanel?
     private var closeTask: Task<Void, Never>?
     #if DEBUG
-    /// -debugQuietPrompts YES：不顯示（驗證時不要跳到使用者的畫面上），只記下目前的提醒
+    /// -debugQuietPrompts YES：不显示（验证时不要跳到用户的画面上），只记下目前的提醒
     private(set) var current: MeetingDetector.Prompt?
     var quiet: Bool { UserDefaults.standard.bool(forKey: "debugQuietPrompts") }
     #endif
-    /// 目前提醒的按鈕動作（DEBUG 的 meetingaction 也用）
+    /// 目前提醒的按钮动作（DEBUG 的 meetingaction 也用）
     private(set) var actions: [String: () -> Void] = [:]
 
     func show(_ prompt: MeetingDetector.Prompt, actions: [(id: String, title: String, action: () -> Void)], message: String) {
@@ -197,7 +197,7 @@ final class MeetingPromptPanel {
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false
-        // 標題列是透明的（只為了圓角和陰影），內容不用避開它，不然上面會多一塊空白
+        // 标题列是透明的（只为了圆角和阴影），内容不用避开它，不然上面会多一块空白
         let hosting = NSHostingView(rootView: content)
         hosting.safeAreaRegions = []
         panel.contentView = hosting

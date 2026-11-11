@@ -3,9 +3,9 @@ import FluidAudio
 import Foundation
 import GRDB
 
-/// 產生 Windows 版用來比對的標準答案（design-windows §4）：讀 shared/golden/fixtures.json，用 Mac 的程式算出提示詞、範本、
-/// 匯出、轉錄流程的規則、資料庫的結果，寫進輸出資料夾。只在 DEBUG 建置，不改任何正式的行為（R26.5）。
-/// shiyinctl dump-golden <fixtures.json> <輸出資料夾>；做完寫 <輸出資料夾>/result.json
+/// 产生 Windows 版用来比对的标准答案（design-windows §4）：读 shared/golden/fixtures.json，用 Mac 的程序算出提示词、模板、
+/// 导出、转录流程的规则、数据库的结果，写进输出文件夹。只在 DEBUG 建置，不改任何正式的行为（R26.5）。
+/// shiyinctl dump-golden <fixtures.json> <输出文件夹>；做完写 <输出文件夹>/result.json
 @MainActor
 enum GoldenDump {
     private typealias Object = [String: Any]
@@ -19,7 +19,7 @@ enum GoldenDump {
             try? FileManager.default.removeItem(at: out)
             try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
             var dump = Writer(root: out)
-            // 參考文件的測試檔放在 fixtures.json 旁邊的 documents/（design §39.7）
+            // 参考文档的测试档放在 fixtures.json 旁边的 documents/（design §39.7）
             let documentsFolder = URL(fileURLWithPath: fixtures).deletingLastPathComponent().appendingPathComponent("documents", isDirectory: true)
             let fixtures = Fixtures(root)
             prompts(fixtures, &dump)
@@ -44,7 +44,7 @@ enum GoldenDump {
         }
     }
 
-    // MARK: 輸出
+    // MARK: 输出
 
     private struct Writer {
         let root: URL
@@ -59,7 +59,7 @@ enum GoldenDump {
 
         mutating func json(_ path: String, _ object: Any) {
             let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes, .fragmentsAllowed]
-            // 不能轉成 JSON 的值（例如推論錯的型別）會丟 Objective-C 例外，先檢查
+            // 不能转成 JSON 的值（例如推论错的类型）会丢 Objective-C 例外，先检查
             guard object is NSNull || JSONSerialization.isValidJSONObject(object) else {
                 text(path + ".error", "invalid JSON object: \(object)")
                 return
@@ -72,7 +72,7 @@ enum GoldenDump {
         }
     }
 
-    // MARK: 測試資料
+    // MARK: 测试资料
 
     private struct MeetingFixture {
         var key: String
@@ -88,11 +88,11 @@ enum GoldenDump {
         var history: [(question: String, answer: String)]
         var question: String
         var knownPeople: [String]
-        /// 參考文件（design §39.7）：fixtures 的 meetingDocuments，name 含副檔名，直接給每頁的文字
+        /// 参考文档（design §39.7）：fixtures 的 meetingDocuments，name 含扩展名，直接给每页的文字
         var documents: [MeetingDocument]
         var language: MeetingLanguage { meeting.meetingLanguage }
 
-        /// 資料庫裡的說話者表：1 到最大編號，沒改名的是預設名稱（跟 saveTranscript 一樣）
+        /// 数据库里的说话者表：1 到最大编号，没改名的是默认名称（跟 saveTranscript 一样）
         var speakerTable: [Int: String] {
             let count = segments.compactMap(\.speaker).max() ?? 0
             var table: [Int: String] = [:]
@@ -109,7 +109,7 @@ enum GoldenDump {
 
         init(_ root: Object) {
             self.root = root
-            // 參考文件放在 meetingDocuments（會議的 key → 文件），不動原本的會議資料
+            // 参考文档放在 meetingDocuments（会议的 key → 文档），不动原本的会议资料
             let documents = root["meetingDocuments"] as? Object ?? [:]
             meetings = (root["meetings"] as? [Object] ?? []).map { o in
                 var fx = GoldenDump.meetingFixture(o)
@@ -179,7 +179,7 @@ enum GoldenDump {
         return try? JSONDecoder().decode(MeetingNotes.self, from: data)
     }
 
-    // MARK: 提示詞（R28.1）
+    // MARK: 提示词（R28.1）
 
     private static func prompts(_ f: Fixtures, _ w: inout Writer) {
         for fx in f.meetings {
@@ -196,7 +196,7 @@ enum GoldenDump {
             }
             if let custom = f["customTemplate"], let data = try? JSONSerialization.data(withJSONObject: custom),
                let json = String(data: data, encoding: .utf8) {
-                let record = TemplateRecord(id: "custom-1", name: "客戶會議", builtin: false, definition: json)  // l10n-skip
+                let record = TemplateRecord(id: "custom-1", name: "客户会议", builtin: false, definition: json)  // l10n-skip
                 w.text(dir + "summarize-custom.txt", NotesPrompt.summarize(context(record.definition(for: l))))
             }
             let general = TemplateRecord(id: "general", name: "", builtin: true, definition: BuiltinTemplates.all[0].definition.jsonString())
@@ -204,7 +204,7 @@ enum GoldenDump {
                 w.text(dir + "revise.txt", NotesPrompt.revise(context(general.definition(for: l)), notes: notes, answers: fx.answers))
             }
 
-            // 逐字稿校正：跟 JobRunner.correct 一樣組 Context
+            // 逐字稿校正：跟 JobRunner.correct 一样组 Context
             let names = fx.speakerTable
             let speakerName = { (idx: Int?) -> String? in idx.map { names[$0] ?? l.defaultSpeaker($0) } }
             let correction = TranscriptCorrection.Context(
@@ -217,7 +217,7 @@ enum GoldenDump {
                 w.text(dir + "correction-prompt-range.txt", TranscriptCorrection.prompt(correction, range: r[0]..<r[1]))
             }
 
-            // 猜說話者：跟 JobRunner.nameSpeakers 一樣
+            // 猜说话者：跟 JobRunner.nameSpeakers 一样
             let unnamed = names.keys.sorted().filter { AppDatabase.isDefaultSpeakerName(names[$0]!) }
             let naming = SpeakerNaming.Context(
                 language: l, meetingDate: fx.meeting.meetingDate, title: fx.meeting.title, participants: fx.meeting.participantList,
@@ -227,7 +227,7 @@ enum GoldenDump {
             w.text(dir + "naming-system.txt", SpeakerNaming.system(l))
             w.text(dir + "naming-prompt.txt", SpeakerNaming.prompt(naming))
 
-            // 對一場會議提問：跟 AppModel.askMeeting 一樣組逐字稿
+            // 对一场会议提问：跟 AppModel.askMeeting 一样组逐字稿
             let lines = fx.segments.map { s -> String in
                 let speaker = s.speaker.map { (names[$0] ?? l.defaultSpeaker($0)) + l.text(zh: "：", en: ": ", ja: "：") } ?? ""
                 return "[\(TimeFormat.string(s.start))] \(speaker)\(s.text)"
@@ -246,7 +246,7 @@ enum GoldenDump {
             w.text(dir + "keywords-system.txt", AskPrompt.keywordsSystem(l))
             w.text(dir + "keywords-prompt.txt", AskPrompt.keywordsPrompt(l, question: fx.question))
 
-            // 有參考文件時（design §39.3）：沒有文件的檔案不變（R61.5）
+            // 有参考文档时（design §39.3）：没有文档的文件不变（R61.5）
             if !fx.documents.isEmpty {
                 let texts = fx.documents.map(DocumentText.init)
                 var withDocuments = context(general.definition(for: l))
@@ -277,7 +277,7 @@ enum GoldenDump {
             ($0.0, ["toolName": $0.1.toolName, "toolDescription": $0.1.toolDescription, "schema": $0.1.schema])
         }))
 
-        // whisper 的提示詞（design §16.4、§18.2）
+        // whisper 的提示词（design §16.4、§18.2）
         let glossaries = f["whisperGlossaries"] as? [[String]] ?? []
         var whisper: [Object] = []
         for language in MeetingLanguage.allCases {
@@ -294,7 +294,7 @@ enum GoldenDump {
                 chunk.append(["key": fx.key, "previous": count,
                               "prompt": WhisperEngine.debugChunkPrompt(base: base, previous: Array(transcribed.prefix(count)), language: fx.language.whisperCode)])
             }
-            // 很長的前一段：超過 120 字（英文 400 字）要截斷
+            // 很长的前一段：超过 120 字（英文 400 字）要截断
             let long = (0..<40).map { TranscribedSegment(start: Double($0), end: Double($0) + 1, text: "第\($0)句 sentence number \($0)", lowConfidence: false) }  // l10n-skip
             chunk.append(["key": fx.key, "previous": "long",
                           "prompt": WhisperEngine.debugChunkPrompt(base: "P", previous: long, language: fx.language.whisperCode)])
@@ -302,11 +302,11 @@ enum GoldenDump {
         w.json("whisper/chunk-prompts.json", chunk)
         w.json("whisper/hallucinations.json", WhisperEngine.hallucinationPhrases)
         let ratios = ["短", "this is a normal sentence without much repetition at all",  // l10n-skip
-                      String(repeating: "重複", count: 40), String(repeating: "ha ", count: 30), "一二三四五六七八九十一二三四五六七八九十"]  // l10n-skip
+                      String(repeating: "重复", count: 40), String(repeating: "ha ", count: 30), "一二三四五六七八九十一二三四五六七八九十"]  // l10n-skip
         w.json("whisper/compression.json", ratios.map { ["text": $0, "ratio": WhisperEngine.compressionRatio($0)] })
     }
 
-    /// 沒有 sortedKeys 的 JSONEncoder 每次啟動鍵的順序都不同（範本的定義、說話者的復原資料）：重新排序後再寫，Windows 比對解析後的內容
+    /// 没有 sortedKeys 的 JSONEncoder 每次启动键的顺序都不同（模板的定义、说话者的复原资料）：重新排序后再写，Windows 比对解析后的内容
     private static func canonical(_ json: String) -> String {
         guard let object = try? JSONSerialization.jsonObject(with: Data(json.utf8), options: [.fragmentsAllowed]),
               let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .withoutEscapingSlashes, .fragmentsAllowed])
@@ -314,7 +314,7 @@ enum GoldenDump {
         return String(decoding: data, as: UTF8.self)
     }
 
-    // MARK: 範本
+    // MARK: 模板
 
     private static func templates(_ w: inout Writer) {
         var list: [Object] = []
@@ -337,7 +337,7 @@ enum GoldenDump {
         })
     }
 
-    // MARK: 匯出（R28.2、R28.3）
+    // MARK: 导出（R28.2、R28.3）
 
     private static func exports(_ f: Fixtures, _ w: inout Writer) {
         for fx in f.meetings {
@@ -358,13 +358,13 @@ enum GoldenDump {
             w.text(dir + "transcript-f.srt", TranscriptExporter.text(bundle, format: "srt", times: true, speakers: false))
             w.text(dir + "transcript-t.vtt", TranscriptExporter.text(bundle, format: "vtt", times: true, speakers: true))
             w.text(dir + "transcript-f.vtt", TranscriptExporter.text(bundle, format: "vtt", times: true, speakers: false))
-            // 沒有會議紀錄、空的會議紀錄
+            // 没有会议记录、空的会议记录
             var empty = bundle
             empty.notes = MeetingNotes(title: "x")
             w.text(dir + "notes-empty.md", NotesExporter.markdown(empty))
             w.text(dir + "notes-empty.html", NotesExporter.html(empty))
 
-            // .shiyin 封包的 JSON（design §10）：跟 MeetingPackage.export 一樣的編碼
+            // .shiyin 封包的 JSON（design §10）：跟 MeetingPackage.export 一样的编码
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
             let m = meeting
@@ -382,14 +382,14 @@ enum GoldenDump {
             let manifest = MeetingPackage.Manifest(format: MeetingPackage.formatVersion, app: "3.6.0", exportedAt: "2026-10-20T00:00:00Z",
                                                    audio: "audio.m4a")
             if let data = try? encoder.encode(manifest) { w.text("package/\(fx.key)/manifest.json", String(decoding: data, as: UTF8.self)) }
-            // 參考文件（design §39.5）
+            // 参考文档（design §39.5）
             if !fx.documents.isEmpty, let data = try? encoder.encode(MeetingPackage.documentEntries(fx.documents)) {
                 w.text("package/\(fx.key)/documents.json", String(decoding: data, as: UTF8.self))
             }
         }
     }
 
-    // MARK: 參考文件（design §39.7）
+    // MARK: 参考文档（design §39.7）
 
     private static func documents(_ f: Fixtures, folder: URL, _ w: inout Writer) {
         func texts(_ list: Any?) -> [DocumentText] {
@@ -398,7 +398,7 @@ enum GoldenDump {
                              pages: $0["pages"] as? [String] ?? [])
             }
         }
-        // 長度分配和組好的區塊
+        // 长度分配和组好的区块
         w.json("documents/budget.json", (f["documentBudget"] as? [Object] ?? []).map { c -> Object in
             let limit = c["limit"] as? Int ?? DocumentPrompt.limit
             let docs = texts(c["documents"])
@@ -415,7 +415,7 @@ enum GoldenDump {
         w.json("documents/normalize.json", (f["documentNormalize"] as? [String] ?? []).map {
             ["input": $0, "output": DocumentReader.normalize($0)]
         })
-        // 檔名：種類、拖進來算不算文件、存的檔名；封包裡的位置安不安全
+        // 文件名：种类、拖进来算不算文档、存的文件名；封包里的位置安不安全
         w.json("documents/names.json", (f["documentNames"] as? [String] ?? []).map { name -> Object in
             let url = URL(fileURLWithPath: "/tmp/" + name)
             return ["name": name, "kind": DocumentReader.kind(of: url).map { $0.rawValue as Any } ?? NSNull(),
@@ -427,7 +427,7 @@ enum GoldenDump {
         w.json("documents/pptx-targets.json", (f["pptxTargets"] as? [String] ?? []).map {
             ["target": $0, "path": OfficeText.resolve($0).map { $0 as Any } ?? NSNull()] as Object
         })
-        // 測試檔讀出來的文字：docx、pptx、純文字（PDF、圖片兩邊的引擎不同，不比）
+        // 测试档读出来的文字：docx、pptx、纯文字（PDF、图片两边的引擎不同，不比）
         let files = ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).filter { !$0.hasPrefix(".") }.sorted()
         for name in files where ["docx", "pptx", "txt", "md", "key", "doc"].contains((name as NSString).pathExtension.lowercased()) {
             let object: Object
@@ -443,7 +443,7 @@ enum GoldenDump {
         }
     }
 
-    // MARK: 心智圖（design §42.5）：每場有紀錄的會議和 mindMapCases，段落名稱用會議語言（同匯出）
+    // MARK: 心智图（design §42.5）：每场有记录的会议和 mindMapCases，段落名称用会议语言（同导出）
 
     private static func mindMaps(_ f: Fixtures, _ w: inout Writer) {
         var cases: [(key: String, notes: MeetingNotes, title: String, language: MeetingLanguage)] = []
@@ -469,7 +469,7 @@ enum GoldenDump {
                                               "boxes": boxes, "edges": edges] as Object)
             w.text("mindmap/\(c.key).svg", MindMap.svg(layout, language: c.language))
         }
-        // 議題時間軸（design §43.3）：有紀錄的會議用會議長度，mindMapCases 用 3600 秒，topicRangeCases 帶自己的長度
+        // 议题时间轴（design §43.3）：有记录的会议用会议长度，mindMapCases 用 3600 秒，topicRangeCases 带自己的长度
         var rangeCases: [(key: String, notes: MeetingNotes, duration: Double, language: MeetingLanguage)] = []
         for fx in f.meetings { if let notes = fx.notes { rangeCases.append((fx.key, notes, Double(fx.meeting.durationSeconds ?? 0), fx.language)) } }
         for c in cases.dropFirst(rangeCases.count) { rangeCases.append((c.key, c.notes, 3600, c.language)) }
@@ -488,7 +488,7 @@ enum GoldenDump {
     // MARK: 小工具
 
     private static func utilities(_ f: Fixtures, _ w: inout Writer) {
-        // 語言檔推出來的東西（design §41.8）：每種語言的名稱、預設說話者、轉錄的參數、給人看的字、提示詞的字
+        // 语言档推出来的东西（design §41.8）：每种语言的名称、默认说话者、转录的参数、给人看的字、提示词的字
         let glossarySample = ["Lumio", "Redis", "Kubernetes"]
         w.json("util/languages.json", MeetingLanguage.allCases.map { l -> Object in
             let p = l.profile
@@ -500,16 +500,16 @@ enum GoldenDump {
                     "qwenContext": QwenEngine.context(glossary: glossarySample, language: l),
                     "duration": [TimeFormat.duration(65, language: l), TimeFormat.duration(3600, language: l), TimeFormat.duration(3900, language: l)],
                     "weekday": DateText.weekday("2026-11-04", language: l),
-                    "text": [l.text(zh: "摘要", en: "Summary", ja: "要約"), l.text(zh: "沒有的字", en: "Not in table", ja: "ない")],
+                    "text": [l.text(zh: "摘要", en: "Summary", ja: "要約"), l.text(zh: "没有的字", en: "Not in table", ja: "ない")],
                     "prompt": [l.prompt(zh: "摘要", en: "Summary", ja: "要約")],
-                    "format": [l.format(zh: "「%@」是%@嗎？", en: "Is “%@” %@?", ja: "「%@」は%@ですか？", "A", "B")],
+                    "format": [l.format(zh: "「%@」是%@吗？", en: "Is “%@” %@?", ja: "「%@」は%@ですか？", "A", "B")],
                     "yesNo": [YesNoAnswer(isYes: true).text(l), YesNoAnswer(isYes: false, correction: "C").text(l)],
                     "sections": TemplateDefinition.builtinSectionIDs.map { TemplateDefinition.sectionLabel($0, language: l) },
                     "promptSections": TemplateDefinition.builtinSectionIDs.map { TemplateDefinition.sectionLabel($0, language: l, prompt: true) },
                     "script": p.fixScript(ChineseScript.toTaiwan("我系陈家豪，唔系好稳定，系统同关系都冇问题，唔该晒，联系我，晒太阳")),  // l10n-skip
                     "ocr": p.ocr.mac, "fonts": [p.fonts.typesetting, p.fonts.lang, p.fonts.titleMac]]
         })
-        // 會議紀錄的寬鬆解碼、JSON 字串、純文字、改名
+        // 会议记录的宽松解码、JSON 字符串、纯文字、改名
         var decode: [Object] = []
         for input in f["notesDecode"] as? [String] ?? [] {
             let notes = try? JSONDecoder().decode(MeetingNotes.self, from: Data(input.utf8))
@@ -586,7 +586,7 @@ enum GoldenDump {
         w.json("util/similarity.json", vectors.map { ["a": $0.0, "b": $0.1, "similarity": Voiceprint.similarity($0.0, $0.1)] as Object })
         w.json("util/voiceprint-data.json", [["vector": [0.5, -1.25, 3.0], "base64": Voiceprint.data([0.5, -1.25, 3.0]).base64EncodedString()]])
 
-        // 回傳結果的檢查
+        // 回传结果的检查
         if let item = f["validateAnswers"] as? Object, let answer = item["answer"],
            let data = try? JSONSerialization.data(withJSONObject: answer),
            let decoded = try? JSONDecoder().decode(AskPrompt.Answer.self, from: data) {
@@ -625,9 +625,9 @@ enum GoldenDump {
         })
     }
 
-    // MARK: 轉錄流程的規則
+    // MARK: 转录流程的规则
 
-    /// 跟 Windows 一樣的亂數：線性同餘，取高 16 位當 Int16
+    /// 跟 Windows 一样的乱数：线性同余，取高 16 位当 Int16
     private struct LCG {
         var state: UInt32
         mutating func next() -> Float {
@@ -636,7 +636,7 @@ enum GoldenDump {
         }
     }
 
-    /// 企業伺服器（design §36.7、E1）：建工作送的 settings、伺服器的結果換成段落（說話者 Mac 在本機辨識，Windows 另外比）
+    /// 企业服务器（design §36.7、E1）：建工作送的 settings、服务器的结果换成段落（说话者 Mac 在本机识别，Windows 另外比）
     private static func server(_ f: Fixtures, _ w: inout Writer) {
         w.json("server/settings.json", (f["serverSettings"] as? [Object] ?? []).map { item -> Object in
             let language = MeetingLanguage(rawValue: item["language"] as? String ?? "zh") ?? .zh
@@ -656,7 +656,7 @@ enum GoldenDump {
     }
 
     private static func pipeline(_ f: Fixtures, _ w: inout Writer) {
-        // 長錄音分段（design §21.16）
+        // 长录音分段（design §21.16）
         if let c = f["chunkSignal"] as? Object {
             let rate = Int(AudioDecoder.sampleRate)
             var lcg = LCG(state: UInt32(c["seed"] as? Int ?? 1))
@@ -676,7 +676,7 @@ enum GoldenDump {
             let first: [Double] = samples.prefix(8).map { Double($0) }
             w.json("pipeline/chunks.json", ["chunks": pairs, "noChunks": nonePairs, "first": first] as Object)
         }
-        // 語言偵測收集有聲音的片段（design §18.8）
+        // 语言检测收集有声音的片段（design §18.8）
         var collectors: [Object] = []
         for c in f["collectorSeeds"] as? [Object] ?? [] {
             let rate = Int(CaptureFormat.sampleRate)
@@ -707,10 +707,10 @@ enum GoldenDump {
         }
         w.json("pipeline/collector.json", collectors)
 
-        // 簡體轉台灣繁體（design §32.5）：Windows 讀同一份字表、同一套最長匹配，要逐字相同
+        // 简体转台湾繁体（design §32.5）：Windows 读同一份字表、同一套最长匹配，要逐字相同
         w.json("util/s2tw.json", (f["s2twCases"] as? [String] ?? []).map { ["in": $0, "out": ChineseScript.toTaiwan($0)] as Object })
 
-        // 更新說明的摘要（R10.6、design §12）：詢問更新的視窗只列前幾項，取段落、取條目的規則兩邊相同
+        // 更新说明的摘要（R10.6、design §12）：询问更新的窗口只列前几项，取段落、取条目的规则两边相同
         w.json("util/release-notes.json", (f["releaseNotesCases"] as? [Object] ?? []).map { c -> Object in
             let r = ReleaseNotes.brief(c["notes"] as? String ?? "", english: c["english"] as? Bool ?? false)
             return ["notes": c["notes"] as? String ?? "", "english": c["english"] as? Bool ?? false, "items": r.items, "more": r.more] as Object
@@ -775,9 +775,9 @@ enum GoldenDump {
         })
     }
 
-    // MARK: 資料庫（R28.5）
+    // MARK: 数据库（R28.5）
 
-    /// shiyinctl seedfixtures <fixtures.json> [key…]：把 fixtures 的會議寫進目前的資料庫（暫存的 SHIYIN_HOME），測本地 MCP 用（design §44.6）
+    /// shiyinctl seedfixtures <fixtures.json> [key…]：把 fixtures 的会议写进目前的数据库（暂存的 SHIYIN_HOME），测本地 MCP 用（design §44.6）
     static func seed(fixtures: String, keys: [String], into model: AppModel) {
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: fixtures)),
               let root = try? JSONSerialization.jsonObject(with: data) as? Object else { return }
@@ -786,7 +786,7 @@ enum GoldenDump {
         model.reload()
     }
 
-    /// 把一場 fixture 的會議寫進資料庫（逐字稿、說話者、重點、會議紀錄、筆記、詞彙），回傳會議 id
+    /// 把一场 fixture 的会议写进数据库（逐字稿、说话者、重点、会议记录、笔记、词汇），回传会议 id
     private static func insertFixture(_ db: AppDatabase, _ fx: MeetingFixture, audioExtension: String? = "m4a") throws -> Int64 {
         let meeting = try db.insertMeeting(fx.meeting, audioExtension: audioExtension)
         let mid = meeting.id!
@@ -801,8 +801,8 @@ enum GoldenDump {
         return mid
     }
 
-    /// 本地 MCP 的工具（design §44.6）：另一個資料庫放 fixtures 的會議，加一場在垃圾桶、一場正在錄的（都不該讀到），
-    /// 照 mcp.calls 一個一個叫，寫出回傳的文字；工具的定義、instructions 寫進 mcp/tools.json
+    /// 本地 MCP 的工具（design §44.6）：另一个数据库放 fixtures 的会议，加一场在垃圾桶、一场正在录的（都不该读到），
+    /// 照 mcp.calls 一个一个叫，写出回传的文字；工具的定义、instructions 写进 mcp/tools.json
     private static func mcp(_ f: Fixtures, _ w: inout Writer) throws {
         guard let spec = f["mcp"] as? Object else { return }
         let dir = try Paths.makeTempDirectory()
@@ -914,9 +914,9 @@ enum GoldenDump {
                 w.json(file!, ["undone": try db.undoNotes(id(op))])
             case "dismissReviewItems":
                 try db.dismissReviewItems(id(op), indexes: Set(op["indexes"] as? [Int] ?? []))
-            case "resolveReviewItems":   // 確認（是）和略過一起移除（R41.4，design §31.3）
+            case "resolveReviewItems":   // 确认（是）和略过一起移除（R41.4，design §31.3）
                 try db.resolveReviewItems(id(op), confirmed: Set(op["confirmed"] as? [Int] ?? []), dismissed: Set(op["dismissed"] as? [Int] ?? []))
-            case "reviewLinks":   // 待確認的題目對應到哪一條紀錄（R41.1，design §31.1）：段落、位置、對到的題號
+            case "reviewLinks":   // 待确认的题目对应到哪一条记录（R41.1，design §31.1）：段落、位置、对到的题号
                 let notes = try db.meeting(id(op))?.decodedNotes ?? MeetingNotes()
                 let links = notes.reviewLinks().map { ref, questions -> (key: (Int, Int, Int), object: Object) in
                     (ref.sortKey, ["section": ref.sectionName, "index": ref.sortKey.1, "sub": ref.sortKey.2, "questions": questions.sorted()])
@@ -958,7 +958,7 @@ enum GoldenDump {
                 try db.setTrashed(id(op), op["trashed"] as? Bool ?? false)
             case "rebuildSearchIndex":
                 try db.rebuildSearchIndex()
-            case "addDocument":   // 參考文件（design §39.1）
+            case "addDocument":   // 参考文档（design §39.1）
                 _ = try db.addDocument(id(op), name: op["name"] as? String ?? "", kind: DocumentKind(rawValue: op["kind"] as? String ?? "") ?? .text,
                                        pages: op["pages"] as? [String] ?? [], ocr: op["ocr"] as? Bool ?? false)
             case "deleteDocument":
@@ -973,7 +973,7 @@ enum GoldenDump {
         }
     }
 
-    /// 一張表的所有列：時間欄位（每次跑都不同）有值時寫成 "<time>"，BLOB 寫成 base64
+    /// 一张表的所有列：时间字段（每次跑都不同）有值时写成 "<time>"，BLOB 写成 base64
     private static func dumpTable(_ db: AppDatabase, _ table: String) throws -> [Object] {
         let timeColumns: Set<String> = ["created_at", "updated_at", "started_at", "finished_at", "deleted_at"]
         let sql = table == "search" ? "SELECT rowid, meeting_id, kind, ref, text FROM search ORDER BY rowid"

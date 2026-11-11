@@ -1,46 +1,46 @@
 <!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8"><title>拾音安裝說明</title>
+<html lang="zh-Hans"><head><meta charset="utf-8"><title>拾音安装说明</title>
 <style>
-body { font-family: "PingFang TC", -apple-system, sans-serif; font-size: 12pt; line-height: 1.7; color: #1E2625; }
-h1, h2 { font-family: "Songti TC", serif; font-weight: 600; }
+body { font-family: "PingFang SC", -apple-system, sans-serif; font-size: 12pt; line-height: 1.7; color: #1E2625; }
+h1, h2 { font-family: "Songti SC", serif; font-weight: 600; }
 h1 { font-size: 24pt; margin-bottom: 2pt; } h2 { font-size: 15pt; margin-top: 18pt; }
 .meta { color: #68726F; }
 code { font-family: Menlo, monospace; font-size: 10.5pt; background: #EEF1EF; padding: 1pt 4pt; }
 </style></head><body>
-<h1>拾音安裝說明</h1>
-<p class="meta">macOS 會議紀錄 app：錄音、即時逐字稿、說話者辨識、AI 會議紀錄</p>
+<h1>拾音安装说明</h1>
+<p class="meta">macOS 会议记录 app：录音、实时逐字稿、说话者识别、AI 会议记录</p>
 
-<h2>1. 安裝</h2>
-<p>把 DMG 裡的「拾音」拖到旁邊的 Applications（應用程式）資料夾。</p>
+<h2>1. 安装</h2>
+<p>把 DMG 里的「拾音」拖到旁边的 Applications（应用程序）文件夹。</p>
 
-<h2>2. 第一次打開</h2>
-<p>拾音沒有經過 Apple 公證，第一次打開時 macOS 會擋下來，顯示「無法驗證開發者」或「Apple 無法檢查是否包含惡意軟體」。請照下面的步驟放行（只要做一次）：</p>
+<h2>2. 第一次打开</h2>
+<p>拾音没有经过 Apple 公证，第一次打开时 macOS 会挡下来，显示「无法验证开发者」或「Apple 无法检查是否包含恶意软件」。请照下面的步骤放行（只要做一次）：</p>
 <ol>
-<li>先在「應用程式」裡雙擊拾音，看到警告後按「完成」或「好」。</li>
-<li>打開「系統設定 → 隱私權與安全性」，往下捲到「安全性」。</li>
-<li>會看到「已阻擋『拾音』」，按旁邊的「仍要打開」，再輸入密碼確認。</li>
+<li>先在「应用程序」里双击拾音，看到警告后按「完成」或「好」。</li>
+<li>打开「系统设置 → 隐私与安全性」，往下卷到「安全性」。</li>
+<li>会看到「已阻挡『拾音』」，按旁边的「仍要打开」，再输入密码确认。</li>
 </ol>
-<p>熟悉終端機的話，也可以執行：<code>xattr -dr com.apple.quarantine /Applications/Shiyin.app</code></p>
+<p>熟悉终端的话，也可以执行：<code>xattr -dr com.apple.quarantine /Applications/Shiyin.app</code></p>
 
-<h2>3. 首次使用引導</h2>
-<p>打開後會出現引導，依序：允許麥克風、下載轉錄模型（約 1.7 GB，只需要一次）、選擇整理會議紀錄的工具。</p>
+<h2>3. 首次使用引导</h2>
+<p>打开后会出现引导，依序：允许麦克风、下载转录模型（约 1.7 GB，只需要一次）、选择整理会议记录的工具。</p>
 <ul>
-<li><b>整理工具</b>：已經安裝並登入 Claude Code（<code>claude</code>）或 Codex（<code>codex</code>）的話直接選；沒有的話可以填 Anthropic 或 OpenAI 的 API key，或先選「不整理」只要逐字稿。</li>
-<li><b>會議語言</b>：中文或英文。新的會議用設定裡的預設語言，錄音、匯入時或之後都可以個別改。</li>
-<li><b>全域快捷鍵</b>：在任何 app 裡按 <code>⌃⌥⌘R</code> 都能開始或停止錄音。</li>
-<li><b>錄線上會議</b>：錄音來源選「麥克風＋電腦聲音（線上會議）」。第一次錄的時候 macOS 會詢問「錄製系統音訊」，請按允許；如果不小心拒絕了，到「系統設定 → 隱私權與安全性 → 錄製螢幕與系統錄音」打開拾音。</li>
+<li><b>整理工具</b>：已经安装并登录 Claude Code（<code>claude</code>）或 Codex（<code>codex</code>）的话直接选；没有的话可以填 Anthropic 或 OpenAI 的 API key，或先选「不整理」只要逐字稿。</li>
+<li><b>会议语言</b>：中文或英文。新的会议用设置里的默认语言，录音、导入时或之后都可以个别改。</li>
+<li><b>全域快捷键</b>：在任何 app 里按 <code>⌃⌥⌘R</code> 都能开始或停止录音。</li>
+<li><b>录在线会议</b>：录音来源选「麦克风＋电脑声音（在线会议）」。第一次录的时候 macOS 会询问「录制系统音频」，请按允许；如果不小心拒绝了，到「系统设置 → 隐私与安全性 → 录制屏幕与系统录音」打开拾音。</li>
 </ul>
 
-<h2>4. 系統需求</h2>
+<h2>4. 系统需求</h2>
 <ul>
 <li>Apple Silicon（M1 以上）的 Mac，macOS 26 以上</li>
-<li>記憶體 8 GB 以上，磁碟空間約 2 GB（加上錄音）</li>
+<li>内存 8 GB 以上，磁盘空间约 2 GB（加上录音）</li>
 </ul>
 
-<h2>5. 隱私</h2>
-<p>錄音、轉錄、說話者辨識都在你的 Mac 上完成，錄音不會上傳。整理會議紀錄時，只會把逐字稿文字送到你選的 AI 服務。</p>
+<h2>5. 隐私</h2>
+<p>录音、转录、说话者识别都在你的 Mac 上完成，录音不会上传。整理会议记录时，只会把逐字稿文字送到你选的 AI 服务。</p>
 
 <h2>6. 更新</h2>
-<p>發布的人有設定更新網址的話，拾音會自己檢查新版，詢問你之後自動下載、驗證並重新打開；也可以從「拾音」選單選「檢查更新…」。</p>
-<p>沒有自動更新時，下載新版 DMG，把新的拾音拖進「應用程式」取代舊的即可。兩種方式的會議資料都會保留。</p>
+<p>发布的人有设置更新网址的话，拾音会自己检查新版，询问你之后自动下载、验证并重新打开；也可以从「拾音」菜单选「检查更新…」。</p>
+<p>没有自动更新时，下载新版 DMG，把新的拾音拖进「应用程序」取代旧的即可。两种方式的会议资料都会保留。</p>
 </body></html>

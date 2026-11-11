@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// 認識的人（design §21.4）：使用者替說話者取過名字的人
+/// 认识的人（design §21.4）：用户替说话者取过名字的人
 struct Person: SnakeCaseRecord, Identifiable, Hashable {
     static let databaseTableName = "people"
     var id: Int64?
@@ -11,7 +11,7 @@ struct Person: SnakeCaseRecord, Identifiable, Hashable {
     mutating func didInsert(_ inserted: InsertionSuccess) { id = inserted.rowID }
 }
 
-/// 設定頁的認識的人：幾份聲紋、最近出現在哪場會議
+/// 设置页的认识的人：几份声纹、最近出现在哪场会议
 struct PersonSummary: Identifiable, Hashable {
     var id: Int64
     var name: String
@@ -20,22 +20,22 @@ struct PersonSummary: Identifiable, Hashable {
     var lastMeetingDate: String?
 }
 
-/// 聲紋的比對與學習（design §21.4、R19.3、D29）。都在本機的資料庫裡做，不上傳
+/// 声纹的比对与学习（design §21.4、R19.3、D29）。都在本机的数据库里做，不上传
 extension AppDatabase {
-    /// 說話少於這個秒數不比對、不學：太短的聲紋不準
+    /// 说话少于这个秒数不比对、不学：太短的声纹不准
     static let voiceprintMinimumSeconds = 8.0
-    /// 相似度門檻（cosine）：AMI 評估（design §21.4.1）同一個人最低 0.81、不同的人最高 0.42，
-    /// 取中間偏高，寧可少帶入、不要帶錯。到這裡算候選，沒到直接帶入的門檻就在待確認問（R33）
+    /// 相似度门槛（cosine）：AMI 评估（design §21.4.1）同一个人最低 0.81、不同的人最高 0.42，
+    /// 取中间偏高，宁可少带入、不要带错。到这里算候选，没到直接带入的门槛就在待确认问（R33）
     static let voiceprintThreshold = 0.65
-    /// 直接帶入：很像（使用者的資料裡不同的人可以像到 0.77、0.85），而且比第二像的人高出一截（design §21.4.1、D91）
+    /// 直接带入：很像（用户的资料里不同的人可以像到 0.77、0.85），而且比第二像的人高出一截（design §21.4.1、D91）
     static let voiceprintAutoThreshold = 0.88
     static let voiceprintAutoMargin = 0.15
-    /// 同一個人的聲紋最多留幾份，超過刪最舊的
+    /// 同一个人的声纹最多留几份，超过删最旧的
     static let voiceprintsPerPerson = 30
 
-    /// 轉錄完：還是預設名稱的說話者跟認識的人比對。很有把握的自動帶入名字（name_source = voiceprint），
-    /// 夠像但沒把握的存成說話者的建議，在待確認問（R33、D91）。
-    /// 一個人在一場會議只對到一位說話者，依相似度由高到低分配。回傳帶入了幾位
+    /// 转录完：还是默认名称的说话者跟认识的人比对。很有把握的自动带入名字（name_source = voiceprint），
+    /// 够像但没把握的存成说话者的建议，在待确认问（R33、D91）。
+    /// 一个人在一场会议只对到一位说话者，依相似度由高到低分配。回传带入了几位
     @discardableResult
     func matchVoiceprints(_ meetingId: Int64) throws -> Int {
         try pool.write { db in
@@ -56,7 +56,7 @@ extension AppDatabase {
             }
             let language = try Meeting.fetchOne(db, key: meetingId)?.meetingLanguage ?? .zh
             var usedSpeakers = Set<Int>(), usedPeople = Set<Int64>()
-            // 已經手動取名、對到某人的說話者，那個人就不再帶給別人
+            // 已经手动取名、对到某人的说话者，那个人就不再带给别人
             for row in try SpeakerName.filter(Column("meeting_id") == meetingId && Column("person_id") != nil).fetchAll(db) {
                 if let person = row.personId { usedPeople.insert(person) }
             }
@@ -72,9 +72,9 @@ extension AppDatabase {
                                    arguments: [name, candidate.person, meetingId, candidate.idx])
                     matched += 1
                 } else {
-                    // 沒把握：不帶入，存成建議，在待確認問「說話者 N 是 X 嗎？」（design §27）
-                    let reason = language.format(zh: "聲音跟之前的%@很像", en: "Sounds like %@ from earlier meetings",
-                                                 ja: "以前の%@の声に似ています", name)  // l10n-skip：會議語言的原因
+                    // 没把握：不带入，存成建议，在待确认问「说话者 N 是 X 吗？」（design §27）
+                    let reason = language.format(zh: "声音跟之前的%@很像", en: "Sounds like %@ from earlier meetings",
+                                                 ja: "以前の%@の声に似ています", name)  // l10n-skip：会议语言的原因
                     try db.execute(sql: """
                         UPDATE speakers SET suggested_name = ?, suggestion_reason = ?, suggestion_time = NULL
                         WHERE meeting_id = ? AND idx = ? AND name_source = 'default'
@@ -85,7 +85,7 @@ extension AppDatabase {
         }
     }
 
-    /// 每位說話者最像的幾位認識的人（不含目前的名字），由高到低：「是別人」的選單、待確認的「不是」用（R33）
+    /// 每位说话者最像的几位认识的人（不含目前的名字），由高到低：「是别人」的菜单、待确认的「不是」用（R33）
     func voiceprintCandidates(_ meetingId: Int64, limit: Int = 3) throws -> [Int: [String]] {
         try pool.read { db in
             let speakers = try SpeakerName.filter(Column("meeting_id") == meetingId).fetchAll(db)
@@ -107,7 +107,7 @@ extension AppDatabase {
         }
     }
 
-    /// 所有認識的人的聲紋
+    /// 所有认识的人的声纹
     private static func library(_ db: Database) throws -> [Int64: [[Float]]] {
         var result: [Int64: [[Float]]] = [:]
         for row in try Row.fetchAll(db, sql: "SELECT person_id, embedding FROM voiceprints") {
@@ -117,11 +117,11 @@ extension AppDatabase {
         return result
     }
 
-    /// 說話者被取名（手動、套用建議）之後：連到同名的人（沒有就建立），把這場會議的聲紋存起來（design §21.4）。
-    /// 名字是預設的「說話者 N」時，取消連結、刪掉這場會議這位說話者存過的聲紋
+    /// 说话者被取名（手动、套用建议）之后：连到同名的人（没有就创建），把这场会议的声纹存起来（design §21.4）。
+    /// 名字是默认的「说话者 N」时，取消链接、删掉这场会议这位说话者存过的声纹
     func learnVoiceprint(_ meetingId: Int64, idx: Int, name: String, source: String = "manual") throws {
         try pool.write { db in
-            // 這位說話者之前存過的聲紋（例如改正自動帶入的名字）先刪掉
+            // 这位说话者之前存过的声纹（例如改正自动带入的名字）先删掉
             try db.execute(sql: "DELETE FROM voiceprints WHERE meeting_id = ? AND speaker_idx = ?", arguments: [meetingId, idx])
             guard !Self.isDefaultSpeakerName(name) else {
                 try db.execute(sql: "UPDATE speakers SET person_id = NULL WHERE meeting_id = ? AND idx = ?", arguments: [meetingId, idx])
@@ -142,7 +142,7 @@ extension AppDatabase {
             let vector = Voiceprint.vector(embedding)
             let existing = try Row.fetchAll(db, sql: "SELECT embedding FROM voiceprints WHERE person_id = ?", arguments: [personId])
                 .map { Voiceprint.vector($0["embedding"] as Data) }
-            // 跟已有的某份幾乎一樣就不重複存
+            // 跟已有的某份几乎一样就不重复存
             guard !existing.contains(where: { Voiceprint.similarity(vector, $0) > 0.95 }) else { return }
             try db.execute(sql: """
                 INSERT INTO voiceprints (person_id, embedding, audio_source, meeting_id, speaker_idx, created_at) VALUES (?, ?, ?, ?, ?, ?)
@@ -154,15 +154,15 @@ extension AppDatabase {
         }
     }
 
-    /// 這場會議說話者辨識至少分出幾個人（design §23.2），nil 自動判斷
+    /// 这场会议说话者识别至少分出几个人（design §23.2），nil 自动判断
     func setMinSpeakers(_ meetingId: Int64, _ minSpeakers: Int?) throws {
         try pool.write { db in
             try db.execute(sql: "UPDATE meetings SET min_speakers = ? WHERE id = ?", arguments: [minSpeakers, meetingId])
         }
     }
 
-    /// 重新辨識說話者（design §23.3）：段落換成新的說話者；刪掉這場存過的聲紋（舊的分群可能混了兩個人）；
-    /// 重建這場的說話者，inherited 的沿用名字，其他用預設名稱，聲紋、說話秒數照新的結果
+    /// 重新识别说话者（design §23.3）：段落换成新的说话者；删掉这场存过的声纹（旧的分群可能混了两个人）；
+    /// 重建这场的说话者，inherited 的沿用名字，其他用默认名称，声纹、说话秒数照新的结果
     func reassignSpeakers(_ meetingId: Int64, segmentSpeakers: [(id: Int64, speaker: Int?)], voices: [Int: SpeakerVoice],
                           inherited: [Int: (name: String, source: String, personId: Int64?)]) throws {
         try pool.write { db in
@@ -189,13 +189,13 @@ extension AppDatabase {
                 try speaker.insert(db)
             }
             try Self.deleteOrphanPeople(db)
-            // 舊的復原資料對不上新的說話者了（design §24.2）
+            // 旧的复原资料对不上新的说话者了（design §24.2）
             try db.execute(sql: "DELETE FROM speaker_undo WHERE meeting_id = ?", arguments: [meetingId])
             try db.execute(sql: "UPDATE meetings SET updated_at = ? WHERE id = ?", arguments: [Clock.now(), meetingId])
         }
     }
 
-    /// 「不是他」：自動帶入的名字不對，回到預設名稱；之後重新比對也不再帶入這位（name_source = manual）
+    /// 「不是他」：自动带入的名字不对，回到默认名称；之后重新比对也不再带入这位（name_source = manual）
     func rejectVoiceprintMatch(_ meetingId: Int64, idx: Int, defaultName: String) throws {
         try pool.write { db in
             try db.execute(sql: "UPDATE speakers SET name = ?, name_source = 'manual', person_id = NULL WHERE meeting_id = ? AND idx = ?",
@@ -206,7 +206,7 @@ extension AppDatabase {
         }
     }
 
-    /// 沒有聲紋、也沒有連到任何說話者的人（例如取名後又改回去），不留在認識的人裡
+    /// 没有声纹、也没有连到任何说话者的人（例如取名后又改回去），不留在认识的人里
     static func deleteOrphanPeople(_ db: Database) throws {
         try db.execute(sql: """
             DELETE FROM people WHERE id NOT IN (SELECT person_id FROM voiceprints)
@@ -214,9 +214,9 @@ extension AppDatabase {
             """)
     }
 
-    // MARK: 猜說話者（design §21.5）
+    // MARK: 猜说话者（design §21.5）
 
-    /// 存 AI 猜的名字：只寫還是預設名稱、還沒有建議的說話者（聲紋的建議優先：有聲音當根據，design §27）
+    /// 存 AI 猜的名字：只写还是默认名称、还没有建议的说话者（声纹的建议优先：有声音当根据，design §27）
     func saveSpeakerSuggestions(_ meetingId: Int64, _ suggestions: [SpeakerNaming.Suggestion]) throws {
         try pool.write { db in
             for s in suggestions {
@@ -235,17 +235,17 @@ extension AppDatabase {
         }
     }
 
-    /// 說話者改名後，會議紀錄裡的舊名字換成新名字（design §21.6）；有改到就存一版，回傳是否有改
+    /// 说话者改名后，会议记录里的旧名字换成新名字（design §21.6）；有改到就存一版，回传是否有改
     @discardableResult
     func replaceSpeakerNameInNotes(_ meetingId: Int64, from old: String, to new: String) throws -> Bool {
         guard old != new, let meeting = try self.meeting(meetingId), let notes = meeting.decodedNotes else { return false }
         let updated = notes.replacingSpeakerName(old, with: new, isDefaultName: Self.isDefaultSpeakerName(old))
         guard updated != notes else { return false }
-        try saveNotes(meetingId, notes: updated, by: nil, reason: String(localized: "說話者改名"))
+        try saveNotes(meetingId, notes: updated, by: nil, reason: String(localized: "说话者改名"))
         return true
     }
 
-    // MARK: 設定頁：認識的人
+    // MARK: 设置页：认识的人
 
     func peopleSummaries() throws -> [PersonSummary] {
         try pool.read { db in
@@ -256,7 +256,7 @@ extension AppDatabase {
                      WHERE s.person_id = p.id AND m.deleted_at IS NULL ORDER BY m.meeting_date DESC LIMIT 1) AS last_id
                 FROM people p ORDER BY p.name COLLATE NOCASE
                 """).map { row in
-                    // 沒有標題的會議跟會議列表一樣顯示檔名
+                    // 没有标题的会议跟会议列表一样显示文件名
                     let last = try (row["last_id"] as Int64?).flatMap { try Meeting.fetchOne(db, key: $0) }
                     return PersonSummary(id: row["id"], name: row["name"], voiceprintCount: row["prints"],
                                          lastMeetingTitle: last?.displayTitle, lastMeetingDate: last?.meetingDate)
@@ -264,7 +264,7 @@ extension AppDatabase {
         }
     }
 
-    /// 改名：認識的人和所有連到他的說話者一起改；新名字已經有人用了就合併過去
+    /// 改名：认识的人和所有连到他的说话者一起改；新名字已经有人用了就合并过去
     func renamePerson(_ id: Int64, to name: String) throws {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -280,7 +280,7 @@ extension AppDatabase {
         }
     }
 
-    /// 刪除認識的人：聲紋刪掉（外鍵），已經帶入的名字留著
+    /// 删除认识的人：声纹删掉（外键），已经带入的名字留着
     func deletePerson(_ id: Int64) throws {
         try pool.write { db in try db.execute(sql: "DELETE FROM people WHERE id = ?", arguments: [id]) }
     }
@@ -289,7 +289,7 @@ extension AppDatabase {
         try pool.write { db in try db.execute(sql: "DELETE FROM people") }
     }
 
-    /// 認識的人的名字，給猜說話者參考寫法
+    /// 认识的人的名字，给猜说话者参考写法
     func peopleNames() throws -> [String] {
         try pool.read { db in try String.fetchAll(db, sql: "SELECT name FROM people ORDER BY name COLLATE NOCASE") }
     }

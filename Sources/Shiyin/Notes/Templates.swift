@@ -1,29 +1,29 @@
 import Foundation
 
-/// 範本的內容（design §8.2）
+/// 模板的内容（design §8.2）
 struct TemplateDefinition: Codable, Hashable {
     struct CustomSpec: Codable, Hashable {
         var title: String
         var instruction: String
     }
 
-    /// 內建段落：summary、decisions、actionItems、openQuestions、topics
+    /// 内置段落：summary、decisions、actionItems、openQuestions、topics
     static let builtinSectionIDs = ["summary", "decisions", "actionItems", "openQuestions", "topics"]
 
-    /// 段落名稱：介面用介面語言，提示詞用會議語言（design §16.5）
-    /// prompt：提示詞裡用（一般語言不查字串表，design §41.1）
+    /// 段落名称：界面用界面语言，提示词用会议语言（design §16.5）
+    /// prompt：提示词里用（一般语言不查字符串表，design §41.1）
     static func sectionLabel(_ id: String, language: MeetingLanguage, prompt: Bool = false) -> String {
         let pick = prompt ? language.prompt : language.text
         switch id {
         case "summary": return pick("摘要", "Summary", "要約")
-        case "decisions": return pick("決議", "Decisions", "決定事項")
-        case "actionItems": return pick("待辦", "Action items", "ToDo")
-        case "openQuestions": return pick("未決問題", "Open questions", "未決事項")
-        default: return pick("議題詳細", "Topics", "議題ごとの詳細")
+        case "decisions": return pick("决议", "Decisions", "決定事項")
+        case "actionItems": return pick("待办", "Action items", "ToDo")
+        case "openQuestions": return pick("未决问题", "Open questions", "未決事項")
+        default: return pick("议题详细", "Topics", "議題ごとの詳細")
         }
     }
 
-    /// 設定畫面用的段落清單（介面語言）
+    /// 设置画面用的段落清单（界面语言）
     static var builtinSections: [(id: String, label: String)] {
         builtinSectionIDs.map { ($0, sectionLabel($0, language: .interface)) }
     }
@@ -45,41 +45,41 @@ struct TemplateDefinition: Codable, Hashable {
     }
 }
 
-/// 內建範本（R6.2）。中文版啟動時寫進資料庫，名稱或內容改了就覆蓋；英文版、日文版不存，依 id 取用（design §16.5、§18.4）。
+/// 内置模板（R6.2）。中文版启动时写进数据库，名称或内容改了就覆盖；英文版、日文版不存，依 id 取用（design §16.5、§18.4）。
 enum BuiltinTemplates {
     static let all: [(id: String, name: String, definition: TemplateDefinition)] = [
-        ("general", "一般會議", TemplateDefinition(
-            description: "週會、專案會議、討論會：摘要、決議、待辦、未決問題、議題",
+        ("general", "一般会议", TemplateDefinition(
+            description: "周会、项目会议、讨论会：摘要、决议、待办、未决问题、议题",
             sections: ["summary", "decisions", "actionItems", "openQuestions", "topics"], custom: [], instruction: "")),
-        ("one-on-one", "一對一", TemplateDefinition(
-            description: "主管與成員的一對一會談",
+        ("one-on-one", "一对一", TemplateDefinition(
+            description: "主管与成员的一对一会谈",
             sections: ["summary", "actionItems", "openQuestions"],
-            custom: [.init(title: "近況與進展", instruction: "對方最近在做的事、進度與卡關的地方"),
-                     .init(title: "回饋", instruction: "雙方給彼此的回饋，標明是誰給誰"),
-                     .init(title: "需要的支持", instruction: "對方提出需要協助或資源的地方")],
-            instruction: "這是一對一會談，語氣保持中性，不要評價個人。")),
-        ("interview", "訪談", TemplateDefinition(
-            description: "使用者訪談、專家訪談、面試",
+            custom: [.init(title: "近况与进展", instruction: "对方最近在做的事、进度与卡关的地方"),
+                     .init(title: "反馈", instruction: "双方给彼此的反馈，标明是谁给谁"),
+                     .init(title: "需要的支持", instruction: "对方提出需要协助或资源的地方")],
+            instruction: "这是一对一会谈，语气保持中性，不要评价个人。")),
+        ("interview", "访谈", TemplateDefinition(
+            description: "用户访谈、专家访谈、面试",
             sections: ["summary", "topics"],
-            custom: [.init(title: "受訪者背景", instruction: "受訪者的角色、經歷、使用情境"),
-                     .init(title: "重點引述", instruction: "保留受訪者的原話，每條一句，附時間點"),
-                     .init(title: "洞察與機會", instruction: "從訪談內容歸納出的需求、痛點與機會")],
-            instruction: "這是訪談，重點是受訪者說了什麼，不要把訪談者的推測寫成受訪者的意見。")),
-        ("lecture", "課堂／演講", TemplateDefinition(
-            description: "課程、演講、分享會、教育訓練",
+            custom: [.init(title: "受访者背景", instruction: "受访者的角色、经历、使用情境"),
+                     .init(title: "重点引述", instruction: "保留受访者的原话，每条一句，附时间点"),
+                     .init(title: "洞察与机会", instruction: "从访谈内容归纳出的需求、痛点与机会")],
+            instruction: "这是访谈，重点是受访者说了什么，不要把访谈者的推测写成受访者的意见。")),
+        ("lecture", "课堂／演讲", TemplateDefinition(
+            description: "课程、演讲、分享会、教育训练",
             sections: ["summary", "topics", "openQuestions"],
-            custom: [.init(title: "重點概念", instruction: "提到的重要概念、名詞與解釋"),
-                     .init(title: "問答", instruction: "聽眾的提問與講者的回答")],
-            instruction: "這是課堂或演講，依講者的段落整理大綱。")),
-        ("brainstorm", "腦力激盪", TemplateDefinition(
-            description: "發想會議、工作坊",
+            custom: [.init(title: "重点概念", instruction: "提到的重要概念、名词与解释"),
+                     .init(title: "问答", instruction: "听众的提问与讲者的回答")],
+            instruction: "这是课堂或演讲，依讲者的段落整理大纲。")),
+        ("brainstorm", "脑力激荡", TemplateDefinition(
+            description: "发想会议、工作坊",
             sections: ["summary", "decisions", "actionItems"],
-            custom: [.init(title: "點子清單", instruction: "每個點子一條，盡量標出是誰提出的"),
-                     .init(title: "評估與取捨", instruction: "對點子的討論、優缺點與取捨理由")],
-            instruction: "這是腦力激盪，不要遺漏任何被提出的點子，即使沒有被採納。")),
+            custom: [.init(title: "点子清单", instruction: "每个点子一条，尽量标出是谁提出的"),
+                     .init(title: "评估与取舍", instruction: "对点子的讨论、优缺点与取舍理由")],
+            instruction: "这是脑力激荡，不要遗漏任何被提出的点子，即使没有被采纳。")),
     ]
 
-    /// 英文版：英文會議整理時用，英文介面也顯示這裡的名稱和說明
+    /// 英文版：英文会议整理时用，英文界面也显示这里的名称和说明
     static let english: [String: (name: String, definition: TemplateDefinition)] = [
         "general": ("General meeting", TemplateDefinition(
             description: "Team meetings, project meetings, discussions: summary, decisions, action items, open questions, topics",
@@ -112,7 +112,7 @@ enum BuiltinTemplates {
             instruction: "This is a brainstorm. Do not leave out any idea that was raised, even if it was not adopted.")),
     ]
 
-    /// 日文版：日文會議整理時用（沒有日文介面，名稱不會顯示）
+    /// 日文版：日文会议整理时用（没有日文界面，名称不会显示）
     static let japanese: [String: TemplateDefinition] = [
         "general": TemplateDefinition(
             description: "定例会議、プロジェクト会議、打ち合わせ：要約、決定事項、ToDo、未決事項、議題",
@@ -156,21 +156,21 @@ enum BuiltinTemplates {
 }
 
 extension TemplateRecord {
-    /// 介面上顯示的名稱：內建範本跟著介面語言，自訂範本照使用者取的名字
+    /// 界面上显示的名称：内置模板跟着界面语言，自订模板照用户取的名字
     var displayName: String {
         guard builtin, MeetingLanguage.interface == .en, let english = BuiltinTemplates.english[id] else { return name }
         return english.name
     }
 
-    /// 介面上顯示的說明
+    /// 界面上显示的说明
     var displayDescription: String {
         if builtin, MeetingLanguage.interface == .en, let english = BuiltinTemplates.english[id] { return english.definition.description }
         return TemplateDefinition.decode(definition).description
     }
 
-    /// 整理時用的內容：內建範本跟著會議語言，自訂範本照使用者寫的
+    /// 整理时用的内容：内置模板跟着会议语言，自订模板照用户写的
     func definition(for language: MeetingLanguage) -> TemplateDefinition {
-        // 依語言用哪一份（design §41.2）：一般語言用英文版，粵語用中文版
+        // 依语言用哪一份（design §41.2）：一般语言用英文版，粤语用中文版
         if builtin, language.base == .en, let english = BuiltinTemplates.english[id] { return english.definition }
         if builtin, language.base == .ja, let japanese = BuiltinTemplates.japanese[id] { return japanese }
         return TemplateDefinition.decode(definition)

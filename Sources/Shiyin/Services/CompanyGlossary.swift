@@ -2,12 +2,12 @@ import Foundation
 import os
 
 extension Notification.Name {
-    /// 公司詞彙表換了（R53）：畫面、建議的新詞要重算
+    /// 公司词汇表换了（R53）：画面、建议的新词要重算
     static let companyGlossaryChanged = Notification.Name("companyGlossaryChanged")
 }
 
-/// 公司詞彙表（R53、design §36.3）：企業伺服器後台維護的詞，存在 SHIYIN_HOME/enterprise-glossary.json，跟自己的詞一起用。
-/// 轉錄、整理在背景執行緒讀，所以不綁 MainActor，用鎖保護
+/// 公司词汇表（R53、design §36.3）：企业服务器后台维护的词，存在 SHIYIN_HOME/enterprise-glossary.json，跟自己的词一起用。
+/// 转录、整理在背景线程读，所以不绑 MainActor，用锁保护
 enum CompanyGlossary {
     private struct Stored: Codable {
         var terms: [String]
@@ -17,7 +17,7 @@ enum CompanyGlossary {
     private static let cache = OSAllocatedUnfairLock<[String]?>(initialState: nil)
     static var file: URL { Paths.home.appendingPathComponent("enterprise-glossary.json") }
 
-    /// 上次從伺服器拿到的（連不上時照樣用）
+    /// 上次从服务器拿到的（连不上时照样用）
     static var terms: [String] {
         cache.withLock { cached in
             if let cached { return cached }
@@ -27,7 +27,7 @@ enum CompanyGlossary {
         }
     }
 
-    /// 伺服器給的詞的上限（design §36.2，同 Windows）：最多 500 個、每個最多 100 字（UTF-16 單位），太長的略過
+    /// 服务器给的词的上限（design §36.2，同 Windows）：最多 500 个、每个最多 100 字（UTF-16 单位），太长的略过
     static let maxTerms = 500
     static let maxTermLength = 100
 
@@ -42,20 +42,20 @@ enum CompanyGlossary {
         DispatchQueue.main.async { NotificationCenter.default.post(name: .companyGlossaryChanged, object: nil) }
     }
 
-    /// 登出時刪掉（R53.4）
+    /// 退出登录时删掉（R53.4）
     static func clear() {
         try? FileManager.default.removeItem(at: file)
         cache.withLock { $0 = [] }
         DispatchQueue.main.async { NotificationCenter.default.post(name: .companyGlossaryChanged, object: nil) }
     }
 
-    /// 自己的詞在前、公司的接在後面，不分大小寫去掉重複（轉錄的提示詞有長度上限，R53.2）。
-    /// 沒有公司的詞時照原本的詞彙表、一個字都不動：沒登入的人跟 4.1.2 一樣（R52.5；自己存了「API」和「api」兩個都留著）
+    /// 自己的词在前、公司的接在后面，不分大小写去掉重复（转录的提示词有长度上限，R53.2）。
+    /// 没有公司的词时照原本的词汇表、一个字都不动：没登录的人跟 4.1.2 一样（R52.5；自己存了「API」和「api」两个都留着）
     static func merge(_ own: [String], _ company: [String]) -> [String] {
         company.isEmpty ? own : clean(own + company)
     }
 
-    /// 去掉空白、重複之後，略過太長的、只留前 maxTerms 個
+    /// 去掉空白、重复之后，略过太长的、只留前 maxTerms 个
     static func limited(_ terms: [String]) -> [String] {
         Array(clean(terms).filter { $0.utf16.count <= maxTermLength }.prefix(maxTerms))
     }

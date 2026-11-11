@@ -1,6 +1,6 @@
 import Foundation
 
-/// Anthropic API（design §8.4）：強制呼叫一個 tool，input_schema 就是要的格式
+/// Anthropic API（design §8.4）：强制调用一个 tool，input_schema 就是要的格式
 struct AnthropicAPI: LLMBackend {
     let model: String
 
@@ -27,7 +27,7 @@ struct AnthropicAPI: LLMBackend {
         let object = try await APIRequest.send(request, provider: "Anthropic")
         guard let content = object["content"] as? [[String: Any]],
               let input = content.first(where: { $0["type"] as? String == "tool_use" })?["input"] else {
-            throw LLMError.badOutput(String(localized: "回應裡沒有會議紀錄（stop_reason：\(object["stop_reason"] as? String ?? String(localized: "未知"))）"))
+            throw LLMError.badOutput(String(localized: "回应里没有会议记录（stop_reason：\(object["stop_reason"] as? String ?? String(localized: "未知"))）"))
         }
         return try JSONSerialization.data(withJSONObject: input)
     }

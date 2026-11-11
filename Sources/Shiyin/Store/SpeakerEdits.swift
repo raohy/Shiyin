@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// 說話者的修正（design §24.2～§24.4、R23）：合併、改句子的說話者、復原最近一次；說話者辨識的自我檢查（§24.5）
+/// 说话者的修正（design §24.2～§24.4、R23）：合并、改句子的说话者、复原最近一次；说话者识别的自我检查（§24.5）
 extension AppDatabase {
     private struct SpeakerSnapshot: Codable {
         struct SegmentState: Codable { var id: Int64; var speaker: Int?; var manual: Bool }
@@ -11,7 +11,7 @@ extension AppDatabase {
         }
         var segments: [SegmentState]
         var speakers: [SpeakerState]
-        /// 合併時換了會議紀錄裡的名字：換之前、換之後的會議紀錄（JSON）。復原時會議紀錄還是換之後的樣子，就換回去
+        /// 合并时换了会议记录里的名字：换之前、换之后的会议记录（JSON）。复原时会议记录还是换之后的样子，就换回去
         var notesBefore: String?
         var notesAfter: String?
     }
@@ -32,12 +32,12 @@ extension AppDatabase {
                        arguments: [meetingId, json, label, Clock.now()])
     }
 
-    /// 可以復原的調整（顯示用的說明），沒有就是 nil
+    /// 可以复原的调整（显示用的说明），没有就是 nil
     func speakerUndoLabel(_ meetingId: Int64) throws -> String? {
         try pool.read { db in try String.fetchOne(db, sql: "SELECT label FROM speaker_undo WHERE meeting_id = ?", arguments: [meetingId]) }
     }
 
-    /// 復原最近一次說話者的調整。合併時換過名字的會議紀錄，之後沒有再改的話一起換回去（拿掉合併時存的那一版）
+    /// 复原最近一次说话者的调整。合并时换过名字的会议记录，之后没有再改的话一起换回去（拿掉合并时存的那一版）
     @discardableResult
     func undoSpeakerEdit(_ meetingId: Int64) throws -> Bool {
         try pool.write { db in
@@ -68,8 +68,8 @@ extension AppDatabase {
         }
     }
 
-    /// 合併說話者（R23.1）：from 的段落併到 into；聲紋依說話秒數加權平均；from 存過的聲紋刪掉；
-    /// 會議紀錄裡 from 的名字換成 into 的名字（存一版）。回傳兩人原本的名字
+    /// 合并说话者（R23.1）：from 的段落并到 into；声纹依说话秒数加权平均；from 存过的声纹删掉；
+    /// 会议记录里 from 的名字换成 into 的名字（存一版）。回传两人原本的名字
     func mergeSpeakers(_ meetingId: Int64, from: Int, into: Int, label: String) throws -> (from: String, into: String)? {
         try pool.write { db in
             guard from != into,
@@ -80,7 +80,7 @@ extension AppDatabase {
             if let notes = meeting.decodedNotes, a.name != b.name {
                 let updated = notes.replacingSpeakerName(b.name, with: a.name, isDefaultName: Self.isDefaultSpeakerName(b.name))
                 if updated != notes {
-                    try Self.saveNotes(db, meetingId, notes: updated, by: nil, reason: String(localized: "合併說話者"))
+                    try Self.saveNotes(db, meetingId, notes: updated, by: nil, reason: String(localized: "合并说话者"))
                     notesAfter = try String.fetchOne(db, sql: "SELECT notes FROM meetings WHERE id = ?", arguments: [meetingId])
                 }
             }
@@ -111,8 +111,8 @@ extension AppDatabase {
         }
     }
 
-    /// 改句子的說話者（R23.2）：to 是 nil 時新增一位說話者（預設名稱）；改過的句子標成 speaker_manual；
-    /// 沒有段落的說話者拿掉。回傳句子現在的說話者
+    /// 改句子的说话者（R23.2）：to 是 nil 时添加一位说话者（默认名称）；改过的句子标成 speaker_manual；
+    /// 没有段落的说话者拿掉。回传句子现在的说话者
     @discardableResult
     func reassignSegments(_ meetingId: Int64, ids: [Int64], to idx: Int?, label: String) throws -> Int {
         try pool.write { db in
@@ -144,7 +144,7 @@ extension AppDatabase {
         }
     }
 
-    /// 說話者辨識完記下自我檢查的分數（design §24.5），之前按過的「不用了」重設
+    /// 说话者识别完记下自我检查的分数（design §24.5），之前按过的「不用了」重置
     func setSpeakerCheck(_ meetingId: Int64, _ score: Double?) throws {
         try pool.write { db in
             try db.execute(sql: "UPDATE meetings SET speaker_check = ?, speaker_hint_dismissed = 0 WHERE id = ?", arguments: [score, meetingId])

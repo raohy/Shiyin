@@ -5,8 +5,8 @@ import PDFKit
 import UniformTypeIdentifiers
 import Vision
 
-/// 讀出會議參考文件的文字（design §39.2、R61.2）：PDF 用 PDFKit，掃描的頁面和圖片用 Vision 的文字辨識，
-/// docx、pptx 自己讀 XML（規則跟 Windows 一樣，標準答案比對），純文字照 UTF-8／UTF-16 讀
+/// 读出会议参考文档的文字（design §39.2、R61.2）：PDF 用 PDFKit，扫描的页面和图片用 Vision 的文字识别，
+/// docx、pptx 自己读 XML（规则跟 Windows 一样，标准答案比对），纯文字照 UTF-8／UTF-16 读
 enum DocumentReader {
     struct Result: Equatable {
         var kind: DocumentKind
@@ -18,7 +18,7 @@ enum DocumentReader {
         case unsupported(ext: String)
         case tooLarge(String), locked(String), unreadable(String), empty(String), encoding(String), duplicate(String)
 
-        /// 標準答案比的是原因，不是訊息（訊息跟著介面語言）
+        /// 标准答案比的是原因，不是消息（消息跟着界面语言）
         var code: String {
             switch self {
             case .unsupported(let ext): return "unsupported:\(ext)"
@@ -35,27 +35,27 @@ enum DocumentReader {
             switch self {
             case .unsupported(let ext):
                 switch ext {
-                case "key": return String(localized: "拾音讀不了 Keynote 檔。請先在 Keynote 匯出成 PDF 再加入。")
-                case "pages": return String(localized: "拾音讀不了 Pages 檔。請先在 Pages 匯出成 PDF 再加入。")
-                case "numbers": return String(localized: "拾音讀不了 Numbers 檔。請先在 Numbers 匯出成 PDF 再加入。")
-                case "doc": return String(localized: "拾音讀不了舊版的 Word 檔（.doc）。請另存成 docx 或 PDF 再加入。")
-                case "": return String(localized: "拾音讀不了沒有副檔名的檔案。請先匯出成 PDF 再加入。")
-                default: return String(localized: "拾音讀不了 .\(ext) 檔。請先匯出成 PDF 再加入。")
+                case "key": return String(localized: "拾音读不了 Keynote 档。请先在 Keynote 导出成 PDF 再加入。")
+                case "pages": return String(localized: "拾音读不了 Pages 档。请先在 Pages 导出成 PDF 再加入。")
+                case "numbers": return String(localized: "拾音读不了 Numbers 档。请先在 Numbers 导出成 PDF 再加入。")
+                case "doc": return String(localized: "拾音读不了旧版的 Word 档（.doc）。请另存成 docx 或 PDF 再加入。")
+                case "": return String(localized: "拾音读不了没有扩展名的文件。请先导出成 PDF 再加入。")
+                default: return String(localized: "拾音读不了 .\(ext) 档。请先导出成 PDF 再加入。")
                 }
-            case .tooLarge(let name): return String(localized: "「\(name)」超過 200 MB，拾音不讀這麼大的文件。")
-            case .locked(let name): return String(localized: "「\(name)」有密碼保護，拾音讀不了。請先移除密碼再加入。")
-            case .unreadable(let name): return String(localized: "「\(name)」讀不出來，檔案可能壞了。")
-            case .empty(let name): return String(localized: "「\(name)」裡讀不到文字。")
-            case .encoding(let name): return String(localized: "「\(name)」不是 UTF-8 的文字檔。請另存成 UTF-8 再加入。")
-            case .duplicate(let name): return String(localized: "「\(name)」已經加過了")
+            case .tooLarge(let name): return String(localized: "「\(name)」超过 200 MB，拾音不读这么大的文档。")
+            case .locked(let name): return String(localized: "「\(name)」有密码保护，拾音读不了。请先移除密码再加入。")
+            case .unreadable(let name): return String(localized: "「\(name)」读不出来，文件可能坏了。")
+            case .empty(let name): return String(localized: "「\(name)」里读不到文字。")
+            case .encoding(let name): return String(localized: "「\(name)」不是 UTF-8 的文字档。请另存成 UTF-8 再加入。")
+            case .duplicate(let name): return String(localized: "「\(name)」已经加过了")
             }
         }
     }
 
     static let maxBytes = 200 * 1024 * 1024
-    /// 掃描的頁面最多辨識幾頁（R61.7）
+    /// 扫描的页面最多识别几页（R61.7）
     static let maxOCRPages = 50
-    /// 一頁的文字（不算空白）少於這個數就當成掃描的頁面
+    /// 一页的文字（不算空白）少于这个数就当成扫描的页面
     static let scannedPageChars = 20
 
     static func kind(of url: URL) -> DocumentKind? {
@@ -69,19 +69,19 @@ enum DocumentReader {
         }
     }
 
-    /// 拖進主視窗時當成文件的（R61.3）：讀得了的，加上看得出是文件、要說明怎麼辦的。txt、md 照舊是逐字稿、筆記
+    /// 拖进主窗口时当成文档的（R61.3）：读得了的，加上看得出是文档、要说明怎么办的。txt、md 照旧是逐字稿、笔记
     static func isDroppedDocument(_ url: URL) -> Bool {
         ["pdf", "docx", "pptx", "png", "jpg", "jpeg", "heic",
          "key", "pages", "numbers", "doc", "rtf", "ppt", "xls", "xlsx"].contains(url.pathExtension.lowercased())
     }
 
-    /// 「加入文件…」的選檔類型
+    /// 「加入文档…」的选档类型
     static var openPanelTypes: [UTType] {
         [.pdf, .plainText, .png, .jpeg, .heic]
             + ["docx", "pptx", "md", "markdown"].compactMap { UTType(filenameExtension: $0) }
     }
 
-    /// 在背景執行：文字辨識一頁約 0.5～1 秒
+    /// 在背景执行：文字识别一页约 0.5～1 秒
     static func read(_ url: URL, language: MeetingLanguage) throws -> Result {
         let name = url.lastPathComponent
         guard let kind = kind(of: url) else { throw DocumentError.unsupported(ext: url.pathExtension.lowercased()) }
@@ -104,11 +104,11 @@ enum DocumentReader {
         return Result(kind: kind, pages: pages, ocr: ocr)
     }
 
-    // MARK: 整理文字（Windows 照同樣的規則）
+    // MARK: 整理文字（Windows 照同样的规则）
 
     private static let blank: Set<Character> = [" ", "\t", "\u{00A0}", "\u{3000}"]
 
-    /// 換行統一成 \n、每行去掉行尾的空白、連續的空行只留一行、整頁去掉頭尾的空白和換行
+    /// 换行统一成 \n、每行去掉行尾的空白、连续的空行只留一行、整页去掉头尾的空白和换行
     static func normalize(_ text: String) -> String {
         let unified = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
         var lines: [Substring] = []
@@ -153,7 +153,7 @@ enum DocumentReader {
         return (pages, ocr)
     }
 
-    /// 長邊 2000 px、白底，自己畫（不用 NSImage 的縮圖，背景執行緒也安全）
+    /// 长边 2000 px、白底，自己画（不用 NSImage 的缩略图，背景线程也安全）
     private static func render(_ page: PDFPage) -> CGImage? {
         let bounds = page.bounds(for: .mediaBox)
         let longest = max(bounds.width, bounds.height)
@@ -171,7 +171,7 @@ enum DocumentReader {
         return context.makeImage()
     }
 
-    // MARK: 圖片、文字辨識
+    // MARK: 图片、文字识别
 
     private static func loadImage(_ url: URL, name: String) throws -> (CGImage, CGImagePropertyOrientation) {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
@@ -185,12 +185,12 @@ enum DocumentReader {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
-        request.recognitionLanguages = language.profile.ocr.mac   // 語言檔（design §41.5）
+        request.recognitionLanguages = language.profile.ocr.mac   // 语言档（design §41.5）
         try VNImageRequestHandler(cgImage: image, orientation: orientation).perform([request])
         return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
     }
 
-    // MARK: 純文字
+    // MARK: 纯文字
 
     private static func readText(_ url: URL, name: String) throws -> String {
         guard let data = try? Data(contentsOf: url) else { throw DocumentError.unreadable(name) }
@@ -209,9 +209,9 @@ enum DocumentReader {
     }
 }
 
-/// docx、pptx 的文字（design §39.2、D136）：`unzip -p` 只取要讀的 XML（不解出圖片），同一套規則讀 Word 的段落、表格和投影片
+/// docx、pptx 的文字（design §39.2、D136）：`unzip -p` 只取要读的 XML（不解出图片），同一套规则读 Word 的段落、表格和幻灯片
 enum OfficeText {
-    /// 一個 XML 檔解壓後最多多大：防止壓縮炸彈
+    /// 一个 XML 档解压后最多多大：防止压缩炸弹
     static let maxEntryBytes = 64 * 1024 * 1024
 
     static func docx(_ url: URL, name: String) throws -> String {
@@ -233,7 +233,7 @@ enum OfficeText {
         return pages
     }
 
-    /// 投影片的 Target 相對於 ppt/；「/」開頭是從根算。有 .. 或奇怪字元的不讀（unzip 的參數是萬用字元的樣式）
+    /// 幻灯片的 Target 相对于 ppt/；「/」开头是从根算。有 .. 或奇怪字符的不读（unzip 的参数是通配符的样式）
     static func resolve(_ target: String) -> String? {
         let path = target.hasPrefix("/") ? String(target.dropFirst()) : "ppt/" + target
         let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./-")
@@ -242,7 +242,7 @@ enum OfficeText {
         return path
     }
 
-    /// 解出 zip 裡的一個檔；找不到、壞掉、太大都是 nil
+    /// 解出 zip 里的一个档；找不到、坏掉、太大都是 nil
     static func entry(_ url: URL, _ path: String) -> Data? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
@@ -278,7 +278,7 @@ enum OfficeText {
         return reader.output
     }
 
-    /// 段落、表格的規則（design §39.2）：只看元素的本地名稱，Word（w:）和投影片（a:）共用
+    /// 段落、表格的规则（design §39.2）：只看元素的本地名称，Word（w:）和幻灯片（a:）共用
     private final class TextCollector: NSObject, XMLParserDelegate {
         private(set) var output = ""
         private var stack: [String] = []
@@ -342,7 +342,7 @@ enum OfficeText {
         }
     }
 
-    /// presentation.xml 的 sldIdLst：每個 sldId 的 r:id，照順序
+    /// presentation.xml 的 sldIdLst：每个 sldId 的 r:id，照顺序
     private final class SlideList: NSObject, XMLParserDelegate {
         private var ids: [String] = []
 
@@ -363,7 +363,7 @@ enum OfficeText {
         }
     }
 
-    /// presentation.xml.rels：Id → Target（外部連結不算）
+    /// presentation.xml.rels：Id → Target（外部链接不算）
     private final class Relationships: NSObject, XMLParserDelegate {
         private var targets: [String: String] = [:]
 

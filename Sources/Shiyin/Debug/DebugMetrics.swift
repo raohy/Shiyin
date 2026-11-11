@@ -1,17 +1,17 @@
 #if DEBUG
 import Foundation
 
-/// 只在 DEBUG：驗證效能用的計數（design §21.12、§21.13）。`shiyinctl metrics <輸出.json> [reset]` 讀出或歸零
+/// 只在 DEBUG：验证性能用的计数（design §21.12、§21.13）。`shiyinctl metrics <输出.json> [reset]` 读出或归零
 @MainActor
 enum DebugMetrics {
-    /// 各種事件發生的次數，例如逐字稿列表重算、會議列表重讀
+    /// 各种事件发生的次数，例如逐字稿列表重算、会议列表重读
     static var counts: [String: Int] = [:]
-    /// 各種工作最近一次花的毫秒數，例如 reloadDetail
+    /// 各种工作最近一次花的毫秒数，例如 reloadDetail
     static var timings: [String: Double] = [:]
-    /// 最近一次 AppModel.perform（含重讀）花的毫秒數，以及最慢的一次
+    /// 最近一次 AppModel.perform（含重读）花的毫秒数，以及最慢的一次
     static var lastPerformMs = 0.0
     static var maxPerformMs = 0.0
-    /// 主執行緒最長卡住多久：每 10 毫秒一次的計時器，兩次之間隔了多久
+    /// 主线程最长卡住多久：每 10 毫秒一次的计时器，两次之间隔了多久
     static var maxMainGapMs = 0.0
     private static var lastTick = Date()
     private static var timer: Timer?
@@ -38,7 +38,7 @@ enum DebugMetrics {
         lastTick = Date()
     }
 
-    /// 啟動時開始量主執行緒的間隔（common modes，選單、捲動時也量得到）
+    /// 启动时开始量主线程的间隔（common modes，菜单、滚动时也量得到）
     static func startMainThreadWatch() {
         guard timer == nil else { return }
         let timer = Timer(timeInterval: 0.01, repeats: true) { _ in
@@ -57,10 +57,10 @@ enum DebugMetrics {
     }
 }
 
-/// 只在 DEBUG：量轉錄各階段的記憶體（design §21.16）。背景執行緒每 50 毫秒讀一次 phys_footprint，記下每個階段的最大值
+/// 只在 DEBUG：量转录各阶段的内存（design §21.16）。背景线程每 50 毫秒读一次 phys_footprint，记下每个阶段的最大值
 final class MemoryMeter: @unchecked Sendable {
     private let lock = NSLock()
-    private var stage = "開始"   // l10n-skip
+    private var stage = "开始"   // l10n-skip
     private var order: [String] = []
     private var peaks: [String: UInt64] = [:]
     private var running = true
@@ -81,7 +81,7 @@ final class MemoryMeter: @unchecked Sendable {
 
     func set(stage: String) { lock.withLock { self.stage = stage } }
 
-    /// 停止量測，回傳各階段的峰值（MB，依出現順序）和整個程序到目前為止的峰值
+    /// 停止量测，回传各阶段的峰值（MB，依出现顺序）和整个程序到目前为止的峰值
     func stop() -> [String: Any] {
         lock.withLock { running = false }
         let mb = { (value: UInt64) in Double(value) / 1_048_576 }

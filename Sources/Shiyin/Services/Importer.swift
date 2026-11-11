@@ -1,19 +1,19 @@
 import Foundation
 import UniformTypeIdentifiers
 
-/// 匯入的選填資料（R1.2）
+/// 导入的选填资料（R1.2）
 struct ImportOptions {
     var title: String = ""
     var date: String? = nil
     var participants: String = ""
-    /// 顯示用的來源名稱；沒給就用檔名
+    /// 显示用的来源名称；没给就用文件名
     var sourceName: String? = nil
     var templateId: String? = nil
-    /// 放進哪個資料夾（R9.2）；空字串是不放
+    /// 放进哪个文件夹（R9.2）；空字符串是不放
     var folder: String = ""
-    /// 會議語言（design §16.3）
+    /// 会议语言（design §16.3）
     var language: MeetingLanguage = AppSettings.defaultMeetingLanguage
-    /// 大約幾個人（design §26.2）：nil 是自動判斷
+    /// 大约几个人（design §26.2）：nil 是自动判断
     var minSpeakers: Int? = nil
 }
 
@@ -22,20 +22,20 @@ enum ImportError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .copyFailed(let name, let reason): return String(localized: "無法匯入「\(name)」：\(reason)")
+        case .copyFailed(let name, let reason): return String(localized: "无法导入「\(name)」：\(reason)")
         }
     }
 }
 
-/// 統一處理四種匯入入口（design §7）
+/// 统一处理四种导入入口（design §7）
 enum Importer {
     static let contentTypes: [UTType] = [.audio, .movie, .audiovisualContent]
-    /// 逐字稿、Markdown 筆記、.shiyin 封包（R3.3～R3.5）
+    /// 逐字稿、Markdown 笔记、.shiyin 封包（R3.3～R3.5）
     static let otherTypes: [UTType] = [UTType(filenameExtension: "shiyin"), UTType(filenameExtension: "srt"),
                                        UTType(filenameExtension: "vtt"), .plainText,
                                        UTType(filenameExtension: "md")].compactMap { $0 }
 
-    /// 會議日期預設值（R1.4）：檔名有日期就用檔名，年份取不晚於今天的最近一年；否則用檔案修改日期
+    /// 会议日期默认值（R1.4）：文件名有日期就用文件名，年份取不晚于今天的最近一年；否则用文件修改日期
     static func inferDate(filename: String, modified: Date?, today: Date = Date()) -> String {
         let name = (filename as NSString).deletingPathExtension
         let calendar = Calendar(identifier: .gregorian)
@@ -74,13 +74,13 @@ enum Importer {
         (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
     }
 
-    /// 只保留英數字的副檔名，避免路徑穿越（N1）
+    /// 只保留英数字的扩展名，避免路径穿越（N1）
     static func safeExtension(_ url: URL) -> String {
         let ext = url.pathExtension.lowercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
         return ext.isEmpty ? "bin" : String(ext.prefix(8))
     }
 
-    /// 建立會議、複製錄音、排轉錄工作。複製失敗會刪掉剛建立的會議。
+    /// 创建会议、复制录音、排转录工作。复制失败会删掉刚创建的会议。
     @discardableResult
     static func importFile(_ url: URL, options: ImportOptions, db: AppDatabase,
                            move: Bool = false) throws -> Meeting {
@@ -100,7 +100,7 @@ enum Importer {
         var moved = false
         do {
             try Paths.ensureDirectories()
-            // 同一個 APFS 磁碟區時，copyItem 會自動用 clone，不佔額外空間
+            // 同一个 APFS 磁盘区时，copyItem 会自动用 clone，不占额外空间
             if move {
                 try FileManager.default.moveItem(at: url, to: meeting.audioURL)
                 moved = true
@@ -108,12 +108,12 @@ enum Importer {
                 try FileManager.default.copyItem(at: url, to: meeting.audioURL)
             }
             try db.enqueue(meeting.id!, kind: .transcribe)
-            // 匿名使用統計（design §30.1）：復原當掉的錄音（move）不算匯入
+            // 匿名使用统计（design §30.1）：复原当掉的录音（move）不算导入
             if !move { UsageStats.shared.imported() }
         } catch {
             try? db.deleteMeeting(meeting.id!)
             if moved {
-                // 復原的錄音是唯一的一份：搬回原處，下次開啟再試（design §20.6、R18.6）
+                // 复原的录音是唯一的一份：搬回原处，下次打开再试（design §20.6、R18.6）
                 try? FileManager.default.moveItem(at: meeting.audioURL, to: url)
             } else {
                 try? FileManager.default.removeItem(at: meeting.audioURL)

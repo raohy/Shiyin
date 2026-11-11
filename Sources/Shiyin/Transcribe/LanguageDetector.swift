@@ -1,15 +1,15 @@
 import Foundation
 import whisper
 
-/// 自動偵測會議的主要語言（design §18.8、R16、D21）：開始錄音後收集約 10 秒有聲音的片段，
-/// 用 Whisper base 在語言檔裡可以偵測的語言之間判斷（design §41.4）
+/// 自动检测会议的主要语言（design §18.8、R16、D21）：开始录音后收集约 10 秒有声音的片段，
+/// 用 Whisper base 在语言档里可以检测的语言之间判断（design §41.4）
 enum LanguageDetector {
-    /// 要收集幾秒有聲音的片段
+    /// 要收集几秒有声音的片段
     static let seconds: Double = 10
-    /// 可以偵測的語言的機率加總成 1 之後，最高的超過這個才切換
+    /// 可以检测的语言的概率加总成 1 之后，最高的超过这个才切换
     static let threshold = 0.7
 
-    /// 回傳可以偵測的語言各自的機率（加總為 1）。blocking，在背景執行
+    /// 回传可以检测的语言各自的概率（加总为 1）。blocking，在背景执行
     nonisolated static func detect(_ samples: [Float], modelPath: String) throws -> [MeetingLanguage: Double] {
         guard FileManager.default.fileExists(atPath: modelPath) else { throw WhisperError.modelMissing }
         var params = whisper_context_default_params()
@@ -33,14 +33,14 @@ enum LanguageDetector {
         return total > 0 ? result.mapValues { $0 / total } : result
     }
 
-    /// 錄音時收集有聲音的片段：每 0.1 秒一段，比背景噪音大 2.5 倍（至少 -54 dBFS）才算，湊滿 `seconds` 秒就交出去；
-    /// 錄了 45 秒還湊不滿（小聲、遠距收音）但有 5 秒以上，也先交出去。只交一次。feed 在寫檔的執行緒上呼叫
+    /// 录音时收集有声音的片段：每 0.1 秒一段，比背景噪音大 2.5 倍（至少 -54 dBFS）才算，凑满 `seconds` 秒就交出去；
+    /// 录了 45 秒还凑不满（小声、远距收音）但有 5 秒以上，也先交出去。只交一次。feed 在写档的线程上调用
     final class Collector: @unchecked Sendable {
         private let lock = NSLock()
         private var voiced: [Float] = []
         private var pending: [Float] = []
         private var seen = 0
-        /// 背景噪音的估計：遇到更小的就馬上降下來，平常慢慢往上爬（換到比較吵的環境也跟得上）
+        /// 背景噪音的估计：遇到更小的就马上降下来，平常慢慢往上爬（换到比较吵的环境也跟得上）
         private var floor: Float?
         private var finished = false
         private let target = Int(LanguageDetector.seconds * CaptureFormat.sampleRate)

@@ -11,17 +11,19 @@ struct MeetingDetailView: View {
         @Bindable var model = model
         VStack(spacing: 0) {
             MeetingTop(detail: detail, isRecording: isRecordingThis)
-                .environment(\.textScale, 1)   // 標題列不跟著文字大小（R59.2）
+                .environment(\.textScale, 1)   // 标题列不跟着文字大小（R59.2）
 
             Divider()
 
             if isRecordingThis {
                 RecordingPanel(detail: detail)
+            } else if detail.meeting.source == "prepared" && !isTrashed {
+                PreparedMeetingView(meeting: detail.meeting)
             } else {
                 Group {
                     switch model.tab {
                     case .summary: NotesPage(detail: detail)
-                    // 換會議時重新建立：編輯中的狀態、草稿是每場會議自己的（design §21.15）
+                    // 换会议时重新创建：编辑中的状态、草稿是每场会议自己的（design §21.15）
                     case .transcript: TranscriptTab(detail: detail).id(detail.meeting.id)
                     case .ask: AskTab(detail: detail).id(detail.meeting.id)
                     }
@@ -30,24 +32,28 @@ struct MeetingDetailView: View {
                 if detail.meeting.hasAudio { PlayerBar(detail: detail) }
             }
         }
-        .environment(\.meetingLanguage, detail.meeting.meetingLanguage)   // 內容的字形、標題字型（design §18.6）
-        .contentTextScale()   // 會議內容的文字大小（design §38.5）
+        .environment(\.meetingLanguage, detail.meeting.meetingLanguage)   // 内容的字形、标题字体（design §18.6）
+        .contentTextScale()   // 会议内容的文字大小（design §38.5）
         .navigationTitle(detail.meeting.displayTitle)
         .toolbar {
             if !isRecordingThis {
-                ToolbarItem(placement: .principal) {
-                    Picker("分頁", selection: $model.tab) {
-                        ForEach(DetailTab.allCases) { tab in Text(tab.label).tag(tab) }
+                if detail.meeting.source != "prepared" {
+                    ToolbarItem(placement: .principal) {
+                        Picker("标签页", selection: $model.tab) {
+                            ForEach(DetailTab.allCases) { tab in Text(tab.label).tag(tab) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 300)
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 300)
                 }
-                // 垃圾桶裡的會議不能操作
+                // 垃圾桶里的会议不能操作
                 if !isTrashed {
-                    // 匯出放在「更多」左邊，看得到（R60、design §38.6）
-                    ToolbarItem(placement: .primaryAction) {
-                        ExportMenu()
+                    // 导出放在「更多」左边，看得到（R60、design §38.6）
+                    if detail.meeting.source != "prepared" {
+                        ToolbarItem(placement: .primaryAction) {
+                            ExportMenu()
+                        }
                     }
                     ToolbarItem(placement: .primaryAction) {
                         MoreMenu(detail: detail)
@@ -71,7 +77,7 @@ struct MeetingHeader: View {
                     .contentTitleFont(26)
                     .textSelection(.enabled)
                     .lineLimit(2)
-                Button("編輯") { editing = true }
+                Button("编辑") { editing = true }
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.celadon)
                     .font(.callout)
@@ -80,8 +86,8 @@ struct MeetingHeader: View {
                     }
                 Spacer(minLength: 0)
             }
-            // 範本和語言選單放在資訊列右邊，標題才能用整行的寬度（英文標題比較長，design §16.3）；
-            // 資訊列放不下時（說話者多、英文字比較長），選單改到下一行，說話者名字才不會被截斷
+            // 模板和语言菜单放在信息列右边，标题才能用整行的宽度（英文标题比较长，design §16.3）；
+            // 信息列放不下时（说话者多、英文字比较长），菜单改到下一行，说话者名字才不会被截断
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) {
                     infoRow(meeting)
@@ -99,14 +105,14 @@ struct MeetingHeader: View {
     private func infoRow(_ meeting: Meeting) -> some View {
         HStack(spacing: 16) {
             if !meeting.folder.isEmpty {
-                Label(meeting.folder, systemImage: "folder").help("這場會議所在的資料夾")
+                Label(meeting.folder, systemImage: "folder").help("这场会议所在的文件夹")
             }
             Text("\(meeting.meetingDate) \(DateText.weekday(meeting.meetingDate))")
             if meeting.durationSeconds != nil { Text(TimeFormat.duration(meeting.durationSeconds)) }
             if let minutes = detail.untranscribedMinutes {
-                // 自動停止的錄音（design §35.3、R48.3）：後面沒人說話的部分沒有轉錄
-                Label("最後 \(minutes) 分鐘沒有人說話，沒有轉錄", systemImage: "moon.zzz")
-                    .help("錄音中很久沒人說話，拾音自動停止了錄音。要轉錄全部的話，用「更多 → 重新處理 → 重新轉錄」。")
+                // 自动停止的录音（design §35.3、R48.3）：后面没人说话的部分没有转录
+                Label("最后 \(minutes) 分钟没有人说话，没有转录", systemImage: "moon.zzz")
+                    .help("录音中很久没人说话，拾音自动停止了录音。要转录全部的话，用「更多 → 重新处理 → 重新转录」。")
             }
             if !detail.speakers.isEmpty {
                 HStack(spacing: 6) {
@@ -139,11 +145,11 @@ struct MeetingHeader: View {
                 }
             }
         } label: {
-            Label(model.templates.first { $0.id == meeting.templateId }?.displayName ?? String(localized: "一般會議"), systemImage: "doc.text")
+            Label(model.templates.first { $0.id == meeting.templateId }?.displayName ?? String(localized: "一般会议"), systemImage: "doc.text")
         }
         .fixedSize()
-        .help("會議紀錄的範本。換了範本之後，從「更多 → 重新處理」選「重新整理會議紀錄」就會照新範本整理")
-        // 會議語言（design §16.3）
+        .help("会议记录的模板。换了模板之后，从「更多 → 重新处理」选「刷新会议记录」就会照新模板整理")
+        // 会议语言（design §16.3）
         Menu {
             ForEach(MeetingLanguage.allCases) { language in
                 Button {
@@ -157,16 +163,16 @@ struct MeetingHeader: View {
             Label(meeting.meetingLanguage.name, systemImage: "globe")
         }
         .fixedSize()
-        .help("會議語言：決定轉錄和會議紀錄用的語言。改了之後，從「更多 → 重新處理」重新轉錄或重新整理會議紀錄")
-        // 會議的參考文件（design §39.4）：垃圾桶裡的會議不放
+        .help("会议语言：决定转录和会议记录用的语言。改了之后，从「更多 → 重新处理」重新转录或刷新会议记录")
+        // 会议的参考文档（design §39.4）：垃圾桶里的会议不放
         if meeting.deletedAt == nil { DocumentsMenu(detail: detail) }
-        // 錄音中先填人數（design §26.2）：錄完轉錄時用
+        // 录音中先填人数（design §26.2）：录完转录时用
         if model.recorder.isRecording && model.recorder.meetingId == meeting.id {
             Menu {
                 Button {
                     model.setMinSpeakers(nil)
                 } label: {
-                    if meeting.minSpeakers == nil { Label("自動判斷", systemImage: "checkmark") } else { Text("自動判斷") }
+                    if meeting.minSpeakers == nil { Label("自动判断", systemImage: "checkmark") } else { Text("自动判断") }
                 }
                 ForEach(2...12, id: \.self) { n in
                     Button {
@@ -176,16 +182,16 @@ struct MeetingHeader: View {
                     }
                 }
             } label: {
-                Label(meeting.minSpeakers.map { String(localized: "大約 \($0) 人") } ?? String(localized: "人數：自動判斷"),
+                Label(meeting.minSpeakers.map { String(localized: "大约 \($0) 人") } ?? String(localized: "人数：自动判断"),
                       systemImage: "person.2")
             }
             .fixedSize()
-            .help("大約幾個人：人多、吵雜或手機放在桌上錄音時，先告訴拾音大約幾個人，說話者會分得比較準")
+            .help("大约几个人：人多、吵杂或手机放在桌上录音时，先告诉拾音大约几个人，说话者会分得比较准")
         }
     }
 }
 
-/// 修改標題、日期、與會者
+/// 修改标题、日期、与会者
 struct EditInfoForm: View {
     @Environment(AppModel.self) private var model
     let meeting: Meeting
@@ -197,17 +203,17 @@ struct EditInfoForm: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Form {
-                TextField("標題", text: $title)
-                DatePicker("會議日期", selection: $date, displayedComponents: .date)
-                TextField("與會者", text: $participants, prompt: Text("用逗號分隔"))
+                TextField("标题", text: $title)
+                DatePicker("会议日期", selection: $date, displayedComponents: .date)
+                TextField("与会者", text: $participants, prompt: Text("用逗号分隔"))
             }
             .formStyle(.columns)
             HStack {
                 Spacer()
                 Button("取消", role: .cancel, action: onDone)
                     .keyboardShortcut(.cancelAction)
-                Button("儲存") {
-                    // 標題欄預先填的是顯示用的標題（還沒命名時是檔名）；沒動過就照原樣存，不然會被當成自訂標題鎖住，整理時不會再取名
+                Button("保存") {
+                    // 标题栏预先填的是显示用的标题（还没命名时是文件名）；没动过就照原样存，不然会被当成自订标题锁住，整理时不会再取名
                     let edited = title.trimmingCharacters(in: .whitespaces)
                     model.updateInfo(title: edited == meeting.displayTitle ? meeting.title : edited,
                                      date: DateText.string(date), participants: participants)
@@ -234,24 +240,24 @@ struct TrashBanner: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Label("這場會議在垃圾桶裡，30 天後會永久刪除", systemImage: "trash")
+            Label("这场会议在垃圾桶里，30 天后会永久删除", systemImage: "trash")
             Spacer()
-            Button("還原") { model.restore(meetingId) }
-            Button("永久刪除", role: .destructive) { confirm = true }
+            Button("还原") { model.restore(meetingId) }
+            Button("永久删除", role: .destructive) { confirm = true }
         }
         .font(.callout)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-        .confirmationDialog("永久刪除這場會議？", isPresented: $confirm) {
-            Button("永久刪除", role: .destructive) { model.deletePermanently(meetingId) }
+        .confirmationDialog("永久删除这场会议？", isPresented: $confirm) {
+            Button("永久删除", role: .destructive) { model.deletePermanently(meetingId) }
         } message: {
-            Text("會議紀錄、逐字稿和錄音檔都會刪除，沒辦法復原。")
+            Text("会议记录、逐字稿和录音档都会删除，没办法复原。")
         }
     }
 }
 
-/// 工作進度、失敗原因
+/// 工作进度、失败原因
 struct StatusBanner: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openSettings) private var openSettings
@@ -271,14 +277,14 @@ struct StatusBanner: View {
         } else if let helper = model.runner.running.values.first(where: {
             $0.job.meetingId == detail.meeting.id && ($0.job.kind == .correct || $0.job.kind == .nameSpeakers || $0.job.kind == .rediarize)
         }) {
-            // 背景的輔助工作（design §21.2）：不算會議的狀態，但讓使用者知道還在跑
+            // 背景的辅助工作（design §21.2）：不算会议的状态，但让用户知道还在跑
             let provider = helper.provider?.shortLabel ?? ""
             HStack(spacing: 10) {
                 ProgressView().controlSize(.small)
                 switch helper.job.kind {
-                case .correct: Text("正在用 \(provider) 檢查可能聽錯的字…")
-                case .rediarize: Text("正在重新辨識說話者…")
-                default: Text("正在用 \(provider) 猜說話者的名字…")
+                case .correct: Text("正在用 \(provider) 检查可能听错的字…")
+                case .rediarize: Text("正在重新识别说话者…")
+                default: Text("正在用 \(provider) 猜说话者的名字…")
                 }
                 Spacer(minLength: 12)
                 Button("取消") { model.cancelJobs() }
@@ -296,9 +302,9 @@ struct StatusBanner: View {
         switch status {
         case .queued:
             let kind = detail.latestJob?.kind
-            return AnyView(Label(kind == .transcribe ? "排隊等待轉錄" : "排隊等待整理", systemImage: "clock"))
+            return AnyView(Label(kind == .transcribe ? "排队等待转录" : "排队等待整理", systemImage: "clock"))
         case .transcribing(_, _) where running?.server?.waiting == true:
-            // 在等企業伺服器（連不上、登入失效，R50.5）：不顯示百分比
+            // 在等企业服务器（连不上、登录失效，R50.5）：不显示百分比
             return AnyView(Label(running?.server?.text ?? "", systemImage: "clock").lineLimit(2))
         case .transcribing(let progress, let stage):
             let note = running?.server?.text ?? ""
@@ -316,18 +322,18 @@ struct StatusBanner: View {
             return AnyView(HStack(spacing: 10) {
                 ProgressView().controlSize(.small)
                 switch running?.job.kind {
-                case .revise: Text("正在用 \(provider) 依你的回答修正會議紀錄…")
-                default: Text("正在用 \(provider) 整理會議紀錄…")
+                case .revise: Text("正在用 \(provider) 依你的回答修正会议记录…")
+                default: Text("正在用 \(provider) 整理会议记录…")
                 }
             })
         case .failed(let kind, let message):
             return AnyView(Label {
-                Text(kind == .transcribe ? String(localized: "轉錄失敗：\(message)") : String(localized: "整理失敗：\(message)")).lineLimit(3).textSelection(.enabled)
+                Text(kind == .transcribe ? String(localized: "转录失败：\(message)") : String(localized: "整理失败：\(message)")).lineLimit(3).textSelection(.enabled)
             } icon: {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
             })
         case .cancelled:
-            return AnyView(Label("已取消轉錄", systemImage: "xmark.circle"))
+            return AnyView(Label("已取消转录", systemImage: "xmark.circle"))
         default:
             return nil
         }
@@ -337,12 +343,12 @@ struct StatusBanner: View {
     private func actions(_ status: MeetingStatus) -> some View {
         switch status {
         case .transcribing where model.runner.runningJob(for: detail.meeting.id!)?.server != nil:
-            // 企業伺服器在排隊、連不上時，可以改在這台 Mac 轉錄（R50.5）
-            Button("改在這台電腦轉錄") { model.runner.transcribeLocally(meetingId: detail.meeting.id!) }
+            // 企业服务器在排队、连不上时，可以改在这台 Mac 转录（R50.5）
+            Button("改在这台电脑转录") { model.runner.transcribeLocally(meetingId: detail.meeting.id!) }
             Button("取消") { model.cancelJobs() }
         case .queued, .transcribing, .summarizing: Button("取消") { model.cancelJobs() }
         case .failed(let kind, let message):
-            // 設定問題（沒登入、key 錯誤…）而且還沒修好（R46.2、design §34.4）：給修的按鈕，不放「重試」（重試也一樣會失敗）
+            // 设置问题（没登录、key 错误…）而且还没修好（R46.2、design §34.4）：给修的按钮，不放「重试」（重试也一样会失败）
             if kind != .transcribe, LLMError.isSetupProblem(errorKind: detail.latestJob?.errorKind),
                let problem = model.summarizerProblem {
                 Button(problem.actionTitle) {
@@ -352,17 +358,17 @@ struct StatusBanner: View {
                     }
                 }
             } else {
-                // 登入問題（3.1.2）：先引導重新登入，登入完再按重試
+                // 登录问题（3.1.2）：先引导重新登录，登录完再按重试
                 if kind != .transcribe, LLMError.isLoginMessage(message),
                    AppSettings.provider == .claude || AppSettings.provider == .codex {
-                    // 桌面版附的 codex：打開那個 app 登入（R55.3）
-                    let title = CLILogin.desktopApp(AppSettings.provider).map { String(localized: "打開 \($0) 登入") }
-                        ?? String(localized: "重新登入 \(AppSettings.provider.shortLabel)")
+                    // 桌面版附的 codex：打开那个 app 登录（R55.3）
+                    let title = CLILogin.desktopApp(AppSettings.provider).map { String(localized: "打开 \($0) 登录") }
+                        ?? String(localized: "重新登录 \(AppSettings.provider.shortLabel)")
                     Button(title) { CLILogin.openLogin(AppSettings.provider) }
                 }
-                Button("重試") { model.retry() }
+                Button("重试") { model.retry() }
             }
-        case .cancelled: Button("重新轉錄") { model.retry() }
+        case .cancelled: Button("重新转录") { model.retry() }
         default: EmptyView()
         }
     }
@@ -373,34 +379,34 @@ struct StatusBanner: View {
     }
 
     private func transcribingText(_ progress: Double?, stage: String, remaining: TimeInterval?) -> String {
-        guard let progress else { return stage.isEmpty ? String(localized: "準備轉錄…") : "\(stage)…" }
-        var text = String(localized: "\(stage.isEmpty ? String(localized: "轉錄") : stage)中 \(Int(progress * 100))%")
+        guard let progress else { return stage.isEmpty ? String(localized: "准备转录…") : "\(stage)…" }
+        var text = String(localized: "\(stage.isEmpty ? String(localized: "转录") : stage)中 \(Int(progress * 100))%")
         if let remaining, remaining > 0 {
-            text += remaining < 60 ? String(localized: "，快好了") : String(localized: "，約剩 \(Int((remaining / 60).rounded(.up))) 分鐘")
+            text += remaining < 60 ? String(localized: "，快好了") : String(localized: "，约剩 \(Int((remaining / 60).rounded(.up))) 分钟")
         }
         return text
     }
 }
 
-/// 右上角的「匯出」（R60、design §38.6）：按下打開匯出對話框，箭頭直接複製會議紀錄。
-/// 工具列的選單建立一次就不更新，動作在按下時才看目前選取的會議（同「更多」）
+/// 右上角的「导出」（R60、design §38.6）：按下打开导出对话框，箭头直接复制会议记录。
+/// 工具列的菜单创建一次就不更新，动作在按下时才看目前选中的会议（同「更多」）
 struct ExportMenu: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Menu {
-            Button("複製會議紀錄：保留格式（貼到 Word、Notion、郵件）") { model.copyNotes(.rich) }
-            Button("複製會議紀錄：Markdown") { model.copyNotes(.markdown) }
-            Button("複製會議紀錄：純文字（貼到 Slack、訊息）") { model.copyNotes(.plain) }
+            Button("复制会议记录：保留格式（贴到 Word、Notion、邮件）") { model.copyNotes(.rich) }
+            Button("复制会议记录：Markdown") { model.copyNotes(.markdown) }
+            Button("复制会议记录：纯文字（贴到 Slack、消息）") { model.copyNotes(.plain) }
             Divider()
-            Button("複製心智圖（圖片）") { model.copyMindMap() }
+            Button("复制心智图（图片）") { model.copyMindMap() }
         } label: {
-            Label("匯出", systemImage: "square.and.arrow.up")
+            Label("导出", systemImage: "square.and.arrow.up")
         } primaryAction: {
             model.openExportSheet()
         }
         .labelStyle(.titleAndIcon)
-        .help("匯出會議紀錄、逐字稿或錄音（⌘E）；箭頭可以直接複製會議紀錄")
+        .help("导出会议记录、逐字稿或录音（⌘E）；箭头可以直接复制会议记录")
     }
 }
 
@@ -408,20 +414,20 @@ struct MoreMenu: View {
     @Environment(AppModel.self) private var model
     let detail: MeetingDetail
 
-    // 工具列右上角的選單建立一次就不會更新（換會議、工作開始或結束都一樣，加 .id 也沒用），
-    // 所以這裡不預先停用：按下時由 AppModel 檢查目前的會議，不能做就說明原因
+    // 工具列右上角的菜单创建一次就不会更新（换会议、工作开始或结束都一样，加 .id 也没用），
+    // 所以这里不预先禁用：按下时由 AppModel 检查目前的会议，不能做就说明原因
     var body: some View {
-        // 三項（R44.4、R60，design §33.2、§38.6）：重新處理的四個動作收成子選單；兩個「復原」回到紀錄的編輯列和說話者的改名處；
-        // 匯出、複製會議紀錄在左邊的「匯出」
+        // 三项（R44.4、R60，design §33.2、§38.6）：重新处理的四个动作收成子菜单；两个「复原」回到记录的编辑列和说话者的改名处；
+        // 导出、复制会议记录在左边的「导出」
         Menu {
-            Menu("重新處理", systemImage: "arrow.clockwise") {
-                Button("重新整理會議紀錄", systemImage: "arrow.clockwise") { model.resummarize() }
-                Button("檢查可能聽錯的字", systemImage: "text.magnifyingglass") { model.checkTranscript() }
-                Button("重新轉錄（含說話者辨識）", systemImage: "waveform") { model.retranscribe() }
-                Button("重新辨識說話者…", systemImage: "person.2.wave.2") { model.requestRediarize() }
+            Menu("重新处理", systemImage: "arrow.clockwise") {
+                Button("刷新会议记录", systemImage: "arrow.clockwise") { model.resummarize() }
+                Button("检查可能听错的字", systemImage: "text.magnifyingglass") { model.checkTranscript() }
+                Button("重新转录（含说话者识别）", systemImage: "waveform") { model.retranscribe() }
+                Button("重新识别说话者…", systemImage: "person.2.wave.2") { model.requestRediarize() }
             }
             Divider()
-            // 工具列的選單建立一次就不會更新（停用狀態、按鈕記住的會議），動作一律在按下時才看目前選取的會議
+            // 工具列的菜单创建一次就不会更新（禁用状态、按钮记住的会议），动作一律在按下时才看目前选中的会议
             FolderMenu()
             Button("移到垃圾桶", systemImage: "trash", role: .destructive) {
                 if let id = model.selection { model.moveToTrash(id) }
@@ -429,11 +435,11 @@ struct MoreMenu: View {
         } label: {
             Label("更多", systemImage: "ellipsis.circle")
         }
-        .help("更多動作")
+        .help("更多动作")
     }
 }
 
-/// 會議頁上方：標題、狀態或垃圾桶提示、草稿提示。截圖（DEBUG 的 snapshot）也用這一份
+/// 会议页上方：标题、状态或垃圾桶提示、草稿提示。截屏（DEBUG 的 snapshot）也用这一份
 struct MeetingTop: View {
     let detail: MeetingDetail
     var isRecording = false
@@ -457,10 +463,10 @@ struct MeetingTop: View {
     }
 }
 
-/// 會議紀錄是用即時逐字稿整理的草稿（design §21.3、R19.1）
+/// 会议记录是用实时逐字稿整理的草稿（design §21.3、R19.1）
 struct DraftNotesBanner: View {
     var body: some View {
-        Label("草稿：用錄音中的即時逐字稿整理的，正式轉錄完成後會自動更新", systemImage: "doc.badge.clock")
+        Label("草稿：用录音中的实时逐字稿整理的，正式转录完成后会自动更新", systemImage: "doc.badge.clock")
             .font(.callout)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 14)
@@ -470,8 +476,8 @@ struct DraftNotesBanner: View {
     }
 }
 
-/// 聲紋自動帶入的說話者名字（design §21.4、R19.3）：名字後面標「自動」。
-/// 點一下直接選是別人（最像的幾位認識的人，一次改名、記住聲音、改會議紀錄，R33.4），或說不是他
+/// 声纹自动带入的说话者名字（design §21.4、R19.3）：名字后面标「自动」。
+/// 点一下直接选是别人（最像的几位认识的人，一次改名、记住声音、改会议记录，R33.4），或说不是他
 private struct AutoSpeakerName: View {
     @Environment(AppModel.self) private var model
     let idx: Int
@@ -482,7 +488,7 @@ private struct AutoSpeakerName: View {
         HStack(spacing: 3) {
             Menu {
                 if !others.isEmpty {
-                    Section("是別人：") {
+                    Section("是别人：") {
                         ForEach(others, id: \.self) { other in
                             Button(other) { model.renameSpeaker(idx, to: other) }
                         }
@@ -490,25 +496,25 @@ private struct AutoSpeakerName: View {
                 }
                 Button("其他人…（到逐字稿改名）") { model.tab = .transcript }
                 Divider()
-                Button("不是\(name)（不知道是誰）") { model.rejectVoiceprintMatch(idx) }
+                Button("不是\(name)（不知道是谁）") { model.rejectVoiceprintMatch(idx) }
             } label: {
                 Text(name).foregroundStyle(Color.speaker(idx))
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            // 選單按鈕在畫面上只畫標題的文字（標籤裡的背景會被拿掉），「自動」標記要放在選單外面
-            Text("自動")
+            // 菜单按钮在画面上只画标题的文字（标签里的背景会被拿掉），「自动」标记要放在菜单外面
+            Text("自动")
                 .font(.caption2)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 1)
                 .background(Color.secondary.opacity(0.15), in: Capsule())
         }
-        .help("拾音認出這個人的聲音，自動帶入名字。不對的話點名字")
+        .help("拾音认出这个人的声音，自动带入名字。不对的话点名字")
     }
 }
 
-/// AI 猜到的說話者名字（design §21.5、R19.2）：按「套用」才改名
+/// AI 猜到的说话者名字（design §21.5、R19.2）：按「套用」才改名
 private struct SpeakerSuggestionsBanner: View {
     @Environment(AppModel.self) private var model
     let detail: MeetingDetail
@@ -517,12 +523,12 @@ private struct SpeakerSuggestionsBanner: View {
     var body: some View {
         let suggestions = detail.speakerSuggestions.sorted { $0.key < $1.key }
         HStack(spacing: 10) {
-            Label("猜到 \(suggestions.count) 位說話者的名字", systemImage: "person.crop.circle.badge.questionmark")
+            Label("猜到 \(suggestions.count) 位说话者的名字", systemImage: "person.crop.circle.badge.questionmark")
             Spacer()
             Button("查看") { showing = true }
                 .popover(isPresented: $showing, arrowEdge: .bottom) {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("猜到的說話者名字").font(.headline)
+                        Text("猜到的说话者名字").font(.headline)
                         ForEach(suggestions, id: \.key) { idx, suggestion in
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 8) {
@@ -542,7 +548,7 @@ private struct SpeakerSuggestionsBanner: View {
                         }
                         Divider()
                         HStack {
-                            Text("套用後，逐字稿和會議紀錄都會換成名字。").font(.caption).foregroundStyle(.secondary)
+                            Text("套用后，逐字稿和会议记录都会换成名字。").font(.caption).foregroundStyle(.secondary)
                             Spacer()
                             Button("全部套用") { model.applyAllSpeakerSuggestions(); showing = false }
                                 .buttonStyle(.borderedProminent)

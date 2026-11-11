@@ -1,6 +1,6 @@
 import Foundation
 
-/// AI 猜說話者（design §21.5、R19.2、D30）：從對話內容猜出還沒有名字的說話者是誰，列成建議，使用者按「套用」才改名
+/// AI 猜说话者（design §21.5、R19.2、D30）：从对话内容猜出还没有名字的说话者是谁，列成建议，用户按「套用」才改名
 enum SpeakerNaming {
     struct Suggestion: Codable, Hashable {
         var speaker: Int
@@ -14,12 +14,12 @@ enum SpeakerNaming {
         var meetingDate: String
         var title: String
         var participants: [String]
-        /// 認識的人（聲紋名單）：名字寫法可以參考
+        /// 认识的人（声纹名单）：名字写法可以参考
         var knownPeople: [String]
         var glossary: [String]
-        /// 要猜的說話者編號（還是預設名稱的）
+        /// 要猜的说话者编号（还是默认名称的）
         var unnamed: [Int]
-        /// 說話者編號 → 逐字稿上顯示的名字（已經有名字的直接寫名字）
+        /// 说话者编号 → 逐字稿上显示的名字（已经有名字的直接写名字）
         var speakerName: (Int) -> String
         var segments: [(start: Double, speaker: Int?, text: String)]
     }
@@ -28,26 +28,26 @@ enum SpeakerNaming {
     {"type":"object","additionalProperties":false,"required":["speakerNames"],"properties":{"speakerNames":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["speaker","name","reason","time"],"properties":{"speaker":{"type":"integer"},"name":{"type":"string"},"reason":{"type":"string"},"time":{"type":"string"}}}}}}
     """
 
-    /// 工具說明是給模型看的，不是介面文字
+    /// 工具说明是给模型看的，不是界面文字
     static let format = LLMClient.OutputFormat(schema: jsonSchema, toolName: "save_speaker_names",
                                                toolDescription: "Save the speaker names inferred from the transcript")
 
-    // MARK: 提示詞（中文、英文、日文各一份）
+    // MARK: 提示词（中文、英文、日文各一份）
 
     static func system(_ language: MeetingLanguage) -> String {
         language.prompt(zh: systemChinese, en: systemEnglish, ja: systemJapanese)
     }
 
     private static let systemChinese = """
-    你要從會議逐字稿判斷「說話者 N」是誰。逐字稿的說話者是用聲音自動分出來的，只有編號。
+    你要从会议逐字稿判断「说话者 N」是谁。逐字稿的说话者是用声音自动分出来的，只有编号。
 
-    規則：
-    1. 只在逐字稿裡有明確根據時才猜，例如：有人叫了某人的名字，下一段就是那位說話者回應；說話者自我介紹（「我是…」）；主持人點名之後那位說話者開始講；別人說「謝謝某某的報告」而剛報告完的是那位說話者。
-    2. 只猜「要猜的說話者」裡的編號。沒有把握的就不要列，寧可少列，不要猜錯。
-    3. 名字照逐字稿、參加者、認識的人、詞彙表裡的寫法。只有職稱或稱謂（例如「老闆」「經理」「主任」）不算名字，不要列。
-    4. 同一個名字只能給一位說話者。
-    5. reason 用一句話說明根據；time 是最能證明的那一段的時間，照逐字稿裡的 [mm:ss] 或 [h:mm:ss] 寫。
-    6. 都沒有把握就回傳空陣列。
+    规则：
+    1. 只在逐字稿里有明确根据时才猜，例如：有人叫了某人的名字，下一段就是那位说话者回应；说话者自我介绍（「我是…」）；主持人点名之后那位说话者开始讲；别人说「谢谢某某的报告」而刚报告完的是那位说话者。
+    2. 只猜「要猜的说话者」里的编号。没有把握的就不要列，宁可少列，不要猜错。
+    3. 名字照逐字稿、参加者、认识的人、词汇表里的写法。只有职称或称谓（例如「老板」「经理」「主任」）不算名字，不要列。
+    4. 同一个名字只能给一位说话者。
+    5. reason 用一句简体中文（大陆用语）说明根据；time 是最能证明的那一段的时间，照逐字稿里的 [mm:ss] 或 [h:mm:ss] 写。
+    6. 都没有把握就回传空数组。
     """
 
     private static let systemEnglish = """
@@ -77,18 +77,18 @@ enum SpeakerNaming {
     static func prompt(_ c: Context) -> String {
         let l = c.language
         let separator = l.prompt(zh: "、", en: ", ", ja: "、"), colon = l.prompt(zh: "：", en: ": ", ja: "：")
-        let none = l.prompt(zh: "（無）", en: "(none)", ja: "（なし）")
+        let none = l.prompt(zh: "（无）", en: "(none)", ja: "（なし）")
         func list(_ items: [String]) -> String { items.isEmpty ? none : items.joined(separator: separator) }
         var lines: [String] = []
-        lines.append(l.prompt(zh: "會議日期", en: "Meeting date", ja: "会議の日付") + colon + c.meetingDate)
-        lines.append(l.prompt(zh: "會議標題", en: "Meeting title", ja: "会議タイトル") + colon + (c.title.isEmpty ? none : c.title))
-        lines.append(l.prompt(zh: "參加者", en: "Participants", ja: "参加者") + colon + list(c.participants))
-        lines.append(l.prompt(zh: "認識的人（之前的會議出現過的名字，寫法可以參考）", en: "Known people (names from earlier meetings, for spelling)",
+        lines.append(l.prompt(zh: "会议日期", en: "Meeting date", ja: "会議の日付") + colon + c.meetingDate)
+        lines.append(l.prompt(zh: "会议标题", en: "Meeting title", ja: "会議タイトル") + colon + (c.title.isEmpty ? none : c.title))
+        lines.append(l.prompt(zh: "参加者", en: "Participants", ja: "参加者") + colon + list(c.participants))
+        lines.append(l.prompt(zh: "认识的人（之前的会议出现过的名字，写法可以参考）", en: "Known people (names from earlier meetings, for spelling)",
                             ja: "知っている人（以前の会議に出てきた名前。表記の参考に）") + colon + list(c.knownPeople))  // l10n-skip
-        lines.append(l.prompt(zh: "詞彙表", en: "Glossary", ja: "用語集") + colon + list(c.glossary))
-        lines.append(l.prompt(zh: "要猜的說話者", en: "Speakers to identify", ja: "判断する話者") + colon + list(c.unnamed.map(c.speakerName)))
+        lines.append(l.prompt(zh: "词汇表", en: "Glossary", ja: "用語集") + colon + list(c.glossary))
+        lines.append(l.prompt(zh: "要猜的说话者", en: "Speakers to identify", ja: "判断する話者") + colon + list(c.unnamed.map(c.speakerName)))
         lines.append("")
-        lines.append(l.prompt(zh: "逐字稿（[時間] 說話者：內容）：", en: "Transcript ([time] speaker: text):", ja: "文字起こし（[時刻] 話者：内容）："))
+        lines.append(l.prompt(zh: "逐字稿（[时间] 说话者：内容）：", en: "Transcript ([time] speaker: text):", ja: "文字起こし（[時刻] 話者：内容）："))
         for s in c.segments {
             let speaker = s.speaker.map { c.speakerName($0) + colon } ?? ""
             lines.append("[\(TimeFormat.string(s.start))] \(speaker)\(s.text)")
@@ -108,7 +108,7 @@ enum SpeakerNaming {
         return validate(output.speakerNames, context: context)
     }
 
-    /// 丟掉不能用的建議：不是要猜的說話者、名字是空的或是預設名稱、太長、同一位說話者或同一個名字重複
+    /// 丢掉不能用的建议：不是要猜的说话者、名字是空的或是默认名称、太长、同一位说话者或同一个名字重复
     static func validate(_ raw: [Suggestion], context: Context) -> [Suggestion] {
         var speakers = Set<Int>(), names = Set<String>()
         return raw.compactMap { item in

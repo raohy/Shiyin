@@ -1,8 +1,8 @@
 import Foundation
 import GRDB
 
-/// 本地 MCP 的工具（design §44.2）：把會議讀成給 AI 看的文字。只讀資料庫；Mac、Windows 同一份輸出（標準答案 mcp/calls.json）。
-/// 說明、標籤用英文（讀的是 AI，D149），會議內容照原本的語言
+/// 本地 MCP 的工具（design §44.2）：把会议读成给 AI 看的文字。只读数据库；Mac、Windows 同一份输出（标准答案 mcp/calls.json）。
+/// 说明、标签用英文（读的是 AI，D149），会议内容照原本的语言
 enum MCPTools {
     struct Result: Equatable {
         var text: String
@@ -11,7 +11,7 @@ enum MCPTools {
 
     static let names = ["list_meetings", "search_meetings", "get_meeting_notes", "get_transcript", "list_action_items"]
 
-    /// 逐字稿一次最多回多少字（段落的行加起來，UTF-16 的長度，Windows 的 string.Length 一樣）
+    /// 逐字稿一次最多回多少字（段落的行加起来，UTF-16 的长度，Windows 的 string.Length 一样）
     static let transcriptLimit = 20_000
 
     static let instructions = [
@@ -67,13 +67,13 @@ enum MCPTools {
 
     // MARK: tools/call
 
-    /// 開關、打開資料庫，再叫工具（`Shiyin --mcp` 用）。每次都重新打開：app 這時升級資料庫也不會被舊的連線擋住
+    /// 开关、打开数据库，再叫工具（`Shiyin --mcp` 用）。每次都重新打开：app 这时升级数据库也不会被旧的连接挡住
     static func run(_ name: String, _ args: [String: Any]) -> Result {
         guard !EnterpriseServer.mcpBlocked else {
             return Result(text: "Your company's Shiyin server has turned off reading meetings from AI tools.", isError: true)
         }
         guard AppSettings.mcpEnabled else {
-            return Result(text: "Reading meetings is turned off in Shiyin. Ask the user to turn on \"讓 AI 工具讀取會議 / Let AI tools read meetings (MCP)\" in Shiyin › Settings › Advanced (進階).", isError: true)  // l10n-skip
+            return Result(text: "Reading meetings is turned off in Shiyin. Ask the user to turn on \"让 AI 工具读取会议 / Let AI tools read meetings (MCP)\" in Shiyin › Settings › Advanced (高级).", isError: true)  // l10n-skip
         }
         let path = Paths.database.path
         guard FileManager.default.fileExists(atPath: path) else { return Result(text: "Shiyin has no meetings yet.", isError: false) }
@@ -89,7 +89,7 @@ enum MCPTools {
         }
     }
 
-    /// 工具本身（標準答案也用這個）；不認得的工具是 nil
+    /// 工具本身（标准答案也用这个）；不认得的工具是 nil
     static func call(_ name: String, _ args: [String: Any], db: AppDatabase, transcriptLimit: Int = transcriptLimit) throws -> Result? {
         do {
             switch name {
@@ -191,7 +191,7 @@ enum MCPTools {
         let end = try time(args["end"], "end")
         let segments = try db.segments(id)
         guard let last = segments.last else { return Result(text: "Meeting \(id) has no transcript yet.\n", isError: false) }
-        // 長度沒記（舊的匯入、0）時用最後一段的結束
+        // 长度没记（旧的导入、0）时用最后一段的结束
         let length = m.durationSeconds.flatMap { $0 > 0 ? Double($0) : nil } ?? last.end
         let selected = segments.filter { $0.start >= start && (end == nil || $0.start < end!) }
         guard !selected.isEmpty else {
@@ -255,7 +255,7 @@ enum MCPTools {
         init(_ message: String) { self.message = message }
     }
 
-    /// 日期、資料夾、負責人的篩選；`text` 是「找不到」後面接的條件
+    /// 日期、文件夹、负责人的筛选；`text` 是「找不到」后面接的条件
     private struct Filter {
         var from: String?
         var to: String?
@@ -289,7 +289,7 @@ enum MCPTools {
         }
     }
 
-    /// 給 AI 讀的會議：不在垃圾桶、不是正在錄的，新的在前（同列表）
+    /// 给 AI 读的会议：不在垃圾桶、不是正在录的，新的在前（同列表）
     private static func meetings(_ db: AppDatabase, _ filter: Filter) throws -> [Meeting] {
         var sql = "SELECT * FROM meetings WHERE deleted_at IS NULL AND NOT (source = 'recording' AND audio_file = '')"
         var arguments: [any DatabaseValueConvertible] = []
@@ -314,7 +314,7 @@ enum MCPTools {
         Dictionary(try db.speakers(id).map { ($0.idx, $0.name) }, uniquingKeysWith: { first, _ in first })
     }
 
-    /// 說話者表的名字；空的用會議語言的預設名稱（同匯出）
+    /// 说话者表的名字；空的用会议语言的默认名称（同导出）
     private static func speakerName(_ name: String, idx: Int, _ m: Meeting) -> String {
         name.isEmpty ? m.meetingLanguage.defaultSpeaker(idx) : name
     }
@@ -331,20 +331,20 @@ enum MCPTools {
         text.replacingOccurrences(of: "\r\n", with: " ").replacingOccurrences(of: "\n", with: " ")
     }
 
-    /// 字串參數：去掉前後空白，空的當成沒給
+    /// 字符串参数：去掉前后空白，空的当成没给
     private static func text(_ value: Any?) -> String? {
         guard let s = value as? String else { return nil }
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
         return t.isEmpty ? nil : t
     }
 
-    /// 數量：數字或數字的字串，限在 1～max；沒給、看不懂用預設值。先限在 ±10 億再轉成整數（Int(Double) 超出範圍會當掉）
+    /// 数量：数字或数字的字符串，限在 1～max；没给、看不懂用默认值。先限在 ±10 亿再转成整数（Int(Double) 超出范围会当掉）
     private static func number(_ value: Any?, fallback: Int, max: Int) -> Int {
         let n: Int? = (value as? NSNumber).map { Int(Swift.min(Swift.max(floor($0.doubleValue), -1e9), 1e9)) } ?? text(value).flatMap { Int($0) }
         return Swift.min(Swift.max(n ?? fallback, 1), max)
     }
 
-    /// 時間：秒數，或 05:20、1:05:20。超過 12 個字的不算時間（換算成秒時會溢位）
+    /// 时间：秒数，或 05:20、1:05:20。超过 12 个字的不算时间（换算成秒时会溢出）
     private static func time(_ value: Any?, _ name: String) throws -> Double? {
         if let n = value as? NSNumber { return Swift.max(0, n.doubleValue) }
         guard let t = text(value) else { return nil }

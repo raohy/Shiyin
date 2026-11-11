@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// 資料表對應（design §3）。欄位名稱在資料庫是 snake_case。
+/// 资料表对应（design §3）。字段名称在数据库是 snake_case。
 protocol SnakeCaseRecord: Codable, FetchableRecord, MutablePersistableRecord {}
 
 extension SnakeCaseRecord {
@@ -36,18 +36,18 @@ struct Meeting: SnakeCaseRecord, Identifiable, Hashable {
     var folder: String = ""
     // v3（design §16.3）
     var language: String = "zh"
-    // v7（design §21.1）：1 是用即時逐字稿整理的草稿，2 是使用者改過的草稿；轉錄引擎（breeze / japanese / system）
+    // v7（design §21.1）：1 是用实时逐字稿整理的草稿，2 是用户改过的草稿；转录引擎（breeze / japanese / system）
     var notesDraft: Int = 0
     var transcribedWith: String = ""
-    // v8（design §23.2）：說話者辨識至少分出幾個人，nil 是自動判斷
+    // v8（design §23.2）：说话者识别至少分出几个人，nil 是自动判断
     var minSpeakers: Int?
-    // v9（design §24.1）：說話者辨識的自我檢查分數（越大越可能把不同的人併在一起），nil 是沒算過；使用者按了「不用了」
+    // v9（design §24.1）：说话者识别的自我检查分数（越大越可能把不同的人并在一起），nil 是没算过；用户按了「不用了」
     var speakerCheck: Double?
     var speakerHintDismissed: Bool = false
 
     var meetingLanguage: MeetingLanguage { MeetingLanguage(rawValue: language) ?? .zh }
 
-    /// 說話者辨識的自我檢查覺得可能把不同的人併在一起（design §24.5）
+    /// 说话者识别的自我检查觉得可能把不同的人并在一起（design §24.5）
     var mayHaveMergedSpeakers: Bool { (speakerCheck ?? 0) >= Diarizer.Quality.hintThreshold }
 
     mutating func didInsert(_ inserted: InsertionSuccess) { id = inserted.rowID }
@@ -81,15 +81,15 @@ struct Segment: SnakeCaseRecord, Identifiable, Hashable {
     var text: String
     var lowConfidence: Bool
     var speaker: Int?
-    var kind: String = "final"           // live（即時預覽）/ final
-    var channel: Int? = nil              // 分聲道轉錄時：0 麥克風、1 電腦聲音（design §17.3）
-    var speakerManual: Bool = false      // v9：使用者改過這句的說話者（design §24.2）
+    var kind: String = "final"           // live（实时预览）/ final
+    var channel: Int? = nil              // 分声道转录时：0 麦克风、1 电脑声音（design §17.3）
+    var speakerManual: Bool = false      // v9：用户改过这句的说话者（design §24.2）
 
     mutating func didInsert(_ inserted: InsertionSuccess) { id = inserted.rowID }
 }
 
 extension Segment {
-    /// 手寫的讀取：GRDB 用 Codable 逐筆解碼時每一筆都要重建欄位對照，2,000 段以上的會議光讀逐字稿就要上百毫秒（design §21.12）
+    /// 手写的读取：GRDB 用 Codable 逐笔解码时每一笔都要重建字段对照，2,000 段以上的会议光读逐字稿就要上百毫秒（design §21.12）
     init(row: Row) throws {
         id = row["id"]
         meetingId = row["meeting_id"]
@@ -105,7 +105,7 @@ extension Segment {
     }
 }
 
-/// 說話者名字（R5.2），沒改過名字時顯示「說話者 n」
+/// 说话者名字（R5.2），没改过名字时显示「说话者 n」
 struct SpeakerName: SnakeCaseRecord, Hashable {
     static let databaseTableName = "speakers"
     var meetingId: Int64
@@ -114,7 +114,7 @@ struct SpeakerName: SnakeCaseRecord, Hashable {
     // v7（design §21.1）
     var nameSource: String = "default"     // default / manual / voiceprint / suggestion
     var personId: Int64?
-    var embedding: Data?                   // 聲紋，Float32×256
+    var embedding: Data?                   // 声纹，Float32×256
     var speechSeconds: Double = 0
     var audioSource: String = "mix"        // mic / system / mix
     var suggestedName: String?
@@ -122,7 +122,7 @@ struct SpeakerName: SnakeCaseRecord, Hashable {
     var suggestionTime: String?
 }
 
-/// 錄音中按 ⌘B 標的重點（R2.4）
+/// 录音中按 ⌘B 标的重点（R2.4）
 struct Bookmark: SnakeCaseRecord, Identifiable, Hashable {
     static let databaseTableName = "bookmarks"
     var id: Int64?
@@ -133,7 +133,7 @@ struct Bookmark: SnakeCaseRecord, Identifiable, Hashable {
     mutating func didInsert(_ inserted: InsertionSuccess) { id = inserted.rowID }
 }
 
-/// 逐字稿校正建議（design §17.4、R14.4）：pending 待確認、accepted 已接受（段落文字已改）、rejected 已拒絕
+/// 逐字稿校正建议（design §17.4、R14.4）：pending 待确认、accepted 已接受（段落文字已改）、rejected 已拒绝
 struct Correction: SnakeCaseRecord, Identifiable, Hashable {
     static let databaseTableName = "corrections"
     var id: Int64?
@@ -152,7 +152,7 @@ struct Correction: SnakeCaseRecord, Identifiable, Hashable {
     mutating func didInsert(_ inserted: InsertionSuccess) { id = inserted.rowID }
 }
 
-/// 詞彙表建議（design §17.5）：使用者確認才加進詞彙表
+/// 词汇表建议（design §17.5）：用户确认才加进词汇表
 struct GlossarySuggestion: Hashable, Identifiable {
     enum Source { case participant, speaker, correction, title }
     var term: String
@@ -161,15 +161,15 @@ struct GlossarySuggestion: Hashable, Identifiable {
 
     var sourceLabel: String {
         switch source {
-        case .participant: String(localized: "參加者")
-        case .speaker: String(localized: "說話者名字")
-        case .correction: String(localized: "校正過的字")
-        case .title: String(localized: "會議標題")
+        case .participant: String(localized: "参加者")
+        case .speaker: String(localized: "说话者名字")
+        case .correction: String(localized: "校正过的字")
+        case .title: String(localized: "会议标题")
         }
     }
 }
 
-/// 會議紀錄範本（R6.2、design §8.2）
+/// 会议记录模板（R6.2、design §8.2）
 struct TemplateRecord: SnakeCaseRecord, Identifiable, Hashable {
     static let databaseTableName = "templates"
     var id: String
@@ -193,10 +193,10 @@ struct NotesVersion: SnakeCaseRecord, Identifiable {
 enum JobKind: String, Codable, CaseIterable {
     case transcribe, summarize, revise, compress
     case correct   // 逐字稿校正（design §17.4）
-    case nameSpeakers   // 猜說話者（design §21.5）
-    case rediarize   // 只重新辨識說話者（design §23）
+    case nameSpeakers   // 猜说话者（design §21.5）
+    case rediarize   // 只重新识别说话者（design §23）
 
-    /// 轉錄線、整理線、輔助線（design §21.2）：校正、猜說話者在輔助線，跟整理同時跑
+    /// 转录线、整理线、辅助线（design §21.2）：校正、猜说话者在辅助线，跟整理同时跑
     var lane: JobLane {
         switch self {
         case .transcribe, .compress, .rediarize: return .transcribe
@@ -208,7 +208,7 @@ enum JobKind: String, Codable, CaseIterable {
     /// 要用整理工具的工作（design §34）
     var usesSummarizer: Bool { self == .summarize || self == .revise || self == .correct || self == .nameSpeakers }
 
-    /// 背景的輔助工作：不發通知、不改會議的狀態
+    /// 背景的辅助工作：不发通知、不改会议的状态
     var isAuxiliary: Bool { self == .compress || self == .correct || self == .nameSpeakers || self == .rediarize }
 }
 
@@ -229,9 +229,9 @@ struct Job: SnakeCaseRecord, Identifiable, Hashable {
     var createdAt: String = Clock.now()
     var startedAt: String?
     var finishedAt: String?
-    /// 執行時拾音意外結束的次數（design §20.5）
+    /// 执行时拾音意外结束的次数（design §20.5）
     var crashes = 0
-    /// 失敗的種類（Error.logSummary，design §21.9）
+    /// 失败的种类（Error.logSummary，design §21.9）
     var errorKind: String?
 
     mutating func didInsert(_ inserted: InsertionSuccess) { id = inserted.rowID }
@@ -246,14 +246,14 @@ struct GlossaryTerm: SnakeCaseRecord, Identifiable, Hashable {
     mutating func didInsert(_ inserted: InsertionSuccess) { id = inserted.rowID }
 }
 
-/// 會議的參考文件的種類（design §39.2）：PDF、投影片有頁碼
+/// 会议的参考文档的种类（design §39.2）：PDF、幻灯片有页码
 enum DocumentKind: String, Codable, CaseIterable {
     case pdf, docx, pptx, text, image
 
     var isPaged: Bool { self == .pdf || self == .pptx }
 }
 
-/// 會議的參考文件（design §39.1、R61）：原始檔在 documents/<file>，讀出來的文字每頁一項
+/// 会议的参考文档（design §39.1、R61）：源文件在 documents/<file>，读出来的文字每页一项
 struct MeetingDocument: SnakeCaseRecord, Identifiable, Hashable {
     static let databaseTableName = "documents"
     var id: Int64?
@@ -261,7 +261,7 @@ struct MeetingDocument: SnakeCaseRecord, Identifiable, Hashable {
     var name: String
     var file: String = ""
     var kind: String
-    var pages: String                    // JSON 字串陣列
+    var pages: String                    // JSON 字符串数组
     var ocr: Bool = false
     var createdAt: String = Clock.now()
 
@@ -271,7 +271,7 @@ struct MeetingDocument: SnakeCaseRecord, Identifiable, Hashable {
     var pageTexts: [String] { (try? JSONDecoder().decode([String].self, from: Data(pages.utf8))) ?? [] }
     var fileURL: URL { Paths.documentsDir.appendingPathComponent(file) }
 
-    /// 頁的文字存成 JSON（同會議紀錄的寫法，Windows 用 SwiftJson 寫出一樣的字串）
+    /// 页的文字存成 JSON（同会议记录的写法，Windows 用 SwiftJson 写出一样的字符串）
     static func encodePages(_ pages: [String]) -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.withoutEscapingSlashes]

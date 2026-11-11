@@ -1,10 +1,10 @@
 import Foundation
 
-/// 匿名使用統計（design §30、R40、D100）：每天一份匯總，送到建置時寫進 app 的統計網址。
-/// 不含任何會議內容（R40.2）。沒有網址、或使用者關掉時，不累計也不送。任何執行緒都能呼叫。
+/// 匿名使用统计（design §30、R40、D100）：每天一份汇总，送到建置时写进 app 的统计网址。
+/// 不含任何会议内容（R40.2）。没有网址、或用户关掉时，不累计也不送。任何线程都能调用。
 final class UsageStats: @unchecked Sendable {
     static let shared = UsageStats()
-    /// 設定 → 進階的開關（預設開）
+    /// 设置 → 高级的开关（默认开）
     static let enabledKey = "usageStats"
 
     struct Counters: Codable, Equatable {
@@ -16,10 +16,10 @@ final class UsageStats: @unchecked Sendable {
         var diarizationRuns = 0
         var summarizer = ["claudeCode": 0, "codex": 0, "api": 0, "local": 0, "enterprise": 0]
         var questionsAsked = 0
-        /// 待確認送出的題數（R41.7、§31.3）：回答（打字或「不是」）、確認（「是」）、略過
+        /// 待确认送出的题数（R41.7、§31.3）：回答（打字或「不是」）、确认（「是」）、略过
         var review = ["answered": 0, "confirmed": 0, "skipped": 0]
         var errors = ["recording": 0, "transcribe": 0, "diarize": 0, "summarize": 0]
-        /// 整理失敗的種類、當時的整理工具、其中幾次是草稿（R47、§34.5）：只有次數
+        /// 整理失败的种类、当时的整理工具、其中几次是草稿（R47、§34.5）：只有次数
         var summarizeErrors = Counters.summarizeErrorKinds.reduce(into: [String: Int]()) { $0[$1] = 0 }
         var summarizeErrorProviders = ["claudeCode": 0, "codex": 0, "api": 0, "local": 0, "enterprise": 0]
         var summarizeDraftErrors = 0
@@ -29,7 +29,7 @@ final class UsageStats: @unchecked Sendable {
 
         init() {}
 
-        /// 舊版存的檔案沒有後來加的欄位（例如 review）：少的當 0，不要整份重來
+        /// 旧版存的文件没有后来加的字段（例如 review）：少的当 0，不要整份重来
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             let base = Counters()
@@ -65,13 +65,13 @@ final class UsageStats: @unchecked Sendable {
     private var sending = false
 
     #if DEBUG
-    /// shiyinctl usageurl：只在記憶體設統計網址；DEBUG 版不讀 Info.plist 的網址（design §30.7）
+    /// shiyinctl usageurl：只在内存设统计网址；DEBUG 版不读 Info.plist 的网址（design §30.7）
     nonisolated(unsafe) static var debugURL: String?
     #endif
 
-    // MARK: 開關、網址
+    // MARK: 开关、网址
 
-    /// 建置時寫進 Info.plist 的統計網址（§30.6）。只接受 https；localhost、127.0.0.1 給測試用
+    /// 建置时写进 Info.plist 的统计网址（§30.6）。只接受 https；localhost、127.0.0.1 给测试用
     static var endpoint: URL? {
         #if DEBUG
         let raw = debugURL ?? ""
@@ -85,7 +85,7 @@ final class UsageStats: @unchecked Sendable {
         return nil
     }
 
-    /// 設定頁、使用說明要不要顯示這個功能：有網址的版本才有（DEBUG 版一律顯示，§30.5）
+    /// 设置页、使用说明要不要显示这个功能：有网址的版本才有（DEBUG 版一律显示，§30.5）
     static var isOffered: Bool {
         #if DEBUG
         return true
@@ -101,19 +101,19 @@ final class UsageStats: @unchecked Sendable {
 
     private static var isActive: Bool { endpoint != nil && isEnabled }
 
-    // MARK: 累計
+    // MARK: 累计
 
-    /// 錄音存檔成功
+    /// 录音存档成功
     func recorded(seconds: Double) {
         add { $0.meetingsRecorded += 1; $0.recordedSeconds += Self.whole(seconds) }
     }
 
-    /// 匯入音訊或影片成功（長度在轉錄完成時才加，見 transcribed）
+    /// 导入音频或视频成功（长度在转录完成时才加，见 transcribed）
     func imported() {
         add { $0.meetingsImported += 1 }
     }
 
-    /// 轉錄完成。engine 是 Meeting.transcribedWith（breeze、system、japanese、qwen），企業伺服器轉的是 server（R52.2）；system 記成 builtin（跨平台的名稱，§30.1）
+    /// 转录完成。engine 是 Meeting.transcribedWith（breeze、system、japanese、qwen），企业服务器转的是 server（R52.2）；system 记成 builtin（跨平台的名称，§30.1）
     func transcribed(seconds: Double, wallSeconds: Double, engine: String, language: MeetingLanguage,
                      imported: Bool, diarized: Bool) {
         let audio = Self.whole(seconds)
@@ -128,19 +128,19 @@ final class UsageStats: @unchecked Sendable {
         }
     }
 
-    /// 重新辨識說話者完成
+    /// 重新识别说话者完成
     func rediarized() {
         add { $0.diarizationRuns += 1 }
     }
 
-    /// 整理（含草稿、修正）成功。只記整理工具的種類，不記網址、模型
+    /// 整理（含草稿、修正）成功。只记整理工具的种类，不记网址、模型
     @MainActor
     func summarized(with provider: LLMProvider) {
         guard let key = Self.providerKind(provider) else { return }
         add { $0.summarizer[key, default: 0] += 1 }
     }
 
-    /// 整理（含草稿、修正）失敗（R47、§34.5）：原本的次數照舊，另外記種類、整理工具、是不是草稿；不記錯誤訊息
+    /// 整理（含草稿、修正）失败（R47、§34.5）：原本的次数照旧，另外记种类、整理工具、是不是草稿；不记错误消息
     @MainActor
     func summarizeFailed(_ error: Error, provider: LLMProvider, draft: Bool) {
         let kind = Self.summarizeFailureKind(error)
@@ -153,7 +153,7 @@ final class UsageStats: @unchecked Sendable {
         }
     }
 
-    /// 整理工具的種類：claudeCode、codex、api、local（本機的 OpenAI 相容服務）、enterprise（公司，R52.2）；none 是 nil
+    /// 整理工具的种类：claudeCode、codex、api、local（本机的 OpenAI 兼容服务）、enterprise（公司，R52.2）；none 是 nil
     @MainActor
     static func providerKind(_ provider: LLMProvider) -> String? {
         switch provider {
@@ -168,7 +168,7 @@ final class UsageStats: @unchecked Sendable {
         }
     }
 
-    /// 失敗的種類（§34.5）
+    /// 失败的种类（§34.5）
     static func summarizeFailureKind(_ error: Error) -> String {
         if let llm = error as? LLMError {
             switch llm {
@@ -192,7 +192,7 @@ final class UsageStats: @unchecked Sendable {
         add { $0.questionsAsked += 1 }
     }
 
-    /// 待確認送出成功（R41.7）：只記題數，不記題目和答案
+    /// 待确认送出成功（R41.7）：只记题数，不记题目和答案
     func reviewed(answered: Int, confirmed: Int, skipped: Int) {
         guard answered + confirmed + skipped > 0 else { return }
         add {
@@ -206,7 +206,7 @@ final class UsageStats: @unchecked Sendable {
         add { $0.errors[kind.rawValue, default: 0] += 1 }
     }
 
-    /// 打開 app、每小時檢查時建立今天的空白匯總：沒有用量的日子也算活躍（§30.3）
+    /// 打开 app、每小时检查时创建今天的空白汇总：没有用量的日子也算活跃（§30.3）
     func touch() {
         add { _ in }
     }
@@ -223,9 +223,9 @@ final class UsageStats: @unchecked Sendable {
         saveLocked(store)
     }
 
-    // MARK: 設定頁、DEBUG
+    // MARK: 设置页、DEBUG
 
-    /// 下一份要送的內容（shiyinctl usage 用；設定頁不顯示）；還沒有已過完的日子就是今天到目前為止的
+    /// 下一份要送的内容（shiyinctl usage 用；设置页不显示）；还没有已过完的日子就是今天到目前为止的
     func previewJSON() -> String {
         lock.lock()
         let store = loadLocked()
@@ -244,7 +244,7 @@ final class UsageStats: @unchecked Sendable {
         saveLocked(store)
     }
 
-    /// 關掉開關時：清掉還沒送的資料（R40.4）
+    /// 关掉开关时：清掉还没送的资料（R40.4）
     func clearPending() {
         lock.lock()
         defer { lock.unlock() }
@@ -255,7 +255,7 @@ final class UsageStats: @unchecked Sendable {
 
     // MARK: 送出（§30.3）
 
-    /// 啟動 60 秒後送一次，之後每小時檢查一次
+    /// 启动 60 秒后送一次，之后每小时检查一次
     func scheduleAutomaticSends() {
         Task.detached(priority: .utility) { [self] in
             try? await Task.sleep(for: .seconds(60))
@@ -268,7 +268,7 @@ final class UsageStats: @unchecked Sendable {
         }
     }
 
-    /// 送今天以前、最近 3 天內、還沒送過的日子，一天一個請求
+    /// 送今天以前、最近 3 天内、还没送过的日子，一天一个请求
     func sendPending() async {
         guard let url = Self.endpoint, Self.isEnabled else { return }
         let start: (installId: String, dates: [String], days: [String: Counters])? = lock.withLock {
@@ -293,7 +293,7 @@ final class UsageStats: @unchecked Sendable {
                 code = (response as? HTTPURLResponse)?.statusCode ?? 0
             } catch {
                 log.info("usage stats not sent: \(error.localizedDescription, privacy: .public)")
-                break   // 網路有問題：剩下的下次再送
+                break   // 网络有问题：剩下的下次再送
             }
             let delivered = (200..<300).contains(code)
             let rejected = (400..<500).contains(code) && code != 429
@@ -311,7 +311,7 @@ final class UsageStats: @unchecked Sendable {
         }
     }
 
-    /// 今天以前、最近 3 天內、還沒送過的日子（從舊到新）
+    /// 今天以前、最近 3 天内、还没送过的日子（从旧到新）
     private func pendingDates(in store: Store, today: String) -> [String] {
         let oldest = Self.dateString(Date().addingTimeInterval(-3 * 86_400))
         return store.days.keys.filter { $0 < today && $0 >= oldest && !store.sent.contains($0) }.sorted()
@@ -330,7 +330,7 @@ final class UsageStats: @unchecked Sendable {
         var errorDetail: ErrorDetail
     }
 
-    /// 2026-10-25 加（R47、§34.5）：舊後台忽略這個鍵，schema 仍是 1
+    /// 2026-10-25 加（R47、§34.5）：旧后台忽略这个键，schema 仍是 1
     struct ErrorDetail: Encodable {
         var summarize: [String: Int]
         var summarizeProvider: [String: Int]
@@ -370,7 +370,7 @@ final class UsageStats: @unchecked Sendable {
         return (try? encoder.encode(payload)) ?? Data()
     }
 
-    /// Updater.currentVersion 是主執行緒的，這裡直接讀 Info.plist
+    /// Updater.currentVersion 是主线程的，这里直接读 Info.plist
     static var appVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
     }
@@ -389,7 +389,7 @@ final class UsageStats: @unchecked Sendable {
         return String(cString: buffer)
     }
 
-    // MARK: 存檔（§30.2）
+    // MARK: 存档（§30.2）
 
     static var fileURL: URL { Paths.home.appendingPathComponent("usage.json") }
 
@@ -400,7 +400,7 @@ final class UsageStats: @unchecked Sendable {
         return store
     }
 
-    /// 只留最近 4 天的匯總、最近 7 天送過的日期
+    /// 只留最近 4 天的汇总、最近 7 天送过的日期
     private func saveLocked(_ store: Store) {
         var store = store
         let keepDays = Self.dateString(Date().addingTimeInterval(-4 * 86_400))
@@ -431,7 +431,7 @@ final class UsageStats: @unchecked Sendable {
     private static func whole(_ seconds: Double) -> Int { seconds.isFinite ? max(0, Int(seconds.rounded())) : 0 }
 
     #if DEBUG
-    /// shiyinctl usage：目前的檔案和下一份要送的內容
+    /// shiyinctl usage：目前的文件和下一份要送的内容
     func debugSnapshot() -> [String: Any] {
         lock.lock()
         let store = loadLocked()
@@ -441,7 +441,7 @@ final class UsageStats: @unchecked Sendable {
         return ["store": stored, "next": preview, "endpoint": Self.endpoint?.absoluteString ?? "", "enabled": Self.isEnabled]
     }
 
-    /// shiyinctl usageage：把今天的匯總改成幾天前（模擬時間過去）
+    /// shiyinctl usageage：把今天的汇总改成几天前（模拟时间过去）
     func debugAge(days: Int) {
         lock.lock()
         defer { lock.unlock() }

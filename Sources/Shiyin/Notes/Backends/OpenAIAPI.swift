@@ -25,7 +25,7 @@ struct OpenAIAPI: LLMBackend {
         let outputs = object["output"] as? [[String: Any]] ?? []
         let text = outputs.flatMap { ($0["content"] as? [[String: Any]]) ?? [] }
             .first { $0["type"] as? String == "output_text" }?["text"] as? String
-        guard let text else { throw LLMError.badOutput(String(localized: "回應裡沒有文字（status：\(object["status"] as? String ?? String(localized: "未知"))）")) }
+        guard let text else { throw LLMError.badOutput(String(localized: "回应里没有文字（status：\(object["status"] as? String ?? String(localized: "未知"))）")) }
         return Data(text.utf8)
     }
 

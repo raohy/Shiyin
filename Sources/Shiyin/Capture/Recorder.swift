@@ -2,7 +2,7 @@ import AVFoundation
 import AppKit
 import Observation
 
-/// 錄音（design §5、R1、R2）：統籌音源、寫檔、即時逐字稿、暫停、音量
+/// 录音（design §5、R1、R2）：统筹音源、写档、实时逐字稿、暂停、音量
 @MainActor
 @Observable
 final class Recorder {
@@ -11,7 +11,7 @@ final class Recorder {
         var file: URL?
         var duration: Double
         var error: String?
-        /// 沒人說話太久而自動停止（R48.2）：最後有人說話的秒數
+        /// 没人说话太久而自动停止（R48.2）：最后有人说话的秒数
         var idleSince: Double? = nil
     }
 
@@ -26,78 +26,78 @@ final class Recorder {
     private(set) var isPaused = false
     private(set) var meetingId: Int64?
     private(set) var startedAt: Date?
-    /// 精確的錄音秒數（筆記的時間點、標記重點用）。每 0.05 秒變一次，畫面不要讀這個，讀 elapsedSeconds（design §25）
+    /// 精确的录音秒数（笔记的时间点、标记重点用）。每 0.05 秒变一次，画面不要读这个，读 elapsedSeconds（design §25）
     @ObservationIgnored private(set) var elapsed: Double = 0
-    /// 畫面顯示的錄音秒數：整秒變了才更新
+    /// 画面显示的录音秒数：整秒变了才更新
     private(set) var elapsedSeconds = 0
-    /// 音量（0～1）。不讓 SwiftUI 觀察：音量條（LevelMeter）自己定時來讀，
-    /// 不然說話時每秒變十幾次，每次整個視窗都要重新排版（design §25）
+    /// 音量（0～1）。不让 SwiftUI 观察：音量条（LevelMeter）自己定时来读，
+    /// 不然说话时每秒变十几次，每次整个窗口都要重新排版（design §25）
     @ObservationIgnored private(set) var micLevel: Float = 0
     @ObservationIgnored private(set) var systemLevel: Float = 0
     private(set) var source = "mic"            // mic / system / both
     private(set) var liveLines: [LiveLine] = []
     private(set) var volatileText = ""
     private(set) var liveStatus = ""
-    /// 系統聲音一直是靜音：可能沒有允許「錄製系統音訊」或沒有東西在播
+    /// 系统声音一直是静音：可能没有允许「录制系统音频」或没有东西在播
     private(set) var systemSilent = false
     var permissionDenied = false
     var failureMessage: String?
-    /// 自動偵測換了會議語言（design §18.8）：錄音畫面顯示「改回」
+    /// 自动检测换了会议语言（design §18.8）：录音画面显示「改回」
     private(set) var languageSwitch: (from: MeetingLanguage, to: MeetingLanguage)?
-    /// 有音源超過 3 秒沒送資料、正在重新連接（design §20.2）：錄音畫面的提示列顯示
+    /// 有音源超过 3 秒没送资料、正在重新连接（design §20.2）：录音画面的提示列显示
     private(set) var deviceWarning: String?
 
     /// 收音提醒（design §26.1、R24.1、R24.3）
     enum LevelHint: String {
-        case silent   // 麥克風的聲音完全是 0
-        case quiet    // 有人在說話，但聲音很小
-        case noisy    // 背景一直很大聲
+        case silent   // 麦克风的声音完全是 0
+        case quiet    // 有人在说话，但声音很小
+        case noisy    // 背景一直很大声
 
-        /// 錄音畫面、選單列、通知都用同一句（R42）
+        /// 录音画面、菜单列、通知都用同一句（R42）
         var text: String {
             switch self {
-            case .silent: return String(localized: "麥克風沒有收到聲音：可能被靜音、被其他 app 佔用，或選錯了麥克風。可以在設定的「錄音與轉錄」換一個。")
-            case .quiet: return String(localized: "聲音有點小：手機或筆電放近說話的人一點。")
-            case .noisy: return String(localized: "背景有點吵，說話者可能分不準。錄完可以用「重新辨識說話者」告訴拾音大約幾個人。")
+            case .silent: return String(localized: "麦克风没有收到声音：可能被静音、被其他 app 占用，或选错了麦克风。可以在设置的「录音与转录」换一个。")
+            case .quiet: return String(localized: "声音有点小：手机或笔记本电脑放近说话的人一点。")
+            case .noisy: return String(localized: "背景有点吵，说话者可能分不准。录完可以用「重新识别说话者」告诉拾音大约几个人。")
             }
         }
     }
     private(set) var levelHint: LevelHint?
 
-    /// 正在收音的麥克風（design §38.3、R58.2）：開始、重新開始、換麥克風後更新
+    /// 正在收音的麦克风（design §38.3、R58.2）：开始、重新开始、换麦克风后更新
     private(set) var micDevice: AudioDevices.Device?
-    /// 用藍牙耳機的麥克風錄現場會議（design §38.4、R58.3）
+    /// 用蓝牙耳机的麦克风录现场会议（design §38.4、R58.3）
     struct MicHint: Equatable {
         var name: String
-        /// 這台電腦的內建麥克風，提示列的「改用」按鈕用；沒有就不放按鈕
+        /// 这台电脑的内置麦克风，提示列的「改用」按钮用；没有就不放按钮
         var builtIn: AudioDevices.Device?
 
-        /// 錄音畫面、選單列、通知都用同一句
+        /// 录音画面、菜单列、通知都用同一句
         var text: String {
-            String(localized: "正在用「\(name)」收音：這是藍牙耳機的麥克風，人不在旁邊時錄不到現場的聲音。")
+            String(localized: "正在用「\(name)」收音：这是蓝牙耳机的麦克风，人不在旁边时录不到现场的声音。")
         }
     }
     private(set) var micHint: MicHint?
     @ObservationIgnored private var micHintDismissed = false
     @ObservationIgnored private var micHintNotified = false
-    /// 藍牙的提示第一次出現：AppModel 決定要不要送通知（同收音提醒，design §31.5）
+    /// 蓝牙的提示第一次出现：AppModel 决定要不要送通知（同收音提醒，design §31.5）
     @ObservationIgnored var onMicHint: ((MicHint) -> Void)?
     @ObservationIgnored private var dismissedLevelHints: Set<LevelHint> = []
-    /// 這場錄音已經通知過的提示（R42.1：每種每場最多一次）
+    /// 这场录音已经通知过的提示（R42.1：每种每场最多一次）
     @ObservationIgnored private var notifiedLevelHints: Set<LevelHint> = []
-    /// 提示第一次出現（design §31.5）：AppModel 決定要不要送通知
+    /// 提示第一次出现（design §31.5）：AppModel 决定要不要送通知
     @ObservationIgnored var onLevelHint: ((LevelHint) -> Void)?
     @ObservationIgnored private var noisySeconds = 0
     @ObservationIgnored private var quietSeconds = 0
 
-    /// 忘了停止錄音（design §35、R48）：最後有人說話的錄音秒數；即時逐字稿有沒有接上音訊
+    /// 忘了停止录音（design §35、R48）：最后有人说话的录音秒数；实时逐字稿有没有接上音频
     @ObservationIgnored private var lastSpeechAt: Double = 0
     @ObservationIgnored private var liveActive = false
-    /// 好像沒人在說話了，要停止錄音嗎？（錄音畫面、選單列顯示）
+    /// 好像没人在说话了，要停止录音吗？（录音画面、菜单列显示）
     private(set) var idlePrompt = false
-    /// 提醒出現（AppModel 送通知）
+    /// 提醒出现（AppModel 送通知）
     @ObservationIgnored var onIdlePrompt: (() -> Void)?
-    /// 15 分鐘提醒、30 分鐘自動停止；DEBUG 可以用啟動參數縮短（design §35.2）
+    /// 15 分钟提醒、30 分钟自动停止；DEBUG 可以用启动参数缩短（design §35.2）
     static var idleRemindSeconds: Double { debugSeconds("idleRemindSeconds") ?? 900 }
     static var idleStopSeconds: Double { debugSeconds("idleStopSeconds") ?? 1800 }
     private static func debugSeconds(_ key: String) -> Double? {
@@ -110,7 +110,7 @@ final class Recorder {
     }
     #if DEBUG
     @ObservationIgnored private(set) var levelCheck: [String: Any] = [:]
-    /// 忘了停止錄音的狀態（design §35.2）：shiyinctl state 的 recorder.idle
+    /// 忘了停止录音的状态（design §35.2）：shiyinctl state 的 recorder.idle
     var idleInfo: [String: Any] {
         ["idleSeconds": isRecording ? elapsed - lastSpeechAt : 0, "lastSpeechAt": lastSpeechAt, "prompt": idlePrompt,
          "liveActive": liveActive, "remindAfter": Self.idleRemindSeconds, "stopAfter": Self.idleStopSeconds]
@@ -118,32 +118,32 @@ final class Recorder {
     #endif
 
     @ObservationIgnored var onFinished: ((Result) -> Void)?
-    /// 錄音開始了（全域快捷鍵標記重點這時才註冊，design §21.10）
+    /// 录音开始了（全域快捷键标记重点这时才注册，design §21.10）
     @ObservationIgnored var onStarted: (() -> Void)?
-    /// 停止後即時辨識收尾完（最後還沒定稿的文字已經存進去），給草稿紀錄用（design §21.3）：會議 id、錄到的秒數
+    /// 停止后实时识别收尾完（最后还没定稿的文字已经存进去），给草稿记录用（design §21.3）：会议 id、录到的秒数
     @ObservationIgnored var onLiveFinished: ((Int64, Double) -> Void)?
     @ObservationIgnored var onLiveFinal: ((Int64, Double, Double, String) -> Void)?
-    /// 錄音中換了會議語言（自動偵測或改回），要更新資料庫
+    /// 录音中换了会议语言（自动检测或改回），要更新数据库
     @ObservationIgnored var onLanguageChange: ((Int64, MeetingLanguage) -> Void)?
     @ObservationIgnored private let tap = MixTap()
     @ObservationIgnored private var writer: RecordingWriter?
-    @ObservationIgnored private var sources: [Int: AudioSource] = [:]   // 聲道 → 音源
-    /// 看門狗：沒送資料的聲道 → 上次試著重新連接的時間；重新連接失敗的原因
+    @ObservationIgnored private var sources: [Int: AudioSource] = [:]   // 声道 → 音源
+    /// 看门狗：没送资料的声道 → 上次试着重新连接的时间；重新连接失败的原因
     @ObservationIgnored private var reconnecting: [Int: Date] = [:]
     @ObservationIgnored private var reconnectErrors: [Int: String] = [:]
     @ObservationIgnored private var pendingRestarts: [Int: DispatchWorkItem] = [:]
-    /// 磁碟空間（design §20.3）：上次檢查的時間；錄音中不到 300 MB 只提醒一次
+    /// 磁盘空间（design §20.3）：上次检查的时间；录音中不到 300 MB 只提醒一次
     @ObservationIgnored private var lastDiskCheck = Date.distantPast
     @ObservationIgnored private var warnedLowDisk = false
     #if DEBUG
-    /// 模擬錄音的檔案送完了，之後沒有資料是正常的
+    /// 模拟录音的文件送完了，之后没有资料是正常的
     @ObservationIgnored private var simulationEnded = false
     #endif
     @ObservationIgnored private var live: LiveTranscriber?
     @ObservationIgnored private var meterTimer: Timer?
     @ObservationIgnored private var activity: NSObjectProtocol?
 
-    /// 這場錄音的會議語言，決定即時逐字稿的辨識語言（design §16.4）
+    /// 这场录音的会议语言，决定实时逐字稿的识别语言（design §16.4）
     private(set) var language: MeetingLanguage = .zh
 
     var hasMic: Bool { source != "system" }
@@ -173,7 +173,7 @@ final class Recorder {
     }
 
     #if DEBUG
-    /// 只在 DEBUG：用音訊檔當麥克風，驗證錄音流程（speed 是倍速）
+    /// 只在 DEBUG：用音频档当麦克风，验证录音流程（speed 是倍速）
     func startSimulated(meetingId: Int64, file: URL, speed: Double, both: Bool, language: MeetingLanguage) {
         guard !isRecording else { return }
         source = both ? "both" : "mic"
@@ -193,12 +193,12 @@ final class Recorder {
         }
     }
 
-    /// 只在 DEBUG：recordstall，某個聲道停止送資料幾秒，nil 是馬上恢復（design §20.2）
+    /// 只在 DEBUG：recordstall，某个声道停止送资料几秒，nil 是马上恢复（design §20.2）
     func simulateStall(channel: Int, seconds: Double?) {
         (sources[0] as? FileSource)?.stall(channel: channel, seconds: seconds)
     }
 
-    /// 只在 DEBUG：recordinterrupt，等於音源發現裝置變了。連續送幾次，驗證只會重新開始一次
+    /// 只在 DEBUG：recordinterrupt，等于音源发现设备变了。连续送几次，验证只会重新开始一次
     func simulateInterruption(channel: Int, times: Int = 3) {
         for _ in 0..<times { sources[channel]?.onInterruption?() }
     }
@@ -214,27 +214,27 @@ final class Recorder {
         guard isRecording, isPaused else { return }
         writer?.resetRecentLevels()
         (noisySeconds, quietSeconds) = (0, 0)
-        markSpeech()   // 按了繼續表示人還在，重新計時（design §35.1）
+        markSpeech()   // 按了继续表示人还在，重新计时（design §35.1）
         writer?.setPaused(false)
         isPaused = false
     }
 
-    /// 「繼續錄」：人還在，重新計時（R48.1）
+    /// 「继续录」：人还在，重新计时（R48.1）
     func continueAfterIdle() {
         guard isRecording else { return }
         markSpeech()
     }
 
-    /// 有人在說話：重新計時，提醒收掉
+    /// 有人在说话：重新计时，提醒收掉
     private func markSpeech() {
         lastSpeechAt = elapsed
         if idlePrompt { idlePrompt = false }
     }
 
-    /// 每秒檢查沒人說話多久（design §35）：15 分鐘提醒、30 分鐘自動停止
+    /// 每秒检查没人说话多久（design §35）：15 分钟提醒、30 分钟自动停止
     private func checkIdle(_ writer: RecordingWriter) {
         guard AppSettings.idleStop, !isPaused else { return }
-        // 即時逐字稿沒在跑時才看聲音（打字、關門也會算，只當備用，D115）
+        // 实时逐字稿没在跑时才看声音（打字、关门也会算，只当备用，D115）
         if !liveActive && soundsLikeSpeech(writer) { markSpeech() }
         let idle = elapsed - lastSpeechAt
         if idle >= Self.idleStopSeconds {
@@ -249,8 +249,8 @@ final class Recorder {
         }
     }
 
-    /// 最近 1 秒有 30% 以上的音框像說話（design §35.1）：比背景（最近 30 秒的第 10 百分位）大 12 dB 而且高於 -50 dBFS，
-    /// 或本身就高於 -40 dBFS（一開始就一直有人說話時，背景也是說話的音量）
+    /// 最近 1 秒有 30% 以上的音框像说话（design §35.1）：比背景（最近 30 秒的第 10 百分位）大 12 dB 而且高于 -50 dBFS，
+    /// 或本身就高于 -40 dBFS（一开始就一直有人说话时，背景也是说话的音量）
     private func soundsLikeSpeech(_ writer: RecordingWriter) -> Bool {
         for channel in 0..<(source == "both" ? 2 : 1) {
             let levels = writer.recentLevels(channel)
@@ -263,7 +263,7 @@ final class Recorder {
         return false
     }
 
-    /// 換麥克風（design §38.3、R58.2）：存成設定，錄音中就接著用新的這支錄（同一個檔案，錄音不停）
+    /// 换麦克风（design §38.3、R58.2）：存成设置，录音中就接着用新的这支录（同一个文件，录音不停）
     func switchMicrophone(uid: String) {
         UserDefaults.standard.set(uid, forKey: AppSettings.inputDeviceKey)
         guard isRecording, let mic = sources[0] as? MicrophoneInput else { return }
@@ -272,7 +272,7 @@ final class Recorder {
         restartSource(0)
     }
 
-    /// 藍牙提示的「知道了」：這場錄音不再出現
+    /// 蓝牙提示的「知道了」：这场录音不再出现
     func dismissMicHint() {
         micHintDismissed = true
         updateMicHint()
@@ -284,7 +284,7 @@ final class Recorder {
         updateMicHint()
     }
 
-    /// 只錄麥克風（現場會議）、實際收音的是藍牙、不是使用者自己指定的那支時提示（R58.3、R58.4、D130）
+    /// 只录麦克风（现场会议）、实际收音的是蓝牙、不是用户自己指定的那支时提示（R58.3、R58.4、D130）
     private func updateMicHint() {
         var hint: MicHint?
         if isRecording, source == "mic", !micHintDismissed, let device = micDevice, device.isBluetooth,
@@ -299,7 +299,7 @@ final class Recorder {
         }
     }
 
-    /// 「知道了」：這一種提示這場錄音不再出現
+    /// 「知道了」：这一种提示这场录音不再出现
     func dismissLevelHint() {
         guard let levelHint else { return }
         dismissedLevelHints.insert(levelHint)
@@ -313,9 +313,9 @@ final class Recorder {
         let duration = writer?.finish() ?? 0
         let file = writer?.url
         if writer?.writeFailed == true {
-            // 寫不進去時關檔可能也沒更新 WAV 標頭的大小，照實際的檔案大小補上（復原流程也是這樣修）
+            // 写不进去时关档可能也没更新 WAV 标头的大小，照实际的文件大小补上（复原流程也是这样修）
             if let file { try? WAVRepair.repair(file) }
-            failureMessage = String(localized: "錄音寫不進磁碟（可能是空間不足），已經停止錄音。停止前錄到的部分有保留，會照常轉錄。")
+            failureMessage = String(localized: "录音写不进磁盘（可能是空间不足），已经停止录音。停止前录到的部分有保留，会照常转录。")
         }
         let live = live
         Task {
@@ -333,7 +333,7 @@ final class Recorder {
         }
     }
 
-    // MARK: 內部
+    // MARK: 内部
 
     private func makeDeviceSources() -> [(Int, AudioSource)] {
         switch source {
@@ -346,7 +346,7 @@ final class Recorder {
     private func begin(meetingId: Int64, makeSources: () -> [(Int, AudioSource)]) {
         do {
             try Paths.ensureDirectories()
-            // 檔名帶會議 id：當掉後可以接回原本的會議（AppModel.recoverRecordings）
+            // 文件名带会议 id：当掉后可以接回原本的会议（AppModel.recoverRecordings）
             let url = Paths.recordingDir.appendingPathComponent("\(meetingId)-\(UUID().uuidString).wav")
             let channels = source == "both" ? 2 : 1
             let writer = try RecordingWriter(url: url, channels: channels)
@@ -366,9 +366,9 @@ final class Recorder {
             }
             guard !started.isEmpty else {
                 try? FileManager.default.removeItem(at: url)
-                throw CaptureError.coreAudio(warnings.first ?? String(localized: "開始錄音"), -1)
+                throw CaptureError.coreAudio(warnings.first ?? String(localized: "开始录音"), -1)
             }
-            if !warnings.isEmpty { failureMessage = String(localized: "有一個音源沒辦法啟動，只錄到另一個：\(warnings.joined(separator: String(localized: "；")))") }
+            if !warnings.isEmpty { failureMessage = String(localized: "有一个音源没办法启动，只录到另一个：\(warnings.joined(separator: String(localized: "；")))") }
             writer.onMix = tap.handler
             writer.start()
             self.writer = writer
@@ -395,7 +395,7 @@ final class Recorder {
             isPaused = false
             isRecording = true
             activity = ProcessInfo.processInfo.beginActivity(options: [.idleSystemSleepDisabled, .userInitiated],
-                                                             reason: String(localized: "拾音正在錄音"))
+                                                             reason: String(localized: "拾音正在录音"))
             let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.tick() }
             }
@@ -407,25 +407,25 @@ final class Recorder {
             log.info("recording started (\(self.source, privacy: .public))")
             onStarted?()
         } catch {
-            abort(meetingId, message: String(localized: "沒辦法開始錄音：\(error.localizedDescription)"))
+            abort(meetingId, message: String(localized: "没办法开始录音：\(error.localizedDescription)"))
         }
     }
 
     private func startLive(writer: RecordingWriter, meetingId: Int64, restarted: Bool = false) {
         let live = LiveTranscriber(language: language)
         self.live = live
-        liveStatus = String(localized: "正在準備即時逐字稿…")
+        liveStatus = String(localized: "正在准备实时逐字稿…")
         liveActive = false
         live.onVolatile = { [weak self] text in
             #if DEBUG
             DebugMetrics.bump("volatileUpdate")
             #endif
             guard let self else { return }
-            // 有新的字就是有人在說話（design §35.1）
+            // 有新的字就是有人在说话（design §35.1）
             if !text.isEmpty && text != self.volatileText { self.markSpeech() }
             self.volatileText = text
         }
-        // 中途重新開始時，新的辨識從 0 秒算，要加上接上音訊時已經錄了多久
+        // 中途重新开始时，新的识别从 0 秒算，要加上接上音频时已经录了多久
         let offset = LiveOffset()
         live.onFinal = { [weak self] start, end, text in
             guard let self else { return }
@@ -437,26 +437,26 @@ final class Recorder {
         Task {
             do {
                 try await live.start()
-                guard self.live === live else { return }   // 準備期間又換了語言
+                guard self.live === live else { return }   // 准备期间又换了语言
                 if restarted { offset.seconds = writer.recordedSeconds }
                 tap.setLive(live.feedHandler)
                 liveStatus = ""
                 liveActive = true
             } catch {
-                liveStatus = String(localized: "即時逐字稿沒辦法啟動（\(error.localizedDescription)），錄音照常進行，錄完會正式轉錄")
+                liveStatus = String(localized: "实时逐字稿没办法启动（\(error.localizedDescription)），录音照常进行，录完会正式转录")
             }
         }
     }
 
-    // MARK: 自動偵測主要語言（design §18.8、R16、D21）
+    // MARK: 自动检测主要语言（design §18.8、R16、D21）
 
-    /// 開始錄音後收集約 10 秒有聲音的片段，判斷是中文、英文還是日文；跟目前不同而且有把握才切換，只判斷一次
+    /// 开始录音后收集约 10 秒有声音的片段，判断是中文、英文还是日文；跟目前不同而且有把握才切换，只判断一次
     private func startLanguageDetection(meetingId: Int64) {
         languageSwitch = nil
         guard AppSettings.autoDetectLanguage else { return }
         let path = ModelStore.path(.languageDetection).path
         guard FileManager.default.fileExists(atPath: path) else {
-            AppModel.shared.models.autoStart(.languageDetection)   // 這次來不及，下次錄音就能用
+            AppModel.shared.models.autoStart(.languageDetection)   // 这次来不及，下次录音就能用
             return
         }
         tap.setDetector(LanguageDetector.Collector { [weak self] samples in
@@ -477,7 +477,7 @@ final class Recorder {
                 .map { "\($0.key.rawValue) \(String(format: "%.2f", $0.value))" }.joined(separator: ", ")
             log.info("language detection: \(summary, privacy: .public)")
             guard let (best, p) = probabilities.max(by: { $0.value < $1.value }).map({ ($0.key, $0.value) }),
-                  best.profile.family != language.profile.family, p >= LanguageDetector.threshold else { return }   // 同一個語系不切（design §41.4）
+                  best.profile.family != language.profile.family, p >= LanguageDetector.threshold else { return }   // 同一个语系不切（design §41.4）
             let from = language
             switchLanguage(to: best)
             languageSwitch = (from, best)
@@ -486,7 +486,7 @@ final class Recorder {
         }
     }
 
-    /// 錄音中換會議語言：即時逐字稿用新的語言重新開始（之前的逐字稿保留，錄完會正式轉錄）
+    /// 录音中换会议语言：实时逐字稿用新的语言重新开始（之前的逐字稿保留，录完会正式转录）
     func switchLanguage(to newLanguage: MeetingLanguage) {
         guard isRecording, let meetingId, let writer, newLanguage != language else { return }
         language = newLanguage
@@ -495,7 +495,7 @@ final class Recorder {
         onLanguageChange?(meetingId, newLanguage)
         guard AppSettings.liveTranscription else { return }
         tap.setLive(nil)
-        // 舊的辨識收尾送來的是用錯的語言聽的，不加進逐字稿
+        // 旧的识别收尾送来的是用错的语言听的，不加进逐字稿
         let old = live
         old?.onFinal = nil
         old?.onVolatile = nil
@@ -510,14 +510,14 @@ final class Recorder {
             stop()
             return
         }
-        // 觀察的屬性只在值真的變了才設（@Observable 設成同樣的值也會讓畫面重算，design §25）
+        // 观察的属性只在值真的变了才设（@Observable 设成同样的值也会让画面重算，design §25）
         elapsed = writer.recordedSeconds
         let seconds = Int(elapsed)
         if seconds != elapsedSeconds {
             elapsedSeconds = seconds
             checkLevels(writer)
             checkIdle(writer)
-            guard isRecording else { return }   // 沒人說話太久，剛自動停止
+            guard isRecording else { return }   // 没人说话太久，刚自动停止
         }
         var silent = systemSilent
         if source == "both" {
@@ -535,7 +535,7 @@ final class Recorder {
         if Date().timeIntervalSince(lastDiskCheck) >= 30 { checkDiskSpace(writer, starting: false) }
     }
 
-    /// 收音提醒（design §26.1）：每秒看麥克風最近 30 秒的音量。第 90 百分位是說話的音量、第 10 百分位是背景
+    /// 收音提醒（design §26.1）：每秒看麦克风最近 30 秒的音量。第 90 百分位是说话的音量、第 10 百分位是背景
     private func checkLevels(_ writer: RecordingWriter) {
         guard hasMic, !isPaused else { return }
         let silent = writer.silence(0) > 10
@@ -545,14 +545,14 @@ final class Recorder {
             speech = levels[Int(Double(levels.count - 1) * 0.9)]
             background = levels[Int(Double(levels.count - 1) * 0.1)]
             noisySeconds = background > -36 ? noisySeconds + 1 : 0
-            // 說話比背景大 4 dB 以上才算有人在說話（完全安靜時聲音很平），不是安靜的停頓
+            // 说话比背景大 4 dB 以上才算有人在说话（完全安静时声音很平），不是安静的停顿
             quietSeconds = speech < -50 && speech - background >= 4 ? quietSeconds + 1 : 0
         }
         let hint: LevelHint? = silent ? .silent : quietSeconds >= 60 ? .quiet : noisySeconds >= 45 ? .noisy : nil
         let shown = hint.flatMap { dismissedLevelHints.contains($0) ? nil : $0 }
         if shown != levelHint {
             levelHint = shown
-            // 第一次出現才通知（R42.1）；提示消失又出現不再通知
+            // 第一次出现才通知（R42.1）；提示消失又出现不再通知
             if let shown, notifiedLevelHints.insert(shown).inserted { onLevelHint?(shown) }
         }
         #if DEBUG
@@ -561,27 +561,27 @@ final class Recorder {
         #endif
     }
 
-    /// 開始錄音時剩不到 1 GB、錄音中剩不到 300 MB 就提醒（錄音照常進行；寫不進去時 tick 會停止錄音）
+    /// 开始录音时剩不到 1 GB、录音中剩不到 300 MB 就提醒（录音照常进行；写不进去时 tick 会停止录音）
     private func checkDiskSpace(_ writer: RecordingWriter, starting: Bool) {
         lastDiskCheck = Date()
-        // ForImportantUsage 含可以清掉的空間，但磁碟映像、外接磁碟會回傳 0，所以跟一般的剩餘空間取大的
+        // ForImportantUsage 含可以清掉的空间，但磁盘映像、外接磁盘会回传 0，所以跟一般的剩余空间取大的
         guard let values = try? Paths.recordingDir.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey, .volumeAvailableCapacityKey])
         else { return }
         let available = max(values.volumeAvailableCapacityForImportantUsage ?? 0, Int64(values.volumeAvailableCapacity ?? 0))
         guard available < (starting ? 1_000_000_000 : 300_000_000), starting || !warnedLowDisk else { return }
         if !starting { warnedLowDisk = true }
-        // 16 kHz、16 位元：單聲道每小時約 115 MB，雙聲道約 230 MB
+        // 16 kHz、16 比特：单声道每小时约 115 MB，双声道约 230 MB
         let bytesPerMinute = CaptureFormat.sampleRate * 2 * Double(writer.channels) * 60
         let minutes = Int(Double(available) / bytesPerMinute)
         let size = ByteCountFormatter.string(fromByteCount: available, countStyle: .file)
         log.info("low disk space: \(available / 1_000_000) MB")
-        let message = String(localized: "磁碟只剩 \(size)，大約只能錄 \(minutes) 分鐘。空間用完時會自動停止錄音，已經錄到的部分會保留。")
+        let message = String(localized: "磁盘只剩 \(size)，大约只能录 \(minutes) 分钟。空间用完时会自动停止录音，已经录到的部分会保留。")
         failureMessage = failureMessage.map { $0 + "\n\n" + message } ?? message
     }
 
-    // MARK: 換裝置、看門狗（design §20.2、R18.2、D25）
+    // MARK: 换设备、看门狗（design §20.2、R18.2、D25）
 
-    /// 裝置切換時通知會連續來好幾次，等 0.3 秒沒有新的通知再重新開始
+    /// 设备切换时通知会连续来好几次，等 0.3 秒没有新的通知再重新开始
     private func scheduleRestart(_ channel: Int) {
         guard isRecording else { return }
         pendingRestarts[channel]?.cancel()
@@ -602,7 +602,7 @@ final class Recorder {
             reconnectErrors[channel] = nil
             log.info("audio source \(channel) restarted")
         } catch {
-            // 錄音不停：另一個音源照常錄，雙聲道時這段會補靜音；看門狗每 5 秒再試
+            // 录音不停：另一个音源照常录，双声道时这段会补静音；看门狗每 5 秒再试
             reconnectErrors[channel] = error.localizedDescription
             log.error("audio source \(channel) restart failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -610,7 +610,7 @@ final class Recorder {
         updateDeviceWarning()
     }
 
-    /// 音源超過 3 秒沒送資料：提示並每 5 秒試一次重新開始；收到資料後提示消失
+    /// 音源超过 3 秒没送资料：提示并每 5 秒试一次重新开始；收到资料后提示消失
     private func watchdog(_ writer: RecordingWriter) {
         #if DEBUG
         if simulationEnded { return }
@@ -635,10 +635,10 @@ final class Recorder {
         let warning = reconnecting.keys.sorted().first.map { channel -> String in
             let mic = source != "system" && channel == 0
             if let reason = reconnectErrors[channel] {
-                return mic ? String(localized: "麥克風沒有送出聲音，重新連接失敗：\(reason)。會繼續重試，錄音沒有停")
-                    : String(localized: "電腦聲音的擷取中斷了，重新連接失敗：\(reason)。會繼續重試，錄音沒有停")
+                return mic ? String(localized: "麦克风没有送出声音，重新连接失败：\(reason)。会继续重试，录音没有停")
+                    : String(localized: "电脑声音的截取中断了，重新连接失败：\(reason)。会继续重试，录音没有停")
             }
-            return mic ? String(localized: "麥克風沒有送出聲音，正在重新連接…") : String(localized: "電腦聲音的擷取中斷了，正在重新連接…")
+            return mic ? String(localized: "麦克风没有送出声音，正在重新连接…") : String(localized: "电脑声音的截取中断了，正在重新连接…")
         }
         if warning != deviceWarning { deviceWarning = warning }
     }
@@ -680,7 +680,7 @@ final class Recorder {
     }
 }
 
-/// 錄音的單聲道混音要同時送給即時逐字稿和語言偵測；寫檔的執行緒呼叫 handler，主執行緒換掉接收端
+/// 录音的单声道混音要同时送给实时逐字稿和语言检测；写档的线程调用 handler，主线程换掉接收端
 final class MixTap: @unchecked Sendable {
     private let lock = NSLock()
     private var live: (([Float]) -> Void)?
@@ -699,7 +699,7 @@ final class MixTap: @unchecked Sendable {
     }
 }
 
-/// 一個即時辨識的時間偏移（design §18.8）
+/// 一个实时识别的时间偏移（design §18.8）
 @MainActor
 private final class LiveOffset {
     var seconds: Double = 0

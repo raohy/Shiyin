@@ -36,7 +36,7 @@ def own_swift_files():
 def load_catalog():
     if CATALOG.exists():
         return json.loads(CATALOG.read_text())
-    return {"sourceLanguage": "zh-Hant", "strings": {}, "version": "1.0"}
+    return {"sourceLanguage": "zh-Hans", "strings": {}, "version": "1.0"}
 
 
 def save_catalog(cat):

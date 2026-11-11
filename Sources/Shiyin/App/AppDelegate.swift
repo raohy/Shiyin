@@ -4,8 +4,8 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var keyMonitor: Any?
 
-    /// 子程序還沒讀完 stdin 就結束時，寫入會收到 SIGPIPE，預設會結束整個拾音（design §20.1）。
-    /// 忽略之後寫入只會失敗，照常讀子程序的結束代碼和錯誤訊息
+    /// 子程序还没读完 stdin 就结束时，写入会收到 SIGPIPE，默认会结束整个拾音（design §20.1）。
+    /// 忽略之后写入只会失败，照常读子程序的结束代码和错误消息
     func applicationWillFinishLaunching(_ notification: Notification) {
         signal(SIGPIPE, SIG_IGN)
     }
@@ -18,13 +18,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
     }
 
-    /// 回到前景時更新 claude、codex 的登入狀態（使用者可能剛在終端機登入，design §34.1）
+    /// 回到前景时更新 claude、codex 的登录状态（用户可能刚在终端登录，design §34.1）
     func applicationDidBecomeActive(_ notification: Notification) {
         Task { await CLILogin.refreshIfStale() }
     }
 
-    /// 拖到 Dock 圖示、Finder 的「打開方式」（R1.3）；企業伺服器的加入連結 shiyin://join（R49.7）；
-    /// AI 工具給的會議連結 shiyin://open（design §44.5）
+    /// 拖到 Dock 图标、Finder 的「打开方式」（R1.3）；企业服务器的加入链接 shiyin://join（R49.7）；
+    /// AI 工具给的会议链接 shiyin://open（design §44.5）
     func application(_ application: NSApplication, open urls: [URL]) {
         AppModel.shared.start()
         for link in urls where EnterpriseJoin.isJoin(link) { Task { await EnterpriseJoin.handle(link) } }
@@ -33,10 +33,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !files.isEmpty { AppModel.shared.importDirectly(files) }
     }
 
-    /// 關掉主視窗 app 不結束，錄音和工作照常進行（R13.3）
+    /// 关掉主窗口 app 不结束，录音和工作照常进行（R13.3）
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
-    /// 結束前讓還開著的編輯器存草稿（design §21.15、R20.6）
+    /// 结束前让还开着的编辑器存草稿（design §21.15、R20.6）
     func applicationWillTerminate(_ notification: Notification) {
         NotificationCenter.default.post(name: .flushDrafts, object: nil)
     }
@@ -46,33 +46,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    /// 錄音中或有工作在跑時先確認（R11.7、R13.4）
+    /// 录音中或有工作在跑时先确认（R11.7、R13.4）
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let model = AppModel.shared
         let recording = model.recorder.isRecording
         let busy = model.runner.isBusy
         guard recording || busy else { return .terminateNow }
         #if DEBUG
-        // shiyinctl quit：等於在確認對話框按「結束」
+        // shiyinctl quit：等于在确认对话框按「结束」
         if DebugControl.confirmQuit { return finishTermination(recording: recording) }
         #endif
 
         let alert = NSAlert()
-        alert.messageText = recording ? String(localized: "正在錄音，要結束拾音嗎？") : String(localized: "還有工作在進行，要結束拾音嗎？")
+        alert.messageText = recording ? String(localized: "正在录音，要结束拾音吗？") : String(localized: "还有工作在进行，要结束拾音吗？")
         var info: [String] = []
-        if recording { info.append(String(localized: "錄音會先存好，下次開啟拾音時開始轉錄。")) }
-        if busy { info.append(String(localized: "進行中的轉錄或整理會中斷，下次開啟時從頭重跑。")) }
+        if recording { info.append(String(localized: "录音会先存好，下次打开拾音时开始转录。")) }
+        if busy { info.append(String(localized: "进行中的转录或整理会中断，下次打开时从头重跑。")) }
         alert.informativeText = info.joined(separator: "\n")
-        alert.addButton(withTitle: String(localized: "結束"))
+        alert.addButton(withTitle: String(localized: "结束"))
         alert.addButton(withTitle: String(localized: "取消"))
         NSApp.activate()
         guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
         return finishTermination(recording: recording)
     }
 
-    /// 送出取消後要等 whisper 的 context 都釋放了再結束：還在 GPU 上算的時候 exit，
-    /// 靜態解構會在 ggml_metal_device_free 裡 abort（design §20.12）。最多等 10 秒。
-    /// 用 run loop 的 Timer 等，不用 MainActor 的 Task：從主佇列裡呼叫 terminate 時，主佇列不會再執行別的工作
+    /// 送出取消后要等 whisper 的 context 都释放了再结束：还在 GPU 上算的时候 exit，
+    /// 静态解构会在 ggml_metal_device_free 里 abort（design §20.12）。最多等 10 秒。
+    /// 用 run loop 的 Timer 等，不用 MainActor 的 Task：从主队列里调用 terminate 时，主队列不会再执行别的工作
     private func finishTermination(recording: Bool) -> NSApplication.TerminateReply {
         let model = AppModel.shared
         if recording { model.recorder.stop() }
@@ -90,8 +90,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return .terminateLater
     }
 
-    /// 空白鍵播放／暫停；游標在輸入框時不攔截（design §9.4）。
-    /// ⌘=（美式鍵盤上 + 的那個鍵，不按 Shift）也算「放大文字」：選單的 ⌘+ 要按 Shift 才對得上（design §38.5）
+    /// 空白键播放／暂停；光标在输入框时不拦截（design §9.4）。
+    /// ⌘=（美式键盘上 + 的那个键，不按 Shift）也算「放大文字」：菜单的 ⌘+ 要按 Shift 才对得上（design §38.5）
     private func installSpaceKey() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             if event.modifierFlags.intersection([.command, .option, .control, .shift]) == .command,

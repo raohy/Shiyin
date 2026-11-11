@@ -20,7 +20,7 @@ ditto "$SCRATCH/app/Shiyin.app" "$STAGE/Shiyin.app"   # Finder 會依在地化�
 # 中英文共用一個 DMG：捷徑和磁碟名稱用不分語言的英文
 ln -s /Applications "$STAGE/Applications"
 # 安裝說明：HTML 用系統的文字排版轉成 PDF
-swift scripts/html-to-pdf.swift scripts/install-guide.html "$STAGE/安裝說明.pdf"
+swift scripts/html-to-pdf.swift scripts/install-guide.html "$STAGE/安装说明.pdf"
 swift scripts/html-to-pdf.swift scripts/install-guide.en.html "$STAGE/Install Guide.pdf"
 cp Resources/ThirdPartyLicenses.txt "$STAGE/Third-Party Licenses.txt"   # 第三方授權（design §12.1、R13.1）
 

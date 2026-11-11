@@ -6,13 +6,13 @@ import AppKit
 import SwiftUI
 import UserNotifications
 
-/// 只在 DEBUG 建置存在的控制通道：讓驗證腳本在不操作畫面（例如螢幕鎖定）時也能觸發功能。
-/// 用 scripts/dev/shiyinctl 送指令；結果寫到指令指定的檔案。正式版（release）不會編進這段程式。
+/// 只在 DEBUG 建置存在的控制通道：让验证脚本在不操作画面（例如屏幕锁定）时也能触发功能。
+/// 用 scripts/dev/shiyinctl 送命令；结果写到命令指定的文件。正式版（release）不会编进这段程序。
 @MainActor
 enum DebugControl {
-    static let notificationName = Notification.Name("com.weiwei.shiyin.debug")
+    static let notificationName = Notification.Name(ProcessInfo.processInfo.environment["SHIYIN_DEBUG_CHANNEL"] ?? "com.weiwei.shiyin.debug")
     static let separator: Character = "\u{1F}"
-    /// quit 指令：結束時不跳確認對話框，直接當成按了「結束」
+    /// quit 命令：结束时不跳确认对话框，直接当成按了「结束」
     static var confirmQuit = false
 
     static func install() {
@@ -29,11 +29,12 @@ enum DebugControl {
         guard let name = args.first else { return }
         let id = args.count > 1 ? Int64(args[1]) : nil
         switch name {
+        case "coach": coachCommand(Array(args.dropFirst()))
         case "select": model.showTrash = false; model.selection = id
-        // notesview list|mindmap：紀錄分頁切換成條列或心智圖（design §42.5；寫進共用設定，測完 defaults delete com.weiwei.shiyin notesView）
+        // notesview list|mindmap：记录标签页切换成条列或心智图（design §42.5；写进共用设置，测完 defaults delete com.weiwei.shiyin notesView）
         case "notesview":
             UserDefaults.standard.set(args.count > 1 && args[1].lowercased() == "mindmap" ? "mindMap" : "list", forKey: AppSettings.notesViewKey)
-        case "tab":   // tab <summary|transcript|ask>；舊名稱 topics、review、notes 當別名（review 順便展開待確認、notes 展開我的筆記，design §33.1）
+        case "tab":   // tab <summary|transcript|ask>；旧名称 topics、review、notes 当别名（review 顺便展开待确认、notes 展开我的笔记，design §33.1）
             if let r = DetailTab.resolve(args[1]) {
                 model.tab = r.tab
                 if r.expandReview { model.reviewExpanded = true }
@@ -47,10 +48,10 @@ enum DebugControl {
         case "trash": if let id { model.moveToTrash(id) }
         case "restore": if let id { model.restore(id) }
         case "purge": if let id { model.deletePermanently(id) }
-        case "confirmpurge": model.confirmPurge = id   // 等於在垃圾桶按右鍵「永久刪除…」
+        case "confirmpurge": model.confirmPurge = id   // 等于在垃圾桶按右键「永久删除…」
         case "reviewexpand":
-            // reviewexpand <會議 id> <summary|decisions|actionItems|openQuestions|topic|custom> <位置> [第二個位置]：
-            // 等於點那一條紀錄旁的待確認標記（R41.2）；位置給 - 就收合。視窗不在目前的桌面時 press 按不到標記，用這個
+            // reviewexpand <会议 id> <summary|decisions|actionItems|openQuestions|topic|custom> <位置> [第二个位置]：
+            // 等于点那一条记录旁的待确认标记（R41.2）；位置给 - 就收合。窗口不在目前的桌面时 press 按不到标记，用这个
             model.selection = id
             let a = Int(args.count > 3 ? args[3] : "") ?? 0, b = Int(args.count > 4 ? args[4] : "") ?? 0
             let ref: NoteItemRef? = switch args[2] {
@@ -63,7 +64,7 @@ enum DebugControl {
             default: nil
             }
             model.reviewDraft?.expanded = ref
-        case "reviewsubmit":   // reviewsubmit <會議 id> [段落 位置 [第二個位置]]：等於按待確認分頁的「送出」；給了段落就是按那一條卡片的「送出」（只送那幾題）
+        case "reviewsubmit":   // reviewsubmit <会议 id> [段落 位置 [第二个位置]]：等于按待确认标签页的「送出」；给了段落就是按那一条卡片的「送出」（只送那几题）
             model.selection = id
             if args.count > 3 {
                 let a = Int(args[3]) ?? 0, b = Int(args.count > 4 ? args[4] : "") ?? 0
@@ -80,12 +81,12 @@ enum DebugControl {
             } else {
                 model.submitReviewDraft()
             }
-        case "reviewskipall":   // reviewskipall <會議 id>：等於按待確認分頁的「全部略過」（R41.5）
+        case "reviewskipall":   // reviewskipall <会议 id>：等于按待确认标签页的「全部略过」（R41.5）
             model.selection = id
             model.reviewDraft?.skipAllUnanswered(questionCount: model.detail?.notes?.reviewItems.count ?? 0,
                                                  speakers: model.detail.map { Array($0.speakerSuggestions.keys) } ?? [])
         case "review":
-            // review <id> <答案 JSON：{"0":"答案"}> <略過的題號，逗號分隔>
+            // review <id> <答案 JSON：{"0":"答案"}> <略过的题号，逗号分隔>
             model.selection = id
             let answers = (try? JSONDecoder().decode([String: String].self, from: Data(args[2].utf8))) ?? [:]
             let dismissed = Set(args[3].split(separator: ",").compactMap { Int($0) })
@@ -97,19 +98,19 @@ enum DebugControl {
             write(["segmentsChanged": result?.segmentsChanged ?? -1, "notesChanged": result?.notesChanged ?? false], to: args[5])
         case "segment": model.updateSegment(id ?? 0, text: args[2])
         case "speaker": model.selection = id; model.renameSpeaker(Int(args[2]) ?? 1, to: args[3])
-        // 聲紋（design §21.4）：notthis <會議 id> <說話者>（不是他）；people <輸出.json>；personrename <id> <名字>；
+        // 声纹（design §21.4）：notthis <会议 id> <说话者>（不是他）；people <输出.json>；personrename <id> <名字>；
         // persondelete <id>；peopledeleteall
         case "notthis": model.selection = id; model.rejectVoiceprintMatch(Int(args[2]) ?? 1)
-        // speakerreview <會議 id> <回答 JSON：{"說話者編號":"是"|"不是，名字"}> <略過的說話者，逐號分隔>：等於在待確認送出說話者的題目（R33.2）
+        // speakerreview <会议 id> <回答 JSON：{"说话者编号":"是"|"不是，名字"}> <略过的说话者，逐号分隔>：等于在待确认送出说话者的题目（R33.2）
         case "speakerreview":
             model.selection = id
             let answers = (try? JSONDecoder().decode([String: String].self, from: Data(args[2].utf8))) ?? [:]
             model.answerSpeakerQuestions(Dictionary(uniqueKeysWithValues: answers.compactMap { k, v in Int(k).map { ($0, v) } }),
                                          skipped: Set(args[3].split(separator: ",").compactMap { Int($0) }))
-        // 猜說話者（design §21.5）：namespeakers <會議 id>（排工作）；applysuggestion、dismisssuggestion <會議 id> <說話者>；
-        // applyallsuggestions <會議 id>
-        // 對會議提問（design §21.8）：ask <會議 id> <問題>；askall <all|folder|recent> <問題>；
-        // questions <會議 id|all> <輸出.json>；cancelask
+        // 猜说话者（design §21.5）：namespeakers <会议 id>（排工作）；applysuggestion、dismisssuggestion <会议 id> <说话者>；
+        // applyallsuggestions <会议 id>
+        // 对会议提问（design §21.8）：ask <会议 id> <问题>；askall <all|folder|recent> <问题>；
+        // questions <会议 id|all> <输出.json>；cancelask
         case "ask": model.selection = id; model.loadMeetingQuestions(id ?? 0); model.askMeeting(args[2])
         case "askall": model.loadAllQuestions(); model.askAll(args[2], scope: AskScope(rawValue: args[1]) ?? .all)
         case "questions":
@@ -118,7 +119,7 @@ enum DebugControl {
                                                                             "answer": (try? JSONSerialization.jsonObject(with: Data($0.answer.utf8))) ?? [:]] }],
                   to: args[2])
         case "cancelask": model.cancelAsk()
-        // 偵測會議（design §21.7）：meetingapp <bundleID> start|stop；meetingprompts <輸出.json>；meetingaction <按鈕>
+        // 检测会议（design §21.7）：meetingapp <bundleID> start|stop；meetingprompts <输出.json>；meetingaction <按钮>
         case "meetingapp": model.meetingDetector.simulated[args[1]] = args[2] == "start"
         case "meetingprompts":
             let current = MeetingPromptPanel.shared.current
@@ -131,25 +132,25 @@ enum DebugControl {
             write(["prompt": text, "actions": MeetingPromptPanel.shared.actions.keys.sorted(), "muted": MeetingDetector.muted,
                    "recording": model.recorder.isRecording], to: args[1])
         case "meetingaction": MeetingPromptPanel.shared.perform(args[1])
-        // reportinfo <輸出.json>：回報問題會附上的內容和網址（不打開瀏覽器、不動剪貼簿，design §21.9）
+        // reportinfo <输出.json>：反馈问题会附上的内容和网址（不打开浏览器、不动剪贴板，design §21.9）
         case "reportinfo":
             let text = ProblemReport.text(db: model.db)
             write(["text": text, "url": ProblemReport.url(body: text)?.absoluteString ?? "", "issuesURL": ProblemReport.issuesURL], to: args[1])
-        // rediarize <會議 id> <人數|auto>：等於在選人數的視窗按「開始」；rediarizerequest <會議 id>：等於按「更多 → 重新辨識說話者…」
+        // rediarize <会议 id> <人数|auto>：等于在选人数的窗口按「开始」；rediarizerequest <会议 id>：等于按「更多 → 重新识别说话者…」
         case "rediarize": if let id { model.rediarize(meetingId: id, minSpeakers: args[2] == "auto" ? nil : Int(args[2])) }
         case "rediarizerequest": model.selection = id; model.requestRediarize()
-        // 說話者的修正（design §24.6）：mergespeaker <會議 id> <來源> <目標>；reassign <會議 id> <說話者|new> <段落 id…>；undospeaker <會議 id>；
-        // speakerhint <會議 id> dismiss：等於按「不用了」
+        // 说话者的修正（design §24.6）：mergespeaker <会议 id> <来源> <目标>；reassign <会议 id> <说话者|new> <段落 id…>；undospeaker <会议 id>；
+        // speakerhint <会议 id> dismiss：等于按「不用了」
         case "mergespeaker": model.selection = id; model.mergeSpeaker(Int(args[2]) ?? 0, into: Int(args[3]) ?? 0)
         case "reassign":
             model.selection = id
             model.reassignSegments(args.dropFirst(3).compactMap { Int64($0) }, to: args[2] == "new" ? nil : Int(args[2]))
         case "undospeaker": model.selection = id; model.undoSpeakerEdit()
         case "speakerhint": model.selection = id; if args.count > 2, args[2] == "dismiss" { model.dismissSpeakerHint() }
-        case "minspeakers": model.selection = id; model.setMinSpeakers(args[2] == "auto" ? nil : Int(args[2]))   // 錄音中的「人數」選單（design §26.2）
+        case "minspeakers": model.selection = id; model.setMinSpeakers(args[2] == "auto" ? nil : Int(args[2]))   // 录音中的「人数」菜单（design §26.2）
         case "levelhint": if args.count > 1, args[1] == "dismiss" { model.recorder.dismissLevelHint() }   // 收音提醒按「知道了」
-        // 麥克風（design §38.7）：fakemic <名稱> <bluetooth 0|1> [內建麥克風的名稱]｜off：加假的麥克風（只在記憶體），
-        // 第一支當成系統預設；micswitch <uid|default>：等於在錄音畫面選一支；michint dismiss：藍牙提示按「知道了」
+        // 麦克风（design §38.7）：fakemic <名称> <bluetooth 0|1> [内置麦克风的名称]｜off：加假的麦克风（只在内存），
+        // 第一支当成系统默认；micswitch <uid|default>：等于在录音画面选一支；michint dismiss：蓝牙提示按「知道了」
         case "fakemic":
             let monitor = MicrophoneMonitor.shared
             if args.count < 3 || args[1] == "off" {
@@ -164,7 +165,7 @@ enum DebugControl {
             }
         case "micswitch": model.switchMicrophone(args[1] == "default" ? "" : args[1])
         case "michint": if args.count > 1, args[1] == "dismiss" { model.recorder.dismissMicHint() }
-        // textsize <−1～5|bigger|smaller|actual>：會議內容的文字大小（design §38.7；寫共用設定，測完 defaults delete contentTextSize）
+        // textsize <−1～5|bigger|smaller|actual>：会议内容的文字大小（design §38.7；写共用设置，测完 defaults delete contentTextSize）
         case "textsize":
             switch args[1] {
             case "bigger": TextSize.change(1)
@@ -187,8 +188,8 @@ enum DebugControl {
         case "language": model.selection = id; model.setMeetingLanguage(MeetingLanguage(rawValue: args[2]) ?? .zh)
         case "transcribe-eval": transcribeEval(audio: args[1], options: args[2], output: args[3])   // design §17.1
         case "dump-golden": GoldenDump.run(fixtures: args[1], output: args[2])   // design-windows §4.1
-        case "seedfixtures": GoldenDump.seed(fixtures: args[1], keys: Array(args.dropFirst(2)), into: model)   // 本地 MCP 的示範會議（design §44.6）
-        case "mcpsetup":   // mcpsetup claudecode|codex|desktop <輸出.json>：等於按設定頁的「加到…」（design §44.6）
+        case "seedfixtures": GoldenDump.seed(fixtures: args[1], keys: Array(args.dropFirst(2)), into: model)   // 本地 MCP 的示范会议（design §44.6）
+        case "mcpsetup":   // mcpsetup claudecode|codex|desktop <输出.json>：等于按设置页的「加到…」（design §44.6）
             let output = args.count > 2 ? args[2] : nil
             Task {
                 let r: MCPSetup.Outcome
@@ -199,11 +200,11 @@ enum DebugControl {
                 }
                 if let output { write(["ok": r.ok, "message": r.message], to: output) }
             }
-        case "mcpcopy":   // mcpcopy command|json：等於按設定頁「複製」選單的「複製 Claude Code 指令」「複製設定（JSON）」（design §44.6）
+        case "mcpcopy":   // mcpcopy command|json：等于按设置页「复制」菜单的「复制 Claude Code 命令」「复制设置（JSON）」（design §44.6）
             MCPSetup.copy(args.count > 1 && args[1] == "json" ? .configJSON : .claudeCodeCommand)
-        case "unquarantine":   // unquarantine <app 的路徑> <輸出.json>：對那個 bundle 跑拿掉隔離屬性（D150）
+        case "unquarantine":   // unquarantine <app 的路径> <输出.json>：对那个 bundle 跑拿掉隔离属性（D150）
             write(["removed": MCPSetup.removeQuarantine(in: URL(fileURLWithPath: args[1]))], to: args[2])
-        case "openlink":   // openlink <shiyin://open?…>：等於點了 AI 工具給的會議連結（design §44.5），不拉到前面
+        case "openlink":   // openlink <shiyin://open?…>：等于点了 AI 工具给的会议链接（design §44.5），不拉到前面
             if let url = URL(string: args[1]), let target = MeetingLink.parse(url) {
                 model.openMeetingLink(target.meetingId, seconds: target.seconds, activate: false)
             }
@@ -219,8 +220,8 @@ enum DebugControl {
                 default: model.revertCorrection(cid)
                 }
             }
-        // correctiongroups <會議 id> <輸出.json>：校正列「依詞處理」看到的組；
-        // correctiongroup <會議 id> accept|reject <第幾組>：等於按那一組的「接受 N 處」「忽略」（design §21.11）
+        // correctiongroups <会议 id> <输出.json>：校正列「依词处理」看到的组；
+        // correctiongroup <会议 id> accept|reject <第几组>：等于按那一组的「接受 N 处」「忽略」（design §21.11）
         case "correctiongroups":
             model.selection = id
             let groups = model.detail?.correctionGroups ?? []
@@ -233,28 +234,28 @@ enum DebugControl {
                 let ids = groups[index].compactMap(\.id)
                 args[2] == "accept" ? model.acceptCorrections(ids) : model.rejectCorrections(ids)
             }
-        case "corrections":  // corrections <會議 id> accept|reject：全部接受或全部忽略
+        case "corrections":  // corrections <会议 id> accept|reject：全部接受或全部忽略
             model.selection = id
             if args[2] == "accept" { model.acceptAllCorrections() } else { model.rejectAllCorrections() }
         case "editnotes":
-            // editnotes <id> <會議紀錄 JSON>
+            // editnotes <id> <会议记录 JSON>
             model.selection = id
             if let notes = try? JSONDecoder().decode(MeetingNotes.self, from: Data(args[2].utf8)) { model.saveEditedNotes(notes, meetingId: id ?? 0) }
         case "usernotes": model.selection = id; model.updateUserNotes(args[2])
-        // notestype <文字>：在畫面上的筆記輸入框（TextEditor 背後的 NSTextView）結尾打字，跟鍵盤打字走同一條路，
-        // 螢幕上鎖、視窗在別的桌面時也能用；notesvalue <輸出.json>：輸入框目前顯示的內容（design §20.4）
+        // notestype <文字>：在画面上的笔记输入框（TextEditor 背后的 NSTextView）结尾打字，跟键盘打字走同一条路，
+        // 屏幕上锁、窗口在别的桌面时也能用；notesvalue <输出.json>：输入框目前显示的内容（design §20.4）
         case "notestype":
             guard let textView = notesTextView() else { break }
             textView.setSelectedRange(NSRange(location: (textView.string as NSString).length, length: 0))
             textView.insertText(args[1], replacementRange: textView.selectedRange())
         case "notesvalue": write(["found": notesTextView() != nil, "text": notesTextView()?.string ?? ""], to: args[1])
-        // press <標籤> [第幾個，從 0 開始] [結果.json]：在 app 內走輔助使用的元件樹，按下標籤相符的按鈕。
-        // 跟從外面用 AX 按的是同一條路，螢幕上鎖、視窗在別的桌面時也能用
-        case "metrics":   // metrics <輸出.json> [reset]：效能計數（design §21.12）；加 reset 讀完歸零
+        // press <标签> [第几个，从 0 开始] [结果.json]：在 app 内走辅助功能的组件树，按下标签相符的按钮。
+        // 跟从外面用 AX 按的是同一条路，屏幕上锁、窗口在别的桌面时也能用
+        case "metrics":   // metrics <输出.json> [reset]：性能计数（design §21.12）；加 reset 读完归零
             write(DebugMetrics.snapshot, to: args[1])
             if args.count > 2 && args[2] == "reset" { DebugMetrics.reset() }
-        // 輸入框（design §21.15 驗證用，螢幕上鎖、視窗在別的桌面時也能用）：用提示文字找 SwiftUI TextField 背後的 NSTextField
-        // typefield <提示文字> <文字> [第幾個]：在結尾打字；fieldvalue <提示文字> <輸出.json> [第幾個]；submitfield <提示文字> [第幾個]：按 Return
+        // 输入框（design §21.15 验证用，屏幕上锁、窗口在别的桌面时也能用）：用提示文字找 SwiftUI TextField 背后的 NSTextField
+        // typefield <提示文字> <文字> [第几个]：在结尾打字；fieldvalue <提示文字> <输出.json> [第几个]；submitfield <提示文字> [第几个]：按 Return
         case "typefield":
             guard let field = textField(placeholder: args[1], index: args.count > 3 ? Int(args[3]) ?? 0 : 0) else { break }
             field.window?.makeFirstResponder(field)
@@ -269,11 +270,11 @@ enum DebugControl {
             guard let field = textField(placeholder: args[1], index: args.count > 2 ? Int(args[2]) ?? 0 : 0) else { break }
             field.window?.makeFirstResponder(field)
             field.currentEditor()?.insertNewline(nil)
-        case "editsegment": model.debugEditSegment = id   // editsegment <段落 id>：等於點那一段開始編輯
-        case "settingsaction": model.debugSettingsAction = Array(args.dropFirst())   // settingsaction pickmodel | savekey <key>（設定頁要開著）
-        // voiceprint-eval <設定.json> <輸出.json>：設定是 [{"file": 音檔, "name": 名稱}]；每個檔案跑說話者辨識，
-        // 輸出每位說話者的聲紋、說話秒數、說話的時段，用來跟 AMI 標註比對、決定門檻（design §21.4.1）
-        // 設定的每一項可以加 threshold、minSpeakers、numSpeakers（字串）換分群設定，比較分出幾個人；dump（路徑）倒出每個片段的聲紋
+        case "editsegment": model.debugEditSegment = id   // editsegment <段落 id>：等于点那一段开始编辑
+        case "settingsaction": model.debugSettingsAction = Array(args.dropFirst())   // settingsaction pickmodel | savekey <key>（设置页要开着）
+        // voiceprint-eval <设置.json> <输出.json>：设置是 [{"file": 音档, "name": 名称}]；每个文件跑说话者识别，
+        // 输出每位说话者的声纹、说话秒数、说话的时段，用来跟 AMI 标注比对、决定门槛（design §21.4.1）
+        // 设置的每一项可以加 threshold、minSpeakers、numSpeakers（字符串）换分群设置，比较分出几个人；dump（路径）倒出每个片段的声纹
         case "voiceprint-eval":
             let config = (try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: args[1])))) as? [[String: String]] ?? []
             let output = args[2]
@@ -292,10 +293,10 @@ enum DebugControl {
                             c.numSpeakers = item["numSpeakers"].flatMap(Int.init)
                             clustering = c
                         }
-                        // 短句的實驗：zeroVote（重新嵌入沒人認領的片段，最短秒數）、minSegment（算聲紋的最短秒數）、step（視窗步距比例）
+                        // 短句的实验：zeroVote（重新嵌入没人认领的片段，最短秒数）、minSegment（算声纹的最短秒数）、step（窗口步距比例）
                         var config: OfflineDiarizerConfig?
                         if item["zeroVote"] != nil || item["minSegment"] != nil || item["step"] != nil || item["legacy"] != nil {
-                            // legacy：改之前的設定（FluidAudio 的預設），跟現在比
+                            // legacy：改之前的设置（FluidAudio 的默认），跟现在比
                             var c = item["legacy"] != nil ? OfflineDiarizerConfig(clustering: clustering ?? .community, exposeChunkEmbeddings: true)
                                 : Diarizer.config(clustering: clustering ?? .community)
                             if let v = item["zeroVote"].flatMap(Double.init) { c.zeroVoteReembed = .init(enabled: true, minDurationSeconds: v) }
@@ -304,7 +305,7 @@ enum DebugControl {
                             config = c
                         }
                         let diarization = try await Diarizer.diarize(samples: samples, clustering: clustering, config: config) { _ in }
-                        // dump：<路徑>.f32 是每個片段的聲紋（256 個 Float32 一筆），<路徑>.json 是對應的群、片段、片段裡的說話者
+                        // dump：<路径>.f32 是每个片段的声纹（256 个 Float32 一笔），<路径>.json 是对应的群、片段、片段里的说话者
                         if let dump = item["dump"] {
                             var floats: [Float] = []
                             for chunk in diarization.chunks { floats += chunk.embedding256 }
@@ -330,14 +331,14 @@ enum DebugControl {
                     write(["done": results.count, "total": config.count, "results": results], to: output)
                 }
             }
-        case "windowsize":   // windowsize <寬> <高>：把主視窗的內容區設成這個大小（點）。官網截圖用（website.md §16）：視窗在別的桌面時 AX 改不了大小，screencapture -l 照樣截得到
+        case "windowsize":   // windowsize <宽> <高>：把主窗口的内容区设成这个大小（点）。官网截屏用（website.md §16）：窗口在别的桌面时 AX 改不了大小，screencapture -l 照样截得到
             if let w = Double(args[1]), let h = Double(args[2]),
                let window = NSApp.windows.first(where: { $0.isVisible && $0.identifier?.rawValue == "main" }) ?? NSApp.windows.first(where: { $0.isVisible && $0.frame.width > 400 }) {
                 window.setContentSize(NSSize(width: w, height: h))
             }
-        case "summon":   // summon：把拾音的視窗移到目前的桌面、放到最前面（真的畫面上用輔助使用測試時，視窗在別的桌面會按不到）
+        case "summon":   // summon：把拾音的窗口移到目前的桌面、放到最前面（真的画面上用辅助功能测试时，窗口在别的桌面会按不到）
             for window in NSApp.windows where window.isVisible && window.frame.width > 400 {
-                // preview 的視窗本來就在每個桌面：再加 moveToActiveSpace 會被 AppKit 丟例外、整個 app 當掉（2026-10-29）
+                // preview 的窗口本来就在每个桌面：再加 moveToActiveSpace 会被 AppKit 丢例外、整个 app 当掉（2026-10-29）
                 if window.collectionBehavior.contains(.canJoinAllSpaces) {
                     window.makeKeyAndOrderFront(nil)
                     continue
@@ -347,7 +348,7 @@ enum DebugControl {
                 window.collectionBehavior.remove(.moveToActiveSpace)
             }
             NSApp.activate()
-        case "livescroll":   // livescroll <0～1>：把錄音畫面的即時逐字稿捲到這個位置（0 是最上面），等於拖捲軸（design §25）
+        case "livescroll":   // livescroll <0～1>：把录音画面的实时逐字稿卷到这个位置（0 是最上面），等于拖滚动条（design §25）
             let fraction = CGFloat(Double(args[1]) ?? 0)
             func scrollViews(_ view: NSView) -> [NSScrollView] {
                 (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap(scrollViews)
@@ -362,7 +363,7 @@ enum DebugControl {
                     scroll.reflectScrolledClipView(scroll.contentView)
                 }
             }
-        case "axdump":   // axdump <輸出.txt>：倒出輔助使用的元件樹（角色、標籤），找 press 要用的標籤
+        case "axdump":   // axdump <输出.txt>：倒出辅助功能的组件树（角色、标签），找 press 要用的标签
             var lines: [String] = []
             func dump(_ element: NSAccessibilityProtocol, depth: Int) {
                 guard depth < 80 else { return }
@@ -378,8 +379,8 @@ enum DebugControl {
             let index = args.count > 2 ? Int(args[2]) ?? 0 : 0
             let pressed = matches.indices.contains(index) && matches[index].accessibilityPerformPress()
             if args.count > 3 { write(["found": matches.count, "pressed": pressed], to: args[3]) }
-        // clickat <x> <y> [視窗 id]：在視窗裡點一下（點，左上原點，含標題列；預設主視窗）。直接交給 NSWindow.sendEvent，
-        // 走 AppKit、SwiftUI 正常的點擊判斷，視窗在別的桌面（例如使用者在全螢幕的 app）也點得到，不碰使用者的滑鼠
+        // clickat <x> <y> [窗口 id]：在窗口里点一下（点，左上原点，含标题列；默认主窗口）。直接交给 NSWindow.sendEvent，
+        // 走 AppKit、SwiftUI 正常的点击判断，窗口在别的桌面（例如用户在全屏幕的 app）也点得到，不碰用户的鼠标
         case "clickat":
             let target = args.count > 3 ? args[3] : "main"
             guard let x = Double(args[1]), let y = Double(args[2]),
@@ -401,21 +402,21 @@ enum DebugControl {
             case "resume": model.recorder.resume()
             default: model.recorder.stop()
             }
-        case "importsheet": model.requestImport(args.dropFirst().map { URL(fileURLWithPath: $0) })   // 只打開匯入對話框
-        case "recordstall":   // recordstall <秒數|off> [聲道]：模擬錄音的音源停止送資料（design §20.2）
+        case "importsheet": model.requestImport(args.dropFirst().map { URL(fileURLWithPath: $0) })   // 只打开导入对话框
+        case "recordstall":   // recordstall <秒数|off> [声道]：模拟录音的音源停止送资料（design §20.2）
             model.recorder.simulateStall(channel: args.count > 2 ? Int(args[2]) ?? 0 : 0, seconds: args[1] == "off" ? nil : Double(args[1]) ?? 5)
-        case "recordinterrupt":   // recordinterrupt [聲道]：等於音源發現裝置變了，Recorder 會重新開始這個音源
+        case "recordinterrupt":   // recordinterrupt [声道]：等于音源发现设备变了，Recorder 会重新开始这个音源
             model.recorder.simulateInterruption(channel: args.count > 1 ? Int(args[1]) ?? 0 : 0)
-        case "recordlang":   // recordlang <語言代碼>：錄音中換會議語言（等於按「改回」；zh、en、ja、yue、ko…）
+        case "recordlang":   // recordlang <语言代码>：录音中换会议语言（等于按「改回」；zh、en、ja、yue、ko…）
             if let language = MeetingLanguage(rawValue: args[1]) { model.recorder.switchLanguage(to: language) }
         case "record-sim":
-            // record-sim <音檔> <倍速> <both: 1/0>
+            // record-sim <音档> <倍速> <both: 1/0>
             model.startSimulatedRecording(file: URL(fileURLWithPath: args[1]), speed: Double(args[2]) ?? 1, both: args.count > 3 && args[3] == "1")
         case "seek": model.player.seek(to: Double(args[1]) ?? 0, play: args.count > 2 && args[2] == "play")
         case "rate": model.player.setRate(Float(args[1]) ?? 1)
         case "toggle": model.player.toggle()
         case "export":
-            // export <項目> <格式> <路徑> [times 1/0] [speakers 1/0] [會議 id，預設目前選取的]
+            // export <项目> <格式> <路径> [times 1/0] [speakers 1/0] [会议 id，默认目前选中的]
             let item = ExportItem(rawValue: args[1]) ?? .notes
             let url = URL(fileURLWithPath: args[3])
             let meetingId = args.count > 6 ? Int64(args[6]) : model.selection
@@ -427,7 +428,7 @@ enum DebugControl {
                 }
                 catch { try? "ERROR \(error.localizedDescription)".write(to: url.appendingPathExtension("error"), atomically: true, encoding: .utf8) }
             }
-        case "import":   // import [lang=ja] [minSpeakers=6] <檔案>…（minSpeakers：匯入對話框的「大約幾個人」，design §26.2）
+        case "import":   // import [lang=ja] [minSpeakers=6] <文件>…（minSpeakers：导入对话框的「大约几个人」，design §26.2）
             var files = Array(args.dropFirst()), options = ImportOptions()
             while let first = files.first, first.hasPrefix("lang=") || first.hasPrefix("minSpeakers=") {
                 if first.hasPrefix("lang=") { options.language = MeetingLanguage(rawValue: String(first.dropFirst(5))) ?? .zh }
@@ -436,9 +437,9 @@ enum DebugControl {
             }
             model.requestImport(files.map { URL(fileURLWithPath: $0) })
             if model.showImportSheet { model.confirmImport(options) }
-        // 會議的參考文件（design §39.7）：adddoc <會議 id> <檔案>…（加到這場，同「加入文件…」選了這些檔）；
-        // drop <檔案>…（等於拖進主視窗：文件加到選取中的會議，其他照舊匯入）；removedoc <文件 id>；
-        // docread <檔案> <zh|en|ja> <輸出.json>（只讀出文字，不寫資料庫）；docbanner <會議 id> dismiss|resummarize（文件有變動的提示條）
+        // 会议的参考文档（design §39.7）：adddoc <会议 id> <文件>…（加到这场，同「加入文档…」选了这些档）；
+        // drop <文件>…（等于拖进主窗口：文档加到选中中的会议，其他照旧导入）；removedoc <文档 id>；
+        // docread <文件> <zh|en|ja> <输出.json>（只读出文字，不写数据库）；docbanner <会议 id> dismiss|resummarize（文档有变动的提示条）
         case "adddoc": if let id { model.addDocuments(args.dropFirst(2).map { URL(fileURLWithPath: $0) }, to: id) }
         case "drop": model.requestImport(args.dropFirst().map { URL(fileURLWithPath: $0) })
         case "removedoc":
@@ -463,24 +464,28 @@ enum DebugControl {
             else { model.copyNotes(args.count > 1 && args[1] == "plain" ? .plain : args.count > 1 && args[1] == "md" ? .markdown : .rich) }
         case "search": model.searchQuery = args.count > 1 ? args[1] : ""
         case "openhit": if let index = Int(args[1]), model.searchResults.indices.contains(index) { model.openSearchHit(model.searchResults[index]) }
-        case "model":   // model start|pause|delete [breeze|japanese|languageDetection|qwen]（qwen 是兩個檔一起）
+        case "model":   // model start|pause|delete [breeze|japanese|languageDetection|qwen]（qwen 是两个档一起）
             let which = ModelStore.Model(rawValue: args.count > 2 ? args[2] : "") ?? .breeze
             args[1] == "start" ? model.models.startAll(which) : args[1] == "pause" ? model.models.pauseAll(which) : model.models.deleteAll(which)
-        case "qwenchunks":   // qwenchunks <錄音> <輸出.json> [最長秒數] [any] [mixed]：先辨識說話者再照 §32.4 分段，倒出片段、切點、能量中位數（驗證分段規則）
+        case "qwenchunks":   // qwenchunks <录音> <输出.json> [最长秒数] [any] [mixed]：先识别说话者再照 §32.4 分段，倒出片段、切点、能量中位数（验证分段规则）
             qwenChunks(audio: args[1], output: args[2], maxSeconds: args.count > 3 ? Double(args[3]) ?? QwenEngine.maxChunkSeconds : QwenEngine.maxChunkSeconds,
                        anyChange: args.contains("any"), splitMixed: args.contains("mixed"))
-        case "s2tw":    // s2tw <輸入.txt> <輸出.txt>：簡體轉台灣繁體（design §32.5），驗證跟原型工具的結果相同
+        case "s2tw":    // s2tw <输入.txt> <输出.txt>：简体转台湾繁体（design §32.5），验证跟原型工具的结果相同
             if let text = try? String(contentsOfFile: args[1], encoding: .utf8) {
                 try? ChineseScript.toTaiwan(text).write(toFile: args[2], atomically: true, encoding: .utf8)
             }
+        case "t2s":    // t2s <输入.txt> <输出.txt>：繁体转大陆简体（design §45），验证跟 scripts/dev/t2s.py 的结果相同
+            if let text = try? String(contentsOfFile: args[1], encoding: .utf8) {
+                try? ChineseScript.toSimplified(text).write(toFile: args[2], atomically: true, encoding: .utf8)
+            }
         case "diarizer": model.models.prepareDiarizer()
-        case "modelurl":   // modelurl <模型> <網址>：改從別的網址下載；網址給 - 就改回原本的
+        case "modelurl":   // modelurl <模型> <网址>：改从别的网址下载；网址给 - 就改回原本的
             if let which = ModelStore.Model(rawValue: args[1]) { model.models.debugURLs[which] = args[2] == "-" ? nil : URL(string: args[2]) }
-        case "llmurl":     // llmurl <anthropic|openai|gemini|openaiCompatible> <網址>：API 改送到本機的假伺服器；網址給 - 就改回原本的
+        case "llmurl":     // llmurl <anthropic|openai|gemini|openaiCompatible> <网址>：API 改送到本机的假服务器；网址给 - 就改回原本的
             if let provider = LLMProvider(rawValue: args[1]) { LLMClient.debugBaseURLs[provider] = args[2] == "-" ? nil : args[2] }
         case "enterprise":
-            // 企業伺服器（design §36.7）：login <網址> <信箱> <輸出.json>（伺服器開發用的登入，不經過瀏覽器）、logout、expire（access token 立刻過期）、
-            // local <會議 id>（等於按「改在這台電腦轉錄」）。登入會寫進共用的設定（網址、帳號），測完用 defaults delete 清掉
+            // 企业服务器（design §36.7）：login <网址> <邮箱> <输出.json>（服务器开发用的登录，不经过浏览器）、logout、expire（access token 立刻过期）、
+            // local <会议 id>（等于按「改在这台电脑转录」）。登录会写进共用的设置（网址、账号），测完用 defaults delete 清掉
             switch args[1] {
             case "login":
                 let output = args[4]
@@ -495,11 +500,11 @@ enum DebugControl {
                 }
             case "logout": Task { await EnterpriseServer.shared.signOut(); model.refreshEnvironment() }
             case "expire": EnterpriseServer.shared.debugExpireAccess()
-            case "glossary": Task { await EnterpriseServer.shared.refreshGlossary() }   // 重新拿公司詞彙表（R53）
-            case "join":   // join <shiyin://join?server=…>：等於點了加入連結（會跳出確認，出現在使用者畫面上）
+            case "glossary": Task { await EnterpriseServer.shared.refreshGlossary() }   // 重新拿公司词汇表（R53）
+            case "join":   // join <shiyin://join?server=…>：等于点了加入链接（会跳出确认，出现在用户画面上）
                 if let url = URL(string: args[2]) { Task { await EnterpriseJoin.handle(url) } }
             case "local": model.runner.transcribeLocally(meetingId: Int64(args[2]) ?? -1)
-            case "info":   // info <網址> <輸出.json>：只讀伺服器的 /api/v1/info、寫出解析結果，不改帳號和設定（本地 MCP 的 mcp 欄位，design §44.6）
+            case "info":   // info <网址> <输出.json>：只读服务器的 /api/v1/info、写出解析结果，不改账号和设置（本地 MCP 的 mcp 字段，design §44.6）
                 let output = args[3]
                 Task {
                     guard let url = EnterpriseServer.normalized(args[2]) else { write(["ok": false, "error": "bad url"], to: output); return }
@@ -512,20 +517,20 @@ enum DebugControl {
                 }
             default: break
             }
-        case "llmkey":   // llmkey <account> <key>：只放記憶體
+        case "llmkey":   // llmkey <account> <key>：只放内存
             Keychain.debugKeys[args[1]] = args[2] == "-" ? nil : args[2]
             Keychain.debugForget(args[1])
-            Keychain.generation += 1   // 等於存了新的 key：解除暫停（design §34.4）
+            Keychain.generation += 1   // 等于存了新的 key：解除暂停（design §34.4）
             model.refreshSummarizerProblem()
-        case "keychainsim":   // keychainsim <account> denied|duplicate|-：模擬鑰匙圈回「拒絕」「已經有舊的」（design §22.1）
+        case "keychainsim":   // keychainsim <account> denied|duplicate|-：模拟钥匙串回「拒绝」「已经有旧的」（design §22.1）
             Keychain.debugSimulated[args[1]] = args[2] == "-" ? nil : args[2]
             Keychain.debugForget(args[1])
-        case "keychainreads": write(["reads": Keychain.debugReads], to: args[1])   // keychainreads <輸出.json>：查鑰匙圈的次數
-        case "llmprovider":   // llmprovider <整理工具> [模型]：只放記憶體，不改共用的設定；給 - 改回設定
+        case "keychainreads": write(["reads": Keychain.debugReads], to: args[1])   // keychainreads <输出.json>：查钥匙串的次数
+        case "llmprovider":   // llmprovider <整理工具> [模型]：只放内存，不改共用的设置；给 - 改回设置
             AppSettings.debugProvider = args[1] == "-" ? nil : LLMProvider(rawValue: args[1])
             AppSettings.debugModel = args.count > 2 ? args[2] : nil
             model.refreshSummarizerProblem()
-        case "summarizer":   // summarizer <輸出.json>：整理工具準備好了沒、登入快取、暫停（design §34.6）
+        case "summarizer":   // summarizer <输出.json>：整理工具准备好了没、登录缓存、暂停（design §34.6）
             let problem = AppSettings.summarizerProblem
             write(["provider": AppSettings.provider.rawValue,
                    "ready": problem == nil,
@@ -535,24 +540,24 @@ enum DebugControl {
                    "shown": model.summarizerProblem.map { String(describing: $0) } ?? "",
                    "loggedIn": ["claude": CLILoginCache.loggedIn(.claude).map { $0 ? "yes" : "no" } ?? "unknown",
                                 "codex": CLILoginCache.loggedIn(.codex).map { $0 ? "yes" : "no" } ?? "unknown"]], to: args[1])
-        case "loginrefresh":   // loginrefresh：重新查 claude、codex 的登入狀態
+        case "loginrefresh":   // loginrefresh：重新查 claude、codex 的登录状态
             Task {
                 await CLILogin.refresh(.claude)
                 await CLILogin.refresh(.codex)
             }
-        case "listmodels":  // listmodels <整理工具> <結果.json>：設定頁「選擇」用的模型清單
+        case "listmodels":  // listmodels <整理工具> <结果.json>：设置页「选择」用的模型清单
             if let provider = LLMProvider(rawValue: args[1]) {
                 Task { write(["models": await LLMClient.listModels(provider)], to: args[2]) }
             }
         case "refreshmodels": model.refreshEnvironment()
         case "verifymodel":
-            // verifymodel <檔案> <結果.json>：用下載完成時同一個函式驗證 SHA-256
+            // verifymodel <文件> <结果.json>：用下载完成时同一个函数验证 SHA-256
             let ok = (try? ModelStore.verify(URL(fileURLWithPath: args[1]))) ?? false
             write(["valid": ok], to: args[2])
         case "state": write(state(), to: args[1])
         case "snapshot": snapshot(to: args[1], scheme: args.count > 2 ? args[2] : "light", target: args.count > 3 ? args[3] : "detail")
         case "filter": model.filter = args.count > 1 ? args[1] : ""
-        // 資料夾（R9.2）：名稱用「-」表示空的
+        // 文件夹（R9.2）：名称用「-」表示空的
         case "folder": if let id { model.moveToFolder(id, folder: args[2] == "-" ? "" : args[2]) }
         case "folderfilter": model.folderFilter = args.count > 1 && args[1] != "-" ? args[1] : nil
         case "renamefolder": model.renameFolder(args[1], to: args[2])
@@ -563,29 +568,29 @@ enum DebugControl {
         case "installupdate":
             if case .available(let manifest) = model.updater.state { Task { await model.updater.install(manifest, model: model) } }
         case "dismissupdate": model.updater.prompt = nil
-        // 匿名使用統計（design §30.7）：DEBUG 版只在這裡設了網址才累計、送出
-        case "usageurl":   // usageurl <網址|off>：只在記憶體設統計網址
+        // 匿名使用统计（design §30.7）：DEBUG 版只在这里设了网址才累计、送出
+        case "usageurl":   // usageurl <网址|off>：只在内存设统计网址
             UsageStats.debugURL = args.count > 1 && args[1] != "off" ? args[1] : nil
             UsageStats.shared.touch()
-        case "usage": write(UsageStats.shared.debugSnapshot(), to: args[1])   // usage <輸出.json>：目前的檔案和下一份要送的
-        case "usageage": UsageStats.shared.debugAge(days: Int(args[1]) ?? 1)   // usageage <天數>：把今天的匯總改成幾天前
+        case "usage": write(UsageStats.shared.debugSnapshot(), to: args[1])   // usage <输出.json>：目前的文件和下一份要送的
+        case "usageage": UsageStats.shared.debugAge(days: Int(args[1]) ?? 1)   // usageage <天数>：把今天的汇总改成几天前
         case "usagesend": Task { await UsageStats.shared.sendPending() }
-        // 全域快捷鍵（R11.3）：不能送按鍵，用這個模擬按下
-        case "hotkey":   // hotkey [bookmark]：模擬按下 ⌃⌥⌘R（或 ⌃⌥⌘B）
+        // 全域快捷键（R11.3）：不能送按键，用这个模拟按下
+        case "hotkey":   // hotkey [bookmark]：模拟按下 ⌃⌥⌘R（或 ⌃⌥⌘B）
             if args.count > 1 && args[1] == "bookmark" { GlobalHotKey.shared.fireBookmark() } else { GlobalHotKey.shared.fire() }
         case "hotkeyenable": GlobalHotKey.shared.setEnabled(args[1] == "1")
-        // 點通知後的動作（系統的點擊沒辦法模擬，直接呼叫同一個處理函式）
+        // 点通知后的动作（系统的点击没办法模拟，直接调用同一个处理函数）
         case "opennotification": if let id { model.notifier.onOpen?(id) }
         case "exportsheet": if args.count < 2 || args[1] == "1" { model.openExportSheet() } else { model.showExportSheet = false }
-        // quit：照正常流程結束拾音（錄音中、有工作時等於在確認對話框按「結束」）
+        // quit：照正常流程结束拾音（录音中、有工作时等于在确认对话框按「结束」）
         case "quit":
             confirmQuit = true
             NSApp.terminate(nil)
-        // benchsave <會議 id> <段數> <輸出.json>：存一份假的逐字稿，量 saveTranscript 花多久（design §20.11）
+        // benchsave <会议 id> <段数> <输出.json>：存一份假的逐字稿，量 saveTranscript 花多久（design §20.11）
         case "benchsave":
             guard let meetingId = id, let count = Int(args[2]) else { return }
             let segments = (0..<count).map { i in
-                Segment(meetingId: meetingId, seq: i, start: Double(i), end: Double(i + 1), text: "測試段落 \(i) Kubernetes 部署",
+                Segment(meetingId: meetingId, seq: i, start: Double(i), end: Double(i + 1), text: "测试段落 \(i) Kubernetes 部署",
                         lowConfidence: false, speaker: nil, kind: "final")
             }
             let start = Date()
@@ -595,7 +600,7 @@ enum DebugControl {
             } catch {
                 write(["error": "\(error)"], to: args[3])
             }
-        // epipe <輸出.json>：子程序沒讀完輸入就結束（design §20.1）。拾音不能被 SIGPIPE 結束
+        // epipe <输出.json>：子程序没读完输入就结束（design §20.1）。拾音不能被 SIGPIPE 结束
         case "epipe":
             let path = args[1]
             var current = sigaction()
@@ -609,7 +614,7 @@ enum DebugControl {
                     write(["error": error.localizedDescription, "survived": true, "sigpipeIgnored": ignored], to: path)
                 }
             }
-        // 麥克風權限被拒時的提醒（R1.8）：真的拒絕要使用者操作，這裡只看畫面
+        // 麦克风权限被拒时的提醒（R1.8）：真的拒绝要用户操作，这里只看画面
         case "permdenied": model.recorder.permissionDenied = args.count < 2 || args[1] == "1"
         case "info": model.selection = id; model.updateInfo(title: args[2], date: args[3], participants: args[4])
         case "closewindow":
@@ -619,18 +624,18 @@ enum DebugControl {
         case "setkey": try? Keychain.set(args[1], args[2])          // setkey anthropic|openai <key>
         case "delkey": Keychain.delete(args[1])
         case "settings": NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        case "preview":   // preview <settings|onboarding [步驟]|import|rename> [front]（import：匯入對話框；rename：說話者的改名小視窗，design §26.2、§24.2）
-            // 設定視窗要 app 在前景才打得開；這裡把畫面放進桌面層的無邊框視窗（被所有視窗蓋住；
-            // 螢幕外的視窗截不到），不搶前景，再用 screencapture -l 截（closewindow <settings|onboarding>-preview 關掉）。
-            // preview detail：目前選取的會議頁（量長會議的效能用，design §21.12：不在畫面上的視窗 SwiftUI 不更新）
+        case "preview":   // preview <settings|onboarding [步骤]|import|rename> [front]（import：导入对话框；rename：说话者的改名小窗口，design §26.2、§24.2）
+            // 设置窗口要 app 在前景才打得开；这里把画面放进桌面层的无边框窗口（被所有窗口盖住；
+            // 屏幕外的窗口截不到），不抢前景，再用 screencapture -l 截（closewindow <settings|onboarding>-preview 关掉）。
+            // preview detail：目前选中的会议页（量长会议的性能用，design §21.12：不在画面上的窗口 SwiftUI 不更新）
             let onboarding = args.count > 1 && args[1] == "onboarding"
             let detailPage = args.count > 1 && args[1] == "detail"
-            // preview settings <分頁編號>：預覽視窗一開始停在那個分頁（0 整理工具 … 4 錄音、5 模型與儲存空間）
+            // preview settings <标签页编号>：预览窗口一开始停在那个标签页（0 整理工具 … 4 录音、5 模型与保存空间）
             SettingsView.previewTab = args.count > 2 && args[1] == "settings" ? Int(args[2]) ?? 0 : 0
             let size = detailPage ? NSSize(width: 1100, height: 760) : NSSize(width: 640, height: 560)
             let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless],
                                   backing: .buffered, defer: false)
-            // 加 front：放在一般視窗層（會出現在使用者畫面上），輔助使用才看得到、按得到裡面的按鈕
+            // 加 front：放在一般窗口层（会出现在用户画面上），辅助功能才看得到、按得到里面的按钮
             let front = args.contains("front")
             window.level = front ? .normal : NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)))
             window.collectionBehavior = front ? [.canJoinAllSpaces] : [.canJoinAllSpaces, .stationary]
@@ -641,8 +646,8 @@ enum DebugControl {
                 window.identifier = NSUserInterfaceItemIdentifier("\(args[1])-preview")
                 window.title = window.identifier!.rawValue
                 let view = args[1] == "import"
-                    ? AnyView(ImportSheet(urls: [URL(fileURLWithPath: "/tmp/週會 0827.m4a")]).environment(model))   // l10n-skip
-                    : AnyView(RenameSpeakerForm(name: .constant("說話者 2"), mergeTargets: [(1, "小明"), (3, "說話者 3")],   // l10n-skip
+                    ? AnyView(ImportSheet(urls: [URL(fileURLWithPath: "/tmp/周会 0827.m4a")]).environment(model))   // l10n-skip
+                    : AnyView(RenameSpeakerForm(name: .constant("说话者 2"), mergeTargets: [(1, "小明"), (3, "说话者 3")],   // l10n-skip
                                                 onMerge: { _ in }, onSave: {}))
                 window.contentView = NSHostingView(rootView: view.background(Color(nsColor: .windowBackgroundColor)))
                 window.setContentSize(window.contentView!.fittingSize)
@@ -663,21 +668,77 @@ enum DebugControl {
         }
     }
 
+    /// coach prepare <title> <preparation.json> <result.json> | start <id> | append <id> <seconds> <text>
+    /// coach analyze|stop|open|show <id> [output.json] | mark <id> <question UUID> <pending|asked|ignored>
+    private static func coachCommand(_ args: [String]) {
+        let model = AppModel.shared
+        guard let command = args.first else { return }
+        let id = args.count > 1 ? Int64(args[1]) : nil
+        do {
+            switch command {
+            case "prepare" where args.count >= 4:
+                let value = try JSONDecoder().decode(MeetingPreparation.self, from: Data(contentsOf: URL(fileURLWithPath: args[2])))
+                let mid = model.saveMeetingPreparation(id: nil, title: args[1], preparation: value)
+                write(["id": mid ?? -1, "error": model.errorMessage ?? ""], to: args[3])
+            case "start":
+                guard let id, var meeting = try model.db.meeting(id) else { return }
+                meeting.source = "recording"
+                try model.db.updateMeeting(meeting)
+                model.coach.begin(id)
+                model.coach.debugRecording = true
+            case "pause": model.coach.debugRecording = false
+            case "resume": model.coach.debugRecording = true
+            case "append" where args.count >= 4:
+                guard let id else { return }
+                let start = Double(args[2]) ?? 0
+                try model.db.appendLiveSegment(id, start: start, end: start + 5, text: args[3])
+            case "analyze": if let id { model.coach.analyze(id) }
+            case "stop": model.coach.stop()
+            case "finish":
+                model.coach.stop()
+                if let id, var meeting = try model.db.meeting(id) {
+                    meeting.source = "transcript"
+                    try model.db.updateMeeting(meeting)
+                    try model.db.pool.write { db in
+                        try db.execute(sql: "UPDATE segments SET kind = 'final' WHERE meeting_id = ? AND kind = 'live'", arguments: [id])
+                    }
+                    model.reload()
+                }
+            case "mark" where args.count >= 4:
+                if let id, let status = CoachQuestion.Status(rawValue: args[3]) { model.markCoachQuestion(id, question: args[2], status: status) }
+            case "enabled" where args.count >= 3:
+                if let id { model.setCoachEnabled(id, enabled: args[2] == "1") }
+            case "show" where args.count >= 3:
+                guard let id else { return }
+                let state = try model.db.assistance(id)
+                let data = try JSONEncoder().encode(state)
+                write(["state": try JSONSerialization.jsonObject(with: data), "busy": model.coach.busy,
+                       "message": model.coach.message, "active": model.coach.meetingId ?? -1,
+                       "reference": state?.notesReference ?? ""], to: args[2])
+            case "open":
+                if let id { model.selection = id; model.tab = .ask }
+                else { model.openPreparation() }
+            case "failrecording": if let id { try model.preservePreparationOrDelete(id); model.reload() }
+            default: break
+            }
+        } catch { model.errorMessage = error.localizedDescription }
+    }
+
     private static func state() -> [String: Any] {
         let model = AppModel.shared
         var out: [String: Any] = [
             "selection": model.selection ?? -1,
             "tab": model.tab.rawValue, "reviewExpanded": model.reviewExpanded, "userNotesExpanded": model.userNotesExpanded,
             "notesView": UserDefaults.standard.string(forKey: AppSettings.notesViewKey) ?? "list",
-            // 本地 MCP（design §44.6）：開關、啟動檔
+            // 本地 MCP（design §44.6）：开关、启动档
             "mcp": ["enabled": AppSettings.mcpEnabled, "launcher": MCPSetup.launcherURL.path,
                     "launcherExists": FileManager.default.fileExists(atPath: MCPSetup.launcherURL.path)] as [String: Any],
-            // 播放條上的議題帶（design §43.3）：選取中的會議，長度同播放條
+            // 播放条上的议题带（design §43.3）：选中中的会议，长度同播放条
             "topicRanges": model.detail.flatMap { d in
                 d.notes.map { MindMap.topicRanges(notes: $0, duration: max(model.player.duration, Double(d.meeting.durationSeconds ?? 0)),
                                                   untitled: MindMap.topicLabel(.interface)) }
             }.map { $0.map { ["branch": $0.branch, "title": $0.title, "start": $0.start, "end": $0.end] } } ?? [],
-            // 會議的參考文件（design §39.7）：選取中的會議
+            // 会议的参考文档（design §39.7）：选中中的会议
             "documents": (model.detail?.documents ?? []).map { d -> [String: Any] in
                 let use = model.detail?.documentUse[d.id ?? 0]
                 return ["id": d.id ?? 0, "name": d.name, "kind": d.kind, "file": d.file, "pages": d.pageTexts.count, "ocr": d.ocr,
@@ -686,7 +747,7 @@ enum DebugControl {
             },
             "readingDocuments": Dictionary(uniqueKeysWithValues: model.readingDocuments.map { (String($0.key), $0.value) }),
             "documentsChanged": model.documentsChanged.sorted(),
-            // 選中的會議：說話者的名字、來源、建議、最像的幾位認識的人（R33，「自動」名字的選單）
+            // 选中的会议：说话者的名字、来源、建议、最像的几位认识的人（R33，「自动」名字的菜单）
             "speakers": (model.detail?.speakers ?? [:]).keys.sorted().map { idx -> [String: Any] in
                 ["idx": idx, "name": model.detail?.speakers[idx] ?? "", "source": model.detail?.speakerSources[idx] ?? "",
                  "suggestion": model.detail?.speakerSuggestions[idx]?.name ?? "", "candidates": model.detail?.speakerCandidates[idx] ?? []]
@@ -706,13 +767,13 @@ enum DebugControl {
                 ["lane": lane.rawValue, "job": r.job.id ?? 0, "kind": r.job.kind.rawValue, "stage": r.stage, "progress": r.progress ?? -1,
                  "remaining": r.remaining ?? -1, "server": r.server.map { ["text": $0.text, "waiting": $0.waiting] } as Any] },
             "enterprise": EnterpriseServer.shared.debugState,
-            // 找到的 claude、codex：使用者自己裝的，或桌面版附的（design §37.4）
+            // 找到的 claude、codex：用户自己装的，或桌面版附的（design §37.4）
             "tools": ["claude": Paths.locateTool("claude").map { ["path": $0.url.path, "desktopApp": $0.desktopApp ?? ""] } as Any,
                       "codex": Paths.locateTool("codex").map { ["path": $0.url.path, "desktopApp": $0.desktopApp ?? "",
                                                                 "extraPath": $0.extraPath] } as Any,
                       "claudeDesktop": DesktopApps.hasClaude],
             "transcriptionEngine": AppSettings.transcriptionEngine,
-            "textSize": TextSize.level,   // 會議內容的文字大小（design §38.5）
+            "textSize": TextSize.level,   // 会议内容的文字大小（design §38.5）
             "player": ["loaded": model.player.isLoaded, "playing": model.player.isPlaying,
                        "time": model.player.currentTime, "duration": model.player.duration, "rate": model.player.rate],
             "recorder": ["recording": model.recorder.isRecording, "paused": model.recorder.isPaused,
@@ -721,11 +782,11 @@ enum DebugControl {
                          "liveLines": model.recorder.liveLines.count, "volatile": model.recorder.volatileText,
                          "liveStatus": model.recorder.liveStatus, "permissionDenied": model.recorder.permissionDenied,
                          "levelCheck": model.recorder.levelCheck,   // 收音提醒（design §26.1）
-                         "idle": model.recorder.idleInfo,   // 忘了停止錄音（design §35）
+                         "idle": model.recorder.idleInfo,   // 忘了停止录音（design §35）
                          "failure": model.recorder.failureMessage ?? "", "language": model.recorder.language.rawValue,
                          "languageSwitch": model.recorder.languageSwitch.map { "\($0.from.rawValue)→\($0.to.rawValue)" } ?? "",
                          "deviceWarning": model.recorder.deviceWarning ?? "",
-                         // 麥克風（design §38.7）
+                         // 麦克风（design §38.7）
                          "micDevice": model.recorder.micDevice.map { ["name": $0.name, "uid": $0.uid, "bluetooth": $0.isBluetooth] } as Any,
                          "micHint": model.recorder.micHint.map { ["text": $0.text, "builtIn": $0.builtIn?.name ?? ""] } as Any],
             "microphones": ["inputs": MicrophoneMonitor.shared.inputs.map { ["name": $0.name, "uid": $0.uid, "bluetooth": $0.isBluetooth,
@@ -751,7 +812,7 @@ enum DebugControl {
             "highlightSegment": model.highlightSegment ?? -1,
             "errorMessage": model.errorMessage ?? "",
             "noticeMessage": model.noticeMessage ?? "",
-            // 視窗的最小尺寸（SwiftUI 依內容算的）：錄音中卡住的調查用
+            // 窗口的最小尺寸（SwiftUI 依内容算的）：录音中卡住的调查用
             "windows": NSApp.windows.map { ["id": $0.identifier?.rawValue ?? "", "title": $0.title, "visible": $0.isVisible,
                                             "minWidth": $0.contentMinSize.width, "minHeight": $0.contentMinSize.height,
                                             "minSizeW": $0.minSize.width, "minSizeH": $0.minSize.height,
@@ -771,7 +832,7 @@ enum DebugControl {
         return out
     }
 
-    /// 提示文字是 placeholder 的輸入框（依畫面上的順序）
+    /// 提示文字是 placeholder 的输入框（依画面上的顺序）
     private static func textField(placeholder: String, index: Int) -> NSTextField? {
         var found: [NSTextField] = []
         func walk(_ view: NSView) {
@@ -785,7 +846,7 @@ enum DebugControl {
         return found.indices.contains(index) ? found[index] : nil
     }
 
-    /// 所有看得到的視窗裡，標籤或標題等於 label 的按鈕（依元件樹的順序）
+    /// 所有看得到的窗口里，标签或标题等于 label 的按钮（依组件树的顺序）
     private static func accessibilityButtons(label: String) -> [NSAccessibilityProtocol] {
         var found: [NSAccessibilityProtocol] = []
         func walk(_ element: NSAccessibilityProtocol, depth: Int) {
@@ -802,7 +863,7 @@ enum DebugControl {
         return found
     }
 
-    /// 主視窗裡可以編輯的 NSTextView（筆記分頁、錄音畫面的筆記輸入框）
+    /// 主窗口里可以编辑的 NSTextView（笔记标签页、录音画面的笔记输入框）
     private static func notesTextView() -> NSTextView? {
         func find(_ view: NSView) -> NSTextView? {
             if let textView = view as? NSTextView, textView.isEditable, !textView.isFieldEditor { return textView }
@@ -817,9 +878,9 @@ enum DebugControl {
         try? data.write(to: URL(fileURLWithPath: path))
     }
 
-    /// correct-eval <transcribe-eval 的輸出.json> <設定.json> <輸出.json>：用目前的整理工具跑逐字稿校正，
-    /// 輸出「全部接受」之後的逐字稿和所有建議（design §17.4），格式跟 transcribe-eval 一樣，可以直接評分。
-    /// 設定：{"language": "zh", "glossary": [...], "title": "…", "participants": [...]}
+    /// correct-eval <transcribe-eval 的输出.json> <设置.json> <输出.json>：用目前的整理工具跑逐字稿校正，
+    /// 输出「全部接受」之后的逐字稿和所有建议（design §17.4），格式跟 transcribe-eval 一样，可以直接评分。
+    /// 设置：{"language": "zh", "glossary": [...], "title": "…", "participants": [...]}
     private static func correctEval(input: String, options: String, output: String) {
         Task { @MainActor in
             let started = Date()
@@ -860,8 +921,8 @@ enum DebugControl {
         }
     }
 
-    /// segment-embed <錄音> <時段.json：[[開始, 結束], …]> <輸出.json>：每一段帶著前後文（10 秒的窗、遮罩只標這一段）
-    /// 用 FluidAudio 的 wespeaker_v2 算聲紋，給短句的實驗離線比對（design §6.3.2）。模型放在快取資料夾，不放進拾音的模型資料夾
+    /// segment-embed <录音> <时段.json：[[开始, 结束], …]> <输出.json>：每一段带着前后文（10 秒的窗、遮罩只标这一段）
+    /// 用 FluidAudio 的 wespeaker_v2 算声纹，给短句的实验离线比对（design §6.3.2）。模型放在缓存文件夹，不放进拾音的模型文件夹
     private static func segmentEmbed(audio: String, spans: String, output: String, batched: Int? = nil) {
         Task { @MainActor in
             let started = Date()
@@ -910,8 +971,8 @@ enum DebugControl {
         }
     }
 
-    /// transcribe-eval <錄音> <設定.json> <輸出.json>：用跟 app 一樣的轉錄流程跑一次，不建立會議、不寫資料庫（design §17.1）。
-    /// 輸出寫完才出現（先寫暫存檔再改名），評估腳本等這個檔案出現就能讀
+    /// transcribe-eval <录音> <设置.json> <输出.json>：用跟 app 一样的转录流程跑一次，不创建会议、不写数据库（design §17.1）。
+    /// 输出写完才出现（先写暂存档再改名），评估脚本等这个文件出现就能读
     private static func transcribeEval(audio: String, options: String, output: String) {
         Task { @MainActor in
             let started = Date()
@@ -920,7 +981,7 @@ enum DebugControl {
             do {
                 let options = try JSONDecoder().decode(TranscriptionOptions.self, from: Data(contentsOf: URL(fileURLWithPath: options)))
                 result["options"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(options))
-                result["whisperDefaults"] = WhisperEngine.defaultParameters()   // whisper.cpp 的預設值（實驗時對照用，design §17.1）
+                result["whisperDefaults"] = WhisperEngine.defaultParameters()   // whisper.cpp 的默认值（实验时对照用，design §17.1）
                 var pipeline = TranscriptionPipeline(options: options)
                 pipeline.stage = { meter.set(stage: $0) }
                 if let run = try await pipeline.run(URL(fileURLWithPath: audio)) {
@@ -961,7 +1022,7 @@ enum DebugControl {
         }
     }
 
-    /// detect-eval <音檔> <開始秒數> <輸出.json>：從開始秒數起，跟錄音時一樣收集 10 秒有聲音的片段做語言偵測（design §18.8）
+    /// detect-eval <音档> <开始秒数> <输出.json>：从开始秒数起，跟录音时一样收集 10 秒有声音的片段做语言检测（design §18.8）
     private static func detectEval(audio: String, start: Double, output: String) {
         Task { @MainActor in
             var result: [String: Any] = ["audio": audio, "start": start]
@@ -991,7 +1052,7 @@ enum DebugControl {
 
     private final class DetectBox: @unchecked Sendable { var samples: [Float]? }
 
-    /// 螢幕鎖定時沒辦法截視窗，改用 ImageRenderer 把畫面畫成圖片（AppKit 元件會變成黃色佔位框）
+    /// 屏幕锁定时没办法截窗口，改用 ImageRenderer 把画面画成图片（AppKit 组件会变成黄色占位框）
     private static func snapshot(to path: String, scheme: String, target: String) {
         let model = AppModel.shared
         let content: AnyView
@@ -1003,7 +1064,7 @@ enum DebugControl {
         case "setup":
             content = AnyView(OnboardingView())
         case "import":
-            content = AnyView(ImportSheet(urls: [URL(fileURLWithPath: "/tmp/週會 0827.m4a")]))
+            content = AnyView(ImportSheet(urls: [URL(fileURLWithPath: "/tmp/周会 0827.m4a")]))
         case "onboarding":
             content = AnyView(OnboardingView())
         case "export":
@@ -1013,17 +1074,23 @@ enum DebugControl {
         case "recording":
             guard let detail = model.detail else { return }
             content = AnyView(RecordingPanel(detail: detail).frame(width: 900, height: 520))
+        case "coach":
+            guard let detail = model.detail else { return }
+            content = AnyView(MeetingAssistancePanel(meeting: detail.meeting, recording: false).padding(20).frame(width: 620))
+        case "prepared":
+            guard let detail = model.detail else { return }
+            content = AnyView(PreparedMeetingView(meeting: detail.meeting).frame(width: 900))
         case "replace":
             content = AnyView(ReplaceSheet(initialFind: "Lumeo"))
         case "folders":
-            // 側欄的資料夾區塊（List 畫不出來，用同樣的列重組）
+            // 侧栏的文件夹区块（List 画不出来，用同样的列重组）
             content = AnyView(VStack(alignment: .leading, spacing: 8) {
-                Text("資料夾").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                FolderRow(name: "所有會議", count: model.meetings.count, symbol: "tray.full", selected: model.folderFilter == nil) {}
+                Text("文件夹").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                FolderRow(name: "所有会议", count: model.meetings.count, symbol: "tray.full", selected: model.folderFilter == nil) {}
                 ForEach(model.folders, id: \.name) { folder in
                     FolderRow(name: folder.name, count: folder.count, symbol: "folder", selected: model.folderFilter == folder.name) {}
                 }
-                Text(model.folderFilter ?? "所有會議").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 8)
+                Text(model.folderFilter ?? "所有会议").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 8)
                 ForEach(model.filteredMeetings) { row in MeetingRowView(row: row, status: model.status(row)) }
             }
             .padding(14).frame(width: 280))
@@ -1035,7 +1102,7 @@ enum DebugControl {
                 }
             }.frame(width: 260))
         case let t where t.hasPrefix("speaker-"):
-            // speaker-2：逐字稿只看說話者 2
+            // speaker-2：逐字稿只看说话者 2
             guard let detail = model.detail else { return }
             content = AnyView(SnapshotView(detail: detail, tab: .transcript, speakerFilter: Int(t.dropFirst(8))).frame(width: 900))
         default:
@@ -1056,15 +1123,15 @@ enum DebugControl {
     }
 }
 
-/// preview detail：跟主視窗一樣的會議頁，跟著 selection 換
+/// preview detail：跟主窗口一样的会议页，跟着 selection 换
 private struct DetailPreview: View {
     @Environment(AppModel.self) private var model
     var body: some View {
-        if let detail = model.detail { MeetingDetailView(detail: detail) } else { Text("沒有選取會議") }  // l10n-skip
+        if let detail = model.detail { MeetingDetailView(detail: detail) } else { Text("没有选中会议") }  // l10n-skip
     }
 }
 
-/// 截圖用：標題、狀態列、分頁內容、播放列（不含 NavigationSplitView 與工具列）
+/// 截屏用：标题、状态栏、标签页内容、播放列（不含 NavigationSplitView 与工具列）
 private struct SnapshotView: View {
     let detail: MeetingDetail
     let tab: DetailTab

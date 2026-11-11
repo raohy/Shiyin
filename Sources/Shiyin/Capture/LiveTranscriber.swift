@@ -2,7 +2,7 @@
 import Foundation
 import Speech
 
-/// 錄音中的即時逐字稿（design §5.3）：SpeechAnalyzer，語言依會議語言（§16.4），暫定結果約 0 秒、定稿約 2 秒
+/// 录音中的实时逐字稿（design §5.3）：SpeechAnalyzer，语言依会议语言（§16.4），暂定结果约 0 秒、定稿约 2 秒
 @MainActor
 final class LiveTranscriber {
     let language: MeetingLanguage
@@ -17,7 +17,7 @@ final class LiveTranscriber {
         self.language = language
     }
 
-    /// 送音訊的部分，可以從寫檔的執行緒呼叫
+    /// 送音频的部分，可以从写档的线程调用
     final class Feeder: @unchecked Sendable {
         private let lock = NSLock()
         private var builder: AsyncStream<AnalyzerInput>.Continuation?
@@ -71,7 +71,7 @@ final class LiveTranscriber {
     }
 
 
-    /// 準備 SpeechAnalyzer；系統還沒有 zh_TW 模型時先下載（併入首次使用引導，design §11）
+    /// 准备 SpeechAnalyzer；系统还没有会议语言的模型（中文是 zh_CN）时先下载（并入首次使用引导，design §11）
     func start() async throws {
         let transcriber = SpeechTranscriber(locale: language.speechLocale, transcriptionOptions: [],
                                             reportingOptions: [.volatileResults], attributeOptions: [.audioTimeRange])
@@ -87,7 +87,8 @@ final class LiveTranscriber {
         resultsTask = Task { [weak self] in
             do {
                 for try await result in transcriber.results {
-                    let text = String(result.text.characters).trimmingCharacters(in: .whitespaces)
+                    let raw = String(result.text.characters).trimmingCharacters(in: .whitespaces)
+                    let text = self?.language.outputScript(raw) ?? raw
                     if result.isFinal {
                         if !text.isEmpty { self?.onFinal?(result.range.start.seconds, result.range.end.seconds, text) }
                         self?.onVolatile?("")
@@ -113,7 +114,7 @@ final class LiveTranscriber {
         await SpeechTranscriber.installedLocales.contains { $0.identifier == language.speechLocale.identifier }
     }
 
-    /// 系統還沒有這個語言的辨識模型時先下載（即時逐字稿和 macOS 內建辨識共用）
+    /// 系统还没有这个语言的识别模型时先下载（实时逐字稿和 macOS 内置识别共用）
     static func ensureAssets(_ language: MeetingLanguage, for transcriber: SpeechTranscriber? = nil) async throws {
         let module = transcriber ?? SpeechTranscriber(locale: language.speechLocale, preset: .transcription)
         if await isLocaleInstalled(language) { return }

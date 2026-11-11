@@ -3,47 +3,47 @@ import AppKit
 import Foundation
 import WebKit
 
-/// 匯出用的完整資料
+/// 导出用的完整资料
 struct ExportBundle {
     var meeting: Meeting
     var segments: [Segment]
     var speakers: [Int: String]
     var bookmarks: [Bookmark]
     var notes: MeetingNotes?
-    /// 參考文件（design §39.5）：只有 .shiyin 封包用到
+    /// 参考文档（design §39.5）：只有 .shiyin 封包用到
     var documents: [MeetingDocument] = []
 
     func speakerName(_ idx: Int?) -> String? { idx.map { speakers[$0] ?? text.speaker($0) } }
 
-    /// 匯出內容的標題、欄位名稱：跟著會議語言，不是介面語言（design §16.6）
+    /// 导出内容的标题、字段名称：跟着会议语言，不是界面语言（design §16.6）
     var text: ExportText { ExportText(meeting.meetingLanguage) }
 }
 
-/// 匯出檔裡的固定文字（design §16.6）
+/// 导出档里的固定文字（design §16.6）
 struct ExportText {
     let language: MeetingLanguage
     init(_ language: MeetingLanguage) { self.language = language }
 
     var transcriptSuffix: String { language.text(zh: "（逐字稿）", en: " (transcript)", ja: "（文字起こし）") }
     var date: String { language.text(zh: "日期", en: "Date", ja: "日付") }
-    var participants: String { language.text(zh: "與會者", en: "Participants", ja: "参加者") }
-    var speakers: String { language.text(zh: "說話者", en: "Speakers", ja: "話者") }
-    var duration: String { language.text(zh: "長度", en: "Duration", ja: "所要時間") }
-    var noNotes: String { language.text(zh: "（尚未整理成會議紀錄）", en: "(No meeting notes yet)", ja: "（議事録はまだありません）") }
-    var details: String { language.text(zh: "詳細", en: "Details", ja: "詳細") }
-    var review: String { language.text(zh: "待確認", en: "To confirm", ja: "要確認") }
-    /// 本地 MCP 的會議紀錄接在後面的「我的筆記」（design §44.2）
-    var userNotes: String { language.text(zh: "我的筆記", en: "My notes", ja: "メモ") }
-    var owner: String { language.text(zh: "負責人", en: "Owner", ja: "担当") }
-    var task: String { language.text(zh: "事項", en: "Item", ja: "内容") }
+    var participants: String { language.text(zh: "与会者", en: "Participants", ja: "参加者") }
+    var speakers: String { language.text(zh: "说话者", en: "Speakers", ja: "話者") }
+    var duration: String { language.text(zh: "长度", en: "Duration", ja: "所要時間") }
+    var noNotes: String { language.text(zh: "（尚未整理成会议记录）", en: "(No meeting notes yet)", ja: "（議事録はまだありません）") }
+    var details: String { language.text(zh: "详细", en: "Details", ja: "詳細") }
+    var review: String { language.text(zh: "待确认", en: "To confirm", ja: "要確認") }
+    /// 本地 MCP 的会议记录接在后面的「我的笔记」（design §44.2）
+    var userNotes: String { language.text(zh: "我的笔记", en: "My notes", ja: "メモ") }
+    var owner: String { language.text(zh: "负责人", en: "Owner", ja: "担当") }
+    var task: String { language.text(zh: "事项", en: "Item", ja: "内容") }
     var due: String { language.text(zh: "期限", en: "Due", ja: "期限") }
-    var time: String { language.text(zh: "時間點", en: "Time", ja: "時刻") }
+    var time: String { language.text(zh: "时间点", en: "Time", ja: "時刻") }
     var unassigned: String { language.text(zh: "未指定", en: "Unassigned", ja: "未定") }
     var colon: String { language.text(zh: "：", en: ": ", ja: "：") }
     var listSeparator: String { language.text(zh: "、", en: ", ", ja: "、") }
     func speaker(_ idx: Int) -> String { language.defaultSpeaker(idx) }
     func section(_ id: String) -> String { TemplateDefinition.sectionLabel(id, language: language) }
-    /// 括號：中文用全形、英文用半形加空白
+    /// 括号：中文用全角、英文用半角加空白
     func paren(_ inner: String) -> String { language.format(zh: "（%@）", en: " (%@)", ja: "（%@）", inner) }
     func dateLine(_ meetingDate: String) -> String { meetingDate + paren(DateText.weekday(meetingDate, language: language)) }
 }
@@ -53,11 +53,11 @@ enum ExportItem: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .notes: return String(localized: "會議紀錄")
-        case .mindMap: return String(localized: "心智圖")
+        case .notes: return String(localized: "会议记录")
+        case .mindMap: return String(localized: "心智图")
         case .transcript: return String(localized: "逐字稿")
-        case .audio: return String(localized: "錄音")
-        case .package: return String(localized: "整場會議（.shiyin）")
+        case .audio: return String(localized: "录音")
+        case .package: return String(localized: "整场会议（.shiyin）")
         }
     }
     var formats: [String] {
@@ -75,8 +75,8 @@ enum ExportError: LocalizedError {
     case noAudio, failed(String)
     var errorDescription: String? {
         switch self {
-        case .noAudio: return String(localized: "這場會議沒有錄音檔")
-        case .failed(let reason): return String(localized: "匯出失敗：\(reason)")
+        case .noAudio: return String(localized: "这场会议没有录音档")
+        case .failed(let reason): return String(localized: "导出失败：\(reason)")
         }
     }
 }
@@ -124,7 +124,7 @@ enum TranscriptExporter {
     }
 }
 
-// MARK: - 會議紀錄（R7.3）
+// MARK: - 会议记录（R7.3）
 
 enum NotesExporter {
     static func markdown(_ b: ExportBundle) -> String {
@@ -165,7 +165,7 @@ enum NotesExporter {
         return out.joined(separator: "\n") + "\n"
     }
 
-    /// 純文字（貼到 Slack、訊息）
+    /// 纯文字（贴到 Slack、消息）
     static func plain(_ b: ExportBundle) -> String {
         markdown(b).replacingOccurrences(of: "## ", with: "").replacingOccurrences(of: "### ", with: "").replacingOccurrences(of: "# ", with: "")
     }
@@ -213,7 +213,7 @@ enum NotesExporter {
     }
 }
 
-// MARK: - HTML → PDF、docx、剪貼簿（design §10）
+// MARK: - HTML → PDF、docx、剪贴板（design §10）
 
 enum HTML {
     static func escape(_ s: String) -> String {
@@ -234,7 +234,7 @@ enum HTML {
         .time { color: #2D6A5D; font-size: 9.5pt; }
         table { border-collapse: collapse; width: 100%; } th, td { border-bottom: 1px solid #DCE1DE; padding: 4pt 6pt; text-align: left; vertical-align: top; }
         th { color: #68726F; font-weight: normal; font-size: 10pt; }
-        .nowrap { white-space: nowrap; }  /* 負責人、期限不拆行，內容欄自己換行（中日文可以在任何字之間換行，表格會把短欄擠到一個字寬） */
+        .nowrap { white-space: nowrap; }  /* 负责人、期限不拆行，内容栏自己换行（中日文可以在任何字之间换行，表格会把短栏挤到一个字宽） */
         </style></head><body>\(body)</body></html>
         """
     }
@@ -244,20 +244,20 @@ enum HTML {
         guard let data = html.data(using: .utf8),
               let string = NSAttributedString(html: data, options: [.characterEncoding: String.Encoding.utf8.rawValue],
                                               documentAttributes: nil)
-        else { throw ExportError.failed(String(localized: "無法產生文件")) }
+        else { throw ExportError.failed(String(localized: "无法产生文档")) }
         return fitShortColumns(string)
     }
 
-    /// 表格欄寬：中日文可以在任何字之間換行，HTML 轉換時算的欄寬又是照它自己假設的版面寬度，排進 A4 等比例縮小後，
-    /// 負責人、期限這種短欄會被擠成「小／田／切」「2026-1／0-15」。改成用百分比：內容最寬的那一欄自動換行，
-    /// 其他欄是內容加內距佔 PDF 版面的比例（最多三成）
+    /// 表格栏宽：中日文可以在任何字之间换行，HTML 转换时算的栏宽又是照它自己假设的版面宽度，排进 A4 等比例缩小后，
+    /// 负责人、期限这种短栏会被挤成「小／田／切」「2026-1／0-15」。改成用百分比：内容最宽的那一栏自动换行，
+    /// 其他栏是内容加内距占 PDF 版面的比例（最多三成）
     private static func fitShortColumns(_ source: NSAttributedString) -> NSAttributedString {
         let string = NSMutableAttributedString(attributedString: source)
         let whole = NSRange(location: 0, length: string.length)
         var widths: [ObjectIdentifier: [Int: CGFloat]] = [:]
         string.enumerateAttribute(.paragraphStyle, in: whole) { value, range, _ in
             guard let block = (value as? NSParagraphStyle)?.textBlocks.last as? NSTextTableBlock else { return }
-            // 量一行排開的寬度：去掉表格的段落樣式，不然會照儲存格的寬度排版
+            // 量一行排开的宽度：去掉表格的段落样式，不然会照保存格的宽度排版
             let text = NSMutableAttributedString(attributedString: string.attributedSubstring(from: range))
             text.removeAttribute(.paragraphStyle, range: NSRange(location: 0, length: text.length))
             let extra = [NSTextBlock.Layer.padding, .border, .margin].reduce(CGFloat(0)) {
@@ -282,29 +282,29 @@ enum HTML {
         return string
     }
 
-    /// PDF 的版面寬度：A4 減掉左右邊界
+    /// PDF 的版面宽度：A4 减掉左右边界
     private static let pageWidth: CGFloat = 595 - 56 * 2
 
-    /// 非同步讀 HTML（design §21.13）：轉換在 WebKit 裡做，主執行緒不用等。
-    /// 2,086 段的逐字稿：同步轉換主執行緒卡 665 ms，非同步最長卡 102 ms；產生的 Word 檔逐位元組相同
+    /// 异步读 HTML（design §21.13）：转换在 WebKit 里做，主线程不用等。
+    /// 2,086 段的逐字稿：同步转换主线程卡 665 ms，异步最长卡 102 ms；产生的 Word 档逐字节相同
     @MainActor
     static func attributedAsync(_ html: String) async throws -> NSAttributedString {
         let string: NSAttributedString = try await withCheckedThrowingContinuation { continuation in
             NSAttributedString.loadFromHTML(string: html) { string, _, error in
                 if let string { continuation.resume(returning: string) }
-                else { continuation.resume(throwing: error ?? ExportError.failed(String(localized: "無法產生文件"))) }
+                else { continuation.resume(throwing: error ?? ExportError.failed(String(localized: "无法产生文档"))) }
             }
         }
         return fitShortColumns(string)
     }
 
-    /// Word：讀 HTML 用 WebKit 非同步做，調整欄寬、轉成 Word 檔在背景做（design §21.13）
+    /// Word：读 HTML 用 WebKit 异步做，调整栏宽、转成 Word 档在背景做（design §21.13）
     @MainActor
     static func docx(_ html: String) async throws -> Data {
         let string: NSAttributedString = try await withCheckedThrowingContinuation { continuation in
             NSAttributedString.loadFromHTML(string: html) { string, _, error in
                 if let string { continuation.resume(returning: string) }
-                else { continuation.resume(throwing: error ?? ExportError.failed(String(localized: "無法產生文件"))) }
+                else { continuation.resume(throwing: error ?? ExportError.failed(String(localized: "无法产生文档"))) }
             }
         }
         let copy = NSAttributedString(attributedString: string)
@@ -316,7 +316,7 @@ enum HTML {
                         documentAttributes: [.documentType: NSAttributedString.DocumentType.officeOpenXML])
     }
 
-    /// 用 NSTextView 排版後印成 PDF（自動分頁，A4）
+    /// 用 NSTextView 排版后印成 PDF（自动标签页，A4）
     @MainActor
     static func pdf(_ html: String, to url: URL) async throws {
         let string = try await attributedAsync(html)
@@ -339,10 +339,10 @@ enum HTML {
         let operation = NSPrintOperation(view: view, printInfo: info)
         operation.showsPrintPanel = false
         operation.showsProgressPanel = false
-        guard operation.run() else { throw ExportError.failed(String(localized: "PDF 產生失敗")) }
+        guard operation.run() else { throw ExportError.failed(String(localized: "PDF 产生失败")) }
     }
 
-    /// 同時放純文字、HTML、RTF，貼到哪裡都有合適的格式（R7.3）
+    /// 同时放纯文字、HTML、RTF，贴到哪里都有合适的格式（R7.3）
     @MainActor
     static func copy(plain: String, html: String) {
         let board = NSPasteboard.general
@@ -355,7 +355,7 @@ enum HTML {
     }
 }
 
-// MARK: - 錄音（R7.1）
+// MARK: - 录音（R7.1）
 
 enum AudioExporter {
     static func export(_ b: ExportBundle, format: String, to url: URL) async throws {
@@ -366,10 +366,10 @@ enum AudioExporter {
             try FileManager.default.copyItem(at: source, to: url)
         } else if format == "m4a" {
             guard let session = AVAssetExportSession(asset: AVURLAsset(url: source), presetName: AVAssetExportPresetAppleM4A)
-            else { throw ExportError.failed(String(localized: "無法建立轉檔")) }
+            else { throw ExportError.failed(String(localized: "无法创建转档")) }
             try await session.export(to: url, as: .m4a)
         } else {
-            // wav：解碼成 16 kHz 單聲道（轉錄用的格式，音質足夠聽清楚人聲）
+            // wav：解码成 16 kHz 单声道（转录用的格式，音质足够听清楚人声）
             let samples = try await AudioDecoder.decode(source)
             try AudioDecoder.writeWAV(samples, to: url)
         }

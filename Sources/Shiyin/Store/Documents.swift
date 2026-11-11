@@ -1,16 +1,16 @@
 import AppKit
 import Foundation
 
-/// 會議的參考文件（design §39.4、R61）：加入、移除、打開，文件有變動的提示
+/// 会议的参考文档（design §39.4、R61）：加入、移除、打开，文档有变动的提示
 extension AppModel {
-    /// 「加入文件…」：選檔後加到選取中的會議
+    /// 「加入文档…」：选档后加到选中中的会议
     func chooseDocuments() {
         guard let id = selection else { return }
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.allowedContentTypes = DocumentReader.openPanelTypes
-        panel.message = String(localized: "選擇會議中一起討論的文件（PDF、Word、PowerPoint、純文字、圖片）")
+        panel.message = String(localized: "选择会议中一起讨论的文档（PDF、Word、PowerPoint、纯文字、图片）")
         panel.prompt = String(localized: "加入")
         panel.begin { response in
             guard response == .OK else { return }
@@ -19,16 +19,16 @@ extension AppModel {
         }
     }
 
-    /// 拖進主視窗的文件：加到選取中的會議（R61.1）
+    /// 拖进主窗口的文档：加到选中中的会议（R61.1）
     func addDroppedDocuments(_ urls: [URL]) {
         guard let id = selection, let meeting = try? db.meeting(id), meeting.deletedAt == nil else {
-            errorMessage = String(localized: "先選一場會議，再把文件拖進來")
+            errorMessage = String(localized: "先选一场会议，再把文档拖进来")
             return
         }
         addDocuments(urls, to: id)
     }
 
-    /// 一份一份依序讀（加入的順序固定），讀取中記在 readingDocuments；讀完複製原始檔、寫資料庫
+    /// 一份一份依序读（加入的顺序固定），读取中记在 readingDocuments；读完复制源文件、写数据库
     func addDocuments(_ urls: [URL], to meetingId: Int64) {
         guard !urls.isEmpty, let meeting = try? db.meeting(meetingId) else { return }
         let language = meeting.meetingLanguage
@@ -55,15 +55,15 @@ extension AppModel {
             guard !added.isEmpty else { return }
             if added.count == 1 {
                 let name = added[0].name
-                noticeMessage = added[0].ocr ? String(localized: "已加入「\(name)」，用文字辨識讀出文字") : String(localized: "已加入「\(name)」")
+                noticeMessage = added[0].ocr ? String(localized: "已加入「\(name)」，用文字识别读出文字") : String(localized: "已加入「\(name)」")
             } else {
-                noticeMessage = String(localized: "已加入 \(added.count) 份文件")
+                noticeMessage = String(localized: "已加入 \(added.count) 份文档")
             }
             markDocumentsChanged(meetingId)
         }
     }
 
-    /// 移除：不另外確認（重新加入就回來了）
+    /// 移除：不另外确认（重新加入就回来了）
     func removeDocument(_ document: MeetingDocument) {
         guard let id = document.id else { return }
         perform(.detail([.documents])) { try db.deleteDocument(id) }
@@ -73,13 +73,13 @@ extension AppModel {
 
     func openDocument(_ document: MeetingDocument) {
         guard FileManager.default.fileExists(atPath: document.fileURL.path) else {
-            errorMessage = String(localized: "找不到「\(document.name)」的原始檔")
+            errorMessage = String(localized: "找不到「\(document.name)」的源文件")
             return
         }
         NSWorkspace.shared.open(document.fileURL)
     }
 
-    /// 已經有會議紀錄（含草稿）時，紀錄分頁頂部提示重新整理（R61.8）
+    /// 已经有会议记录（含草稿）时，记录标签页顶部提示刷新（R61.8）
     private func markDocumentsChanged(_ meetingId: Int64) {
         if (try? db.meeting(meetingId))?.notes != nil { documentsChanged.insert(meetingId) }
     }
@@ -89,13 +89,13 @@ extension AppModel {
     }
 }
 
-/// 存參考文件：讀出文字、寫資料庫、複製原始檔（design §39.1、§39.4）；封包匯入也用
+/// 存参考文档：读出文字、写数据库、复制源文件（design §39.1、§39.4）；封包导入也用
 enum DocumentStore {
     static func add(_ url: URL, meetingId: Int64, language: MeetingLanguage, db: AppDatabase) throws -> MeetingDocument {
         let accessing = url.startAccessingSecurityScopedResource()
         defer { if accessing { url.stopAccessingSecurityScopedResource() } }
         let result = try DocumentReader.read(url, language: language)
-        // 同一份（檔名和讀出來的文字都一樣）加過了就不再加：送給整理工具會重複
+        // 同一份（文件名和读出来的文字都一样）加过了就不再加：送给整理工具会重复
         let name = safeName(url.lastPathComponent)
         if try db.documents(meetingId).contains(where: { $0.name == name && $0.pageTexts == result.pages }) {
             throw DocumentReader.DocumentError.duplicate(name)
@@ -104,7 +104,7 @@ enum DocumentStore {
                         meetingId: meetingId, db: db)
     }
 
-    /// 寫資料庫（拿到 id）再複製原始檔到 documents/<id>/<檔名>；複製失敗就把那一列刪掉
+    /// 写数据库（拿到 id）再复制源文件到 documents/<id>/<文件名>；复制失败就把那一列删掉
     static func save(_ source: URL, name: String, kind: DocumentKind, pages: [String], ocr: Bool,
                      meetingId: Int64, db: AppDatabase) throws -> MeetingDocument {
         let document = try db.addDocument(meetingId, name: safeName(name), kind: kind, pages: pages, ocr: ocr)
@@ -119,7 +119,7 @@ enum DocumentStore {
         return document
     }
 
-    /// 檔名只取最後一段、去掉開頭的「.」；是空的就叫 document
+    /// 文件名只取最后一段、去掉开头的「.」；是空的就叫 document
     static func safeName(_ name: String) -> String {
         let last = String((name as NSString).lastPathComponent.drop { $0 == "." })
         return last.isEmpty ? "document" : last

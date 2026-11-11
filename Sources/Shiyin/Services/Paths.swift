@@ -1,6 +1,6 @@
 import Foundation
 
-/// 拾音所有檔案的位置（design §3）。資料一律放 SHIYIN_HOME，不放專案資料夾。
+/// 拾音所有文件的位置（design §3）。资料一律放 SHIYIN_HOME，不放项目文件夹。
 enum Paths {
     static let home: URL = {
         if let custom = ProcessInfo.processInfo.environment["SHIYIN_HOME"], !custom.isEmpty {
@@ -12,7 +12,7 @@ enum Paths {
 
     static var modelsDir: URL { home.appendingPathComponent("models", isDirectory: true) }
     static var backupsDir: URL { home.appendingPathComponent("backups", isDirectory: true) }
-    /// 第二版留下的 Python 環境與 mlx 模型，第三版用不到（R10.5）
+    /// 第二版留下的 Python 环境与 mlx 模型，第三版用不到（R10.5）
     static var legacyItems: [URL] {
         [home.appendingPathComponent("venv", isDirectory: true),
          home.appendingPathComponent("models/breeze-asr-25", isDirectory: true)]
@@ -20,12 +20,12 @@ enum Paths {
     static var audioDir: URL { home.appendingPathComponent("audio", isDirectory: true) }
     static var recordingDir: URL { audioDir.appendingPathComponent("recording", isDirectory: true) }
     static var database: URL { home.appendingPathComponent("shiyin.sqlite") }
-    /// 會議的參考文件的原始檔（design §39.1）
+    /// 会议的参考文档的源文件（design §39.1）
     static var documentsDir: URL { home.appendingPathComponent("documents", isDirectory: true) }
     static var tmpDir: URL { home.appendingPathComponent("tmp", isDirectory: true) }
     static var logsDir: URL { home.appendingPathComponent("logs", isDirectory: true) }
 
-    /// 從 Finder 開的 app 只有系統 PATH，外部工具一律在這些目錄找
+    /// 从 Finder 开的 app 只有系统 PATH，外部工具一律在这些目录找
     static let toolDirectories: [String] = [
         "/opt/homebrew/bin", "/usr/local/bin",
         (NSHomeDirectory() as NSString).appendingPathComponent(".local/bin"),
@@ -34,31 +34,31 @@ enum Paths {
     /// 找到的外部工具（design §37.1）
     struct ToolLocation: Equatable {
         let url: URL
-        /// 接在子程序 PATH 前面的資料夾（桌面版附的 codex 的 codex-path，有 rg）
+        /// 接在子程序 PATH 前面的文件夹（桌面版附的 codex 的 codex-path，有 rg）
         let extraPath: [String]
-        /// 桌面版附的 codex：app 的名稱和位置；使用者自己裝的 CLI 是 nil
+        /// 桌面版附的 codex：app 的名称和位置；用户自己装的 CLI 是 nil
         let desktopApp: String?
         let appURL: URL?
 
-        /// 子程序用的環境變數
+        /// 子程序用的环境变量
         var environment: [String: String] { Paths.subprocessEnvironment(prependPath: extraPath) }
     }
 
     static func findTool(_ name: String) -> URL? { locateTool(name)?.url }
 
-    /// 先找使用者自己裝的（toolDirectories），codex 找不到時再找 Codex 桌面版附的（R55.1）
+    /// 先找用户自己装的（toolDirectories），codex 找不到时再找 Codex 桌面版附的（R55.1）
     static func locateTool(_ name: String) -> ToolLocation? {
         #if DEBUG
-        // -debugNoCLI YES：當成沒有安裝 claude、codex（包括桌面版附的），在裝了 CLI 的電腦上測（design §19.6）
+        // -debugNoCLI YES：当成没有安装 claude、codex（包括桌面版附的），在装了 CLI 的电脑上测（design §19.6）
         if ["claude", "codex"].contains(name) && UserDefaults.standard.bool(forKey: "debugNoCLI") { return nil }
-        // -debugToolDirectory <資料夾>：先找這個資料夾，用假的 claude、codex 測（design §40.3）
+        // -debugToolDirectory <文件夹>：先找这个文件夹，用假的 claude、codex 测（design §40.3）
         if let debugDir = UserDefaults.standard.string(forKey: "debugToolDirectory"), !debugDir.isEmpty {
             let path = (debugDir as NSString).appendingPathComponent(name)
             if FileManager.default.isExecutableFile(atPath: path) {
                 return ToolLocation(url: URL(fileURLWithPath: path), extraPath: [], desktopApp: nil, appURL: nil)
             }
         }
-        // -debugOnlyDesktopCLI YES：不看使用者自己裝的，只找桌面版附的（design §37.4）
+        // -debugOnlyDesktopCLI YES：不看用户自己装的，只找桌面版附的（design §37.4）
         let skipInstalled = UserDefaults.standard.bool(forKey: "debugOnlyDesktopCLI")
         #else
         let skipInstalled = false
@@ -78,7 +78,7 @@ enum Paths {
         return nil
     }
 
-    /// 子程序用的環境變數：補上工具目錄到 PATH
+    /// 子程序用的环境变量：补上工具目录到 PATH
     static func subprocessEnvironment(extra: [String: String] = [:], prependPath: [String] = []) -> [String: String] {
         var env = ProcessInfo.processInfo.environment
         let current = env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
@@ -95,7 +95,7 @@ enum Paths {
         try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: home.path)
     }
 
-    /// 在 tmp/ 底下建立一個用完即刪的資料夾
+    /// 在 tmp/ 底下创建一个用完即删的文件夹
     static func makeTempDirectory() throws -> URL {
         let dir = tmpDir.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

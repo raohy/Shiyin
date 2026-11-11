@@ -1,54 +1,54 @@
 import Foundation
 
-/// 轉錄的設定（design §6、§17）。JobRunner 用目前的 app 設定產生；評估工具（shiyinctl transcribe-eval）從 JSON 讀，
-/// 同一段錄音可以換設定重跑比較（§17.1）
+/// 转录的设置（design §6、§17）。JobRunner 用目前的 app 设置产生；评估工具（shiyinctl transcribe-eval）从 JSON 读，
+/// 同一段录音可以换设置重跑比较（§17.1）
 struct TranscriptionOptions: Codable {
-    /// breeze：whisper.cpp，模型依會議語言（中文、英文 Breeze，日文 large-v3-turbo，design §18.2）；system：macOS 內建辨識；
-    /// qwen：Qwen3-ASR（llama.cpp，中文、英文，design §32）；server：企業伺服器（design §36.3，說話者照樣在本機辨識）
+    /// breeze：whisper.cpp，模型依会议语言（中文、英文 Breeze，日文 large-v3-turbo，design §18.2）；system：macOS 内置识别；
+    /// qwen：Qwen3-ASR（llama.cpp，中文、英文，design §32）；server：企业服务器（design §36.3，说话者照样在本机识别）
     enum Engine: String, Codable { case breeze, system, qwen, server }
-    /// 分聲道時怎麼處理麥克風收到的回音（design §17.3）
+    /// 分声道时怎么处理麦克风收到的回音（design §17.3）
     enum Echo: String, Codable {
         case none
-        case dedupe   // 轉錄後刪掉跟電腦聲音重複的麥克風段落
+        case dedupe   // 转录后删掉跟电脑声音重复的麦克风段落
     }
 
     var engine: Engine = .breeze
     var language: MeetingLanguage = .zh
     var glossary: [String] = []
     var diarize = true
-    /// 雙聲道錄音（麥克風、電腦聲音）分開轉錄（design §17.3）；還在評估，設定裡沒有開關
+    /// 双声道录音（麦克风、电脑声音）分开转录（design §17.3）；还在评估，设置里没有开关
     var splitChannels = false
     var echo: Echo = .dedupe
-    /// 評估用：換一個 whisper 模型檔（design §18.2 比較日文引擎）；nil 依會議語言選
+    /// 评估用：换一个 whisper 模型档（design §18.2 比较日文引擎）；nil 依会议语言选
     var model: String?
-    /// 沒分聲道時聲紋記成哪種收音（design §21.4）：mic、system，雙聲道混在一起是 mix
+    /// 没分声道时声纹记成哪种收音（design §21.4）：mic、system，双声道混在一起是 mix
     var audioSource = "mix"
-    /// whisper 每段幾秒（design §21.16、D34）；評估時設 0 不分段
+    /// whisper 每段几秒（design §21.16、D34）；评估时设 0 不分段
     var chunkSeconds: Double = 600
-    /// 說話者辨識至少分出幾個人（design §23.2），nil 自動判斷
+    /// 说话者识别至少分出几个人（design §23.2），nil 自动判断
     var minSpeakers: Int?
-    /// 評估用：whisper 解碼參數和提示詞的寫法（design §17.1）；nil 用 app 的預設值。正式轉錄不設
+    /// 评估用：whisper 解码参数和提示词的写法（design §17.1）；nil 用 app 的默认值。正式转录不设
     var tuning: DecoderTuning?
 
-    /// whisper 解碼的實驗開關（只有 transcribe-eval 會設）：每一項 nil 就用 whisper.cpp 或 app 的預設值
+    /// whisper 解码的实验开关（只有 transcribe-eval 会设）：每一项 nil 就用 whisper.cpp 或 app 的默认值
     struct DecoderTuning: Codable {
-        /// whisper.cpp 的 no_context（預設 true：每個 30 秒的窗只用基本提示詞，不接前一個窗的文字）
+        /// whisper.cpp 的 no_context（默认 true：每个 30 秒的窗只用基本提示词，不接前一个窗的文字）
         var noContext: Bool?
         var beamSize: Int?
-        /// 預設 0.2；-1 關掉信心不夠時升溫重試
+        /// 默认 0.2；-1 关掉信心不够时升温重试
         var temperatureInc: Float?
         var entropyThold: Float?
         var logprobThold: Float?
         var noSpeechThold: Float?
-        /// 壓掉非語音的 token（音樂、掌聲這類標記）
+        /// 压掉非语音的 token（音乐、掌声这类标记）
         var suppressNst: Bool?
-        /// 不做 app 的幻覺過濾，看過濾丟掉了什麼
+        /// 不做 app 的幻觉过滤，看过滤丢掉了什么
         var keepAll: Bool?
-        /// 提示詞的寫法：nil 是現在的「以下是…詞彙：…」；natural 是寫成像逐字稿的一句話（design §17.1）
+        /// 提示词的写法：nil 是现在的「以下是…词汇：…」；natural 是写成像逐字稿的一句话（design §17.1）
         var promptStyle: String?
-        /// 段落最長幾個字（搭配 split_on_word），0 或 nil 不限制
+        /// 段落最长几个字（搭配 split_on_word），0 或 nil 不限制
         var maxLen: Int?
-        /// Qwen3-ASR（design §32.4）：每段最長幾秒（預設 15）、跳針時要不要重試（預設 true）、要不要先辨識說話者再分段（預設 true）
+        /// Qwen3-ASR（design §32.4）：每段最长几秒（默认 15）、跳针时要不要重试（默认 true）、要不要先识别说话者再分段（默认 true）
         var qwenChunkSeconds: Double?
         var qwenRetry: Bool?
         var qwenTurns: Bool?
@@ -59,20 +59,20 @@ struct TranscriptionOptions: Codable {
 
     init() {}
 
-    /// 寫進 meetings.transcribed_with（design §21.17）
+    /// 写进 meetings.transcribed_with（design §21.17）
     var transcribedWith: String { engine == .system ? "system" : engine == .qwen ? "qwen" : language.usesTurbo ? "japanese" : "breeze" }
 
-    /// local：使用者在這一場按了「改在這台電腦轉錄」（R50.5），不用企業伺服器
+    /// local：用户在这一场按了「改在这台电脑转录」（R50.5），不用企业服务器
     @MainActor
     static func current(language: MeetingLanguage, glossary: [String], channels: String, minSpeakers: Int? = nil,
                         local: Bool = false) -> TranscriptionOptions {
         var options = TranscriptionOptions()
         options.minSpeakers = minSpeakers
-        // 這個語言的模型還沒下載好時，這一場先用 macOS 內建辨識（design §21.17、D35）；
-        // 中文、英文選了 Qwen3-ASR（design §32.3）而還沒下載好、已經有 Breeze 時先用 Breeze（R43.7）；
-        // 固定用 Qwen3-ASR 的語言（粵語）不用 Breeze，先用內建（design §41.3）
+        // 这个语言的模型还没下载好时，这一场先用 macOS 内置识别（design §21.17、D35）；
+        // 中文、英文选了 Qwen3-ASR（design §32.3）而还没下载好、已经有 Breeze 时先用 Breeze（R43.7）；
+        // 固定用 Qwen3-ASR 的语言（粤语）不用 Breeze，先用内置（design §41.3）
         let wanted = ModelStore.transcription(for: language)
-        // 企業伺服器（R50.1）：登入失效時也照樣選它，工作停著等重新登入（R49.4）
+        // 企业服务器（R50.1）：登录失效时也照样选它，工作停着等重新登录（R49.4）
         if AppSettings.usesEnterpriseTranscription && !local { options.engine = .server }
         else if AppSettings.useSystemTranscriber { options.engine = .system }
         else if ModelStore.isDownloaded(wanted) { options.engine = wanted == .qwen ? .qwen : .breeze }
@@ -81,13 +81,13 @@ struct TranscriptionOptions: Codable {
         options.language = language
         options.glossary = glossary
         options.diarize = AppSettings.diarize
-        // 只有錄音時選了「麥克風＋電腦聲音」的會議才分聲道；匯入的雙聲道檔案（音樂、影片）照舊混成一軌
+        // 只有录音时选了「麦克风＋电脑声音」的会议才分声道；导入的双声道文件（音乐、视频）照旧混成一轨
         options.splitChannels = AppSettings.splitChannels && channels == "both"
         options.audioSource = channels == "both" ? "mix" : channels
         return options
     }
 
-    // 評估用的 JSON 只寫要改的欄位，其他用預設值
+    // 评估用的 JSON 只写要改的字段，其他用默认值
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         engine = try c.decodeIfPresent(Engine.self, forKey: .engine) ?? .breeze
@@ -107,16 +107,16 @@ struct TranscriptionOptions: Codable {
 struct TranscriptionResult {
     var segments: [TranscribedSegment]
     var speakers: [Int?]
-    /// 分聲道時每段來自哪個聲道（0 麥克風、1 電腦聲音）；沒分聲道時都是 nil
+    /// 分声道时每段来自哪个声道（0 麦克风、1 电脑声音）；没分声道时都是 nil
     var channels: [Int?]
     var duration: Double
-    /// 每位說話者（逐字稿上的編號）的聲紋、說話秒數、收音（design §21.4）
+    /// 每位说话者（逐字稿上的编号）的声纹、说话秒数、收音（design §21.4）
     var voices: [Int: SpeakerVoice] = [:]
-    /// whisper 分段的位置（秒）；評估工具用來檢查接縫
+    /// whisper 分段的位置（秒）；评估工具用来检查接缝
     var seams: [Double] = []
-    /// 說話者辨識分得準不準的線索（design §24.3）；分聲道、沒辨識時是 nil
+    /// 说话者识别分得准不准的线索（design §24.3）；分声道、没识别时是 nil
     var diarizationQuality: Diarizer.Quality? = nil
-    /// 企業伺服器用的引擎（breeze、qwen、japanese）：寫進 transcribed_with，取代 options.transcribedWith（design §36.3）
+    /// 企业服务器用的引擎（breeze、qwen、japanese）：写进 transcribed_with，取代 options.transcribedWith（design §36.3）
     var transcribedWith: String? = nil
 }
 
@@ -126,38 +126,45 @@ struct SpeakerVoice {
     var source: String     // mic / system / mix
 }
 
-/// 轉錄流程：解碼 → 辨識 → 說話者辨識（design §6）；雙聲道錄音可以分開轉錄再合併（§17.3）
+/// 转录流程：解码 → 识别 → 说话者识别（design §6）；双声道录音可以分开转录再合并（§17.3）
 @MainActor
 struct TranscriptionPipeline {
     var options: TranscriptionOptions
-    /// whisper 模型檔（engine 是 breeze 時用）：評估時可以指定，平常依會議語言選。不看引擎設定：設定是 Qwen 時 transcription(for:) 回 qwen，
-    /// 但 whisper 這條路只認 Breeze 和 large-v3-turbo（2026-10-24 評估時 Breeze 跑去載 GGUF 而失敗）
+    /// whisper 模型档（engine 是 breeze 时用）：评估时可以指定，平常依会议语言选。不看引擎设置：设置是 Qwen 时 transcription(for:) 回 qwen，
+    /// 但 whisper 这条路只认 Breeze 和 large-v3-turbo（2026-10-24 评估时 Breeze 跑去载 GGUF 而失败）
     var modelPath: String { options.model ?? ModelStore.path(options.language.usesTurbo ? .japanese : .breeze).path }
-    /// 目前在做哪一步（顯示在會議列表）
+    /// 目前在做哪一步（显示在会议列表）
     var stage: (String) -> Void = { _ in }
-    /// 整體進度 0～1，會從背景執行緒呼叫
+    /// 整体进度 0～1，会从背景线程调用
     var progress: @Sendable (Double) -> Void = { _ in }
-    /// 這一步要怎麼取消（whisper 用 Control，macOS 內建用 Task）
+    /// 这一步要怎么取消（whisper 用 Control，macOS 内置用 Task）
     var setCancel: (@escaping () -> Void) -> Void = { _ in }
-    /// 每一步之間檢查工作是否還要繼續
+    /// 每一步之间检查工作是否还要继续
     var shouldContinue: () -> Bool = { true }
-    /// 企業伺服器（design §36.3）：上次傳到一半、還沒拿到結果的工作 id；換了就告訴 JobRunner 記下來
+    /// 企业服务器（design §36.3）：上次传到一半、还没拿到结果的工作 id；换了就告诉 JobRunner 记下来
     var remoteId: String?
     var onRemoteId: (String?) -> Void = { _ in }
-    /// 企業伺服器的狀態（排隊第幾、為什麼在等）；nil 是伺服器的部分做完了
+    /// 企业服务器的状态（排队第几、为什么在等）；nil 是服务器的部分做完了
     var onServer: (ServerNote?) -> Void = { _ in }
-    /// 使用者按了「改在這台電腦轉錄」（R50.5）
+    /// 用户按了「改在这台电脑转录」（R50.5）
     var switchToLocal: () -> Bool = { false }
 
-    /// 回傳 nil 表示中途被取消
+    /// 回传 nil 表示中途被取消
     func run(_ audio: URL) async throws -> TranscriptionResult? {
+        guard var result = try await runEngine(audio) else { return nil }
+        // 中文、粤语的结果一律转大陆简体（design §45、D151）：Breeze 输出台湾繁体，其他引擎的输出也可能夹杂繁体
+        for i in result.segments.indices { result.segments[i].text = options.language.outputScript(result.segments[i].text) }
+        return result
+    }
+
+    private func runEngine(_ audio: URL) async throws -> TranscriptionResult? {
         if options.engine == .server { return try await runServer(audio) }
         if options.engine == .qwen {
             guard ModelStore.isDownloaded(.qwen) else { throw WhisperError.modelMissing }
             return try await runQwen(audio)
         }
         guard options.engine == .system || FileManager.default.fileExists(atPath: modelPath) else { throw WhisperError.modelMissing }
-        stage(String(localized: "讀取錄音"))
+        stage(String(localized: "读取录音"))
         if options.splitChannels {
             let channels = try await AudioDecoder.decodeChannels(audio)
             if channels.count == 2 { return try await runSplit(microphone: channels[0], system: channels[1]) }
@@ -175,7 +182,7 @@ struct TranscriptionPipeline {
         var voices: [Int: SpeakerVoice] = [:]
         var quality: Diarizer.Quality?
         if diarize {
-            stage(String(localized: "辨識說話者"))
+            stage(String(localized: "识别说话者"))
             (speakers, voices, quality) = await self.speakers(of: transcribed, in: samples, source: options.audioSource) { report(share + $0 * (1 - share)) }
         }
         guard shouldContinue() else { return nil }
@@ -183,11 +190,11 @@ struct TranscriptionPipeline {
                                    voices: voices, seams: seams, diarizationQuality: quality)
     }
 
-    // MARK: 企業伺服器（design §36.3、R50）
+    // MARK: 企业服务器（design §36.3、R50）
 
-    /// 錄音解成 16 kHz 單聲道、寫成 16-bit WAV 上傳；伺服器轉錄的同時，Mac 在本機辨識說話者（聲紋跟本機一樣，D122）
+    /// 录音解成 16 kHz 单声道、写成 16-bit WAV 上传；服务器转录的同时，Mac 在本机识别说话者（声纹跟本机一样，D122）
     private func runServer(_ audio: URL) async throws -> TranscriptionResult? {
-        stage(String(localized: "讀取錄音"))
+        stage(String(localized: "读取录音"))
         let samples = try await AudioDecoder.decode(audio)
         guard shouldContinue() else { return nil }
         let duration = Double(samples.count) / AudioDecoder.sampleRate
@@ -199,7 +206,7 @@ struct TranscriptionPipeline {
         guard shouldContinue() else { return nil }
         progress(0)
 
-        // 說話者辨識不用等逐字稿，跟伺服器同時做
+        // 说话者识别不用等逐字稿，跟服务器同时做
         let diarize = options.diarize && duration > 5
         let minSpeakers = options.minSpeakers
         let diarization: Task<Diarizer.Output?, Never>? = diarize ? Task {
@@ -215,7 +222,7 @@ struct TranscriptionPipeline {
         var voices: [Int: SpeakerVoice] = [:]
         var quality: Diarizer.Quality?
         if let diarization {
-            stage(String(localized: "辨識說話者"))
+            stage(String(localized: "识别说话者"))
             if let output = await diarization.value {
                 guard shouldContinue() else { return nil }
                 (speakers, voices) = await assignSpeakers(output, to: remote.segments, in: samples, source: options.audioSource)
@@ -228,13 +235,13 @@ struct TranscriptionPipeline {
                                    voices: voices, seams: remote.seams, diarizationQuality: quality, transcribedWith: remote.engine)
     }
 
-    // MARK: whisper 從檔案依序讀（design §21.16）
+    // MARK: whisper 从文件依序读（design §21.16）
 
-    /// whisper 一段一段從檔案讀，說話者辨識時才解碼整段：轉錄時記憶體裡不用留整段錄音
+    /// whisper 一段一段从文件读，说话者识别时才解码整段：转录时内存里不用留整段录音
     private func runStreaming(_ audio: URL) async throws -> TranscriptionResult? {
         guard shouldContinue() else { return nil }
-        stage(String(localized: "轉錄"))
-        // 還不知道長度（太短不辨識說話者），先照要辨識說話者算進度
+        stage(String(localized: "转录"))
+        // 还不知道长度（太短不识别说话者），先照要识别说话者算进度
         let share = options.diarize ? 0.85 : 1.0
         let report = progress
         progress(0)
@@ -252,7 +259,7 @@ struct TranscriptionPipeline {
         var voices: [Int: SpeakerVoice] = [:]
         var quality: Diarizer.Quality?
         if options.diarize && duration > 5 {
-            stage(String(localized: "辨識說話者"))
+            stage(String(localized: "识别说话者"))
             let samples = try await AudioDecoder.decode(audio)
             guard shouldContinue() else { return nil }
             (speakers, voices, quality) = await self.speakers(of: result.segments, in: samples, source: options.audioSource) {
@@ -267,9 +274,9 @@ struct TranscriptionPipeline {
 
     // MARK: Qwen3-ASR（design §32.4）
 
-    /// 先解碼整段、先辨識說話者，再依說話者片段和安靜處分段轉錄；段落的時間就是分段的時間，說話者是那一段重疊最多的人
+    /// 先解码整段、先识别说话者，再依说话者片段和安静处分段转录；段落的时间就是分段的时间，说话者是那一段重叠最多的人
     private func runQwen(_ audio: URL) async throws -> TranscriptionResult? {
-        stage(String(localized: "讀取錄音"))
+        stage(String(localized: "读取录音"))
         let samples = try await AudioDecoder.decode(audio)
         guard shouldContinue() else { return nil }
         let duration = Double(samples.count) / AudioDecoder.sampleRate
@@ -279,7 +286,7 @@ struct TranscriptionPipeline {
         var output: Diarizer.Output?
         let share = diarize ? 0.15 : 0.0
         if diarize {
-            stage(String(localized: "辨識說話者"))
+            stage(String(localized: "识别说话者"))
             do {
                 output = try await Diarizer.diarize(samples: samples, minSpeakers: options.minSpeakers) { report($0 * share) }
             } catch {
@@ -287,7 +294,7 @@ struct TranscriptionPipeline {
             }
         }
         guard shouldContinue() else { return nil }
-        stage(String(localized: "轉錄"))
+        stage(String(localized: "转录"))
         let control = WhisperEngine.Control { report(share + $0 * (1 - share)) }
         setCancel { control.cancel() }
         let chunks = QwenEngine.chunks(samples, turns: output?.turns ?? [], maxSeconds: options.tuning?.qwenChunkSeconds ?? QwenEngine.maxChunkSeconds,
@@ -309,7 +316,7 @@ struct TranscriptionPipeline {
                                    diarizationQuality: output?.quality)
     }
 
-    /// 已經辨識好說話者：段落依重疊量標說話者、短句再確認（R34）、每位說話者的聲紋（跟 speakers(of:in:source:) 後半一樣）
+    /// 已经识别好说话者：段落依重叠量标说话者、短句再确认（R34）、每位说话者的声纹（跟 speakers(of:in:source:) 后半一样）
     private func assignSpeakers(_ output: Diarizer.Output, to segments: [TranscribedSegment], in samples: [Float],
                                 source: String) async -> ([Int?], [Int: SpeakerVoice]) {
         var (speakers, numbering) = Diarizer.assignNumbering(output.turns, to: segments)
@@ -327,7 +334,7 @@ struct TranscriptionPipeline {
         return (speakers, voices)
     }
 
-    // MARK: 分聲道（design §17.3）
+    // MARK: 分声道（design §17.3）
 
     private func runSplit(microphone: [Float], system: [Float]) async throws -> TranscriptionResult? {
         guard shouldContinue() else { return nil }
@@ -336,7 +343,7 @@ struct TranscriptionPipeline {
         let report = progress
         progress(0)
 
-        // 兩個聲道各自轉錄、各自辨識說話者；沒有聲音的聲道（例如沒有播放任何聲音）直接跳過
+        // 两个声道各自转录、各自识别说话者；没有声音的声道（例如没有播放任何声音）直接跳过
         var parts: [(channel: Int, segments: [TranscribedSegment], speakers: [Int?], voices: [Int: SpeakerVoice])] = []
         let inputs = [(0, microphone), (1, system)].filter { Self.hasSound($0.1) }
         for (index, (channel, samples)) in inputs.enumerated() {
@@ -346,7 +353,7 @@ struct TranscriptionPipeline {
             var speakers: [Int?] = segments.map { _ in nil }
             var voices: [Int: SpeakerVoice] = [:]
             if diarize && !segments.isEmpty {
-                stage(String(localized: "辨識說話者"))
+                stage(String(localized: "识别说话者"))
                 (speakers, voices, _) = await self.speakers(of: segments, in: samples, source: channel == 0 ? "mic" : "system") {
                     report(base + width * (share + $0 * (1 - share)))
                 }
@@ -355,7 +362,7 @@ struct TranscriptionPipeline {
             parts.append((channel, segments, speakers, voices))
         }
 
-        // 說話者編號：麥克風那一邊的人先編，電腦聲音那一邊接著編
+        // 说话者编号：麦克风那一边的人先编，电脑声音那一边接着编
         var merged: [(segment: TranscribedSegment, speaker: Int?, channel: Int)] = []
         var offsetVoices: [Int: SpeakerVoice] = [:]
         var offset = 0
@@ -370,7 +377,7 @@ struct TranscriptionPipeline {
         }
         merged.sort { $0.segment.start < $1.segment.start }
         let segments = merged.map(\.segment)
-        // 刪掉回音段落後，說話者編號可能有空號，依出現順序重新編
+        // 删掉回音段落后，说话者编号可能有空号，依出现顺序重新编
         var numbering: [Int: Int] = [:]
         let speakers: [Int?] = merged.map { item in
             guard let speaker = item.speaker else { return nil }
@@ -385,7 +392,7 @@ struct TranscriptionPipeline {
                                    voices: voices)
     }
 
-    /// 方均根低於 -70 dBFS 就當作沒有聲音
+    /// 方均根低于 -70 dBFS 就当作没有声音
     private static func hasSound(_ samples: [Float]) -> Bool {
         guard !samples.isEmpty else { return false }
         var sum: Double = 0
@@ -393,7 +400,7 @@ struct TranscriptionPipeline {
         return (sum / Double(samples.count)).squareRoot() > 3e-4
     }
 
-    /// 麥克風段落跟電腦聲音的某一段時間重疊一半以上、文字也很像，就是喇叭的回音
+    /// 麦克风段落跟电脑声音的某一段时间重叠一半以上、文字也很像，就是喇叭的回音
     nonisolated static func isEcho(_ segment: TranscribedSegment, of system: [TranscribedSegment]) -> Bool {
         let length = max(segment.end - segment.start, 0.01)
         let text = comparable(segment.text)
@@ -405,7 +412,7 @@ struct TranscriptionPipeline {
         }
     }
 
-    /// 兩句幾乎一樣（最長共同子序列 ÷ 較長那句的長度 > 0.8）；whisper 分段的接縫去掉重複用
+    /// 两句几乎一样（最长共同子序列 ÷ 较长那句的长度 > 0.8）；whisper 分段的接缝去掉重复用
     nonisolated static func similar(_ a: String, _ b: String) -> Bool {
         let x = comparable(a), y = comparable(b)
         guard min(x.count, y.count) >= 4 else { return false }
@@ -416,7 +423,7 @@ struct TranscriptionPipeline {
         text.lowercased().filter { $0.isLetter || $0.isNumber }.map { $0 }
     }
 
-    /// 最長共同子序列 ÷ 較短那段的長度
+    /// 最长共同子序列 ÷ 较短那段的长度
     private nonisolated static func similarity(_ a: [Character], _ b: [Character]) -> Double {
         guard !a.isEmpty, !b.isEmpty else { return 0 }
         var prev = [Int](repeating: 0, count: b.count + 1)
@@ -428,14 +435,14 @@ struct TranscriptionPipeline {
         return Double(prev[b.count]) / Double(min(a.count, b.count))
     }
 
-    // MARK: 共用步驟
+    // MARK: 共用步骤
 
-    /// 辨識一段聲音；進度換算到整體的 from…from+span。回傳 nil 表示被取消；沒有辨識出任何文字時回傳空陣列。
-    /// 另外回傳 whisper 分段的位置（秒）
+    /// 识别一段声音；进度换算到整体的 from…from+span。回传 nil 表示被取消；没有识别出任何文字时回传空数组。
+    /// 另外回传 whisper 分段的位置（秒）
     private func transcribe(_ samples: [Float], from base: Double, span: Double) async throws -> ([TranscribedSegment], [Double])? {
         let report = progress
         let useSystem = options.engine == .system
-        stage(useSystem ? String(localized: "轉錄（macOS 內建）") : String(localized: "轉錄"))
+        stage(useSystem ? String(localized: "转录（macOS 内置）") : String(localized: "转录"))
         let segments: [TranscribedSegment]
         var seams: [Double] = []
         do {
@@ -460,20 +467,20 @@ struct TranscriptionPipeline {
                 seams = chunks.dropFirst().map { Double($0.lowerBound) / AudioDecoder.sampleRate }
             }
         } catch WhisperError.empty where options.splitChannels {
-            // 分聲道時某一邊沒人說話是正常的
+            // 分声道时某一边没人说话是正常的
             segments = []
         }
         return shouldContinue() ? (segments, seams) : nil
     }
 
-    /// 說話者辨識；失敗不影響逐字稿，回傳全部沒有說話者
-    /// 每段的說話者，以及每位說話者的聲紋（換成逐字稿上的編號）
+    /// 说话者识别；失败不影响逐字稿，回传全部没有说话者
+    /// 每段的说话者，以及每位说话者的声纹（换成逐字稿上的编号）
     private func speakers(of segments: [TranscribedSegment], in samples: [Float], source: String,
                           onProgress: @escaping @Sendable (Double) -> Void) async -> ([Int?], [Int: SpeakerVoice], Diarizer.Quality?) {
         do {
             let output = try await Diarizer.diarize(samples: samples, minSpeakers: options.minSpeakers, onProgress: onProgress)
             var (speakers, numbering) = Diarizer.assignNumbering(output.turns, to: segments)
-            // 短句再跟每位說話者比一次（R34、design §6.3.2）；模型下載不了或算不出來就照說話者辨識的結果
+            // 短句再跟每位说话者比一次（R34、design §6.3.2）；模型下载不了或算不出来就照说话者识别的结果
             do {
                 speakers = try await SpeakerRecheck.refine(segments, speakers: speakers, samples: samples)
             } catch {

@@ -54,6 +54,8 @@ CORRECTIONS = {"corrections": []}
 SPEAKER_NAMES = {"speakerNames": []}
 KEYWORDS = {"keywords": ["假伺服器"]}
 ANSWER = {"answer": "假伺服器的回答。", "found": True, "citations": [{"time": "00:05", "quote": "這是假伺服器回傳的摘要。"}]}
+COACH = {"summary": "正在討論交付範圍，接口的費用和期限尚未確認。", "questions": [
+    {"text": "接口部分的費用和交付日期何時確認？", "reason": "接口仍需單獨評估，影響交付範圍。", "segment": 0, "priority": 1}]}
 FAILED_ONCE = threading.Lock()
 
 
@@ -78,7 +80,8 @@ def ask_codex(messages, schema):
 def answer_for(text):
     """依工具名稱、schema 或提示詞判斷要回哪一種（會議紀錄、逐字稿校正、猜說話者、搜尋關鍵詞、回答）"""
     custom = MODE.get("responses", {})
-    for key, default, marks in (("speakerNames", SPEAKER_NAMES, ("speaker_names", "speakerNames")),
+    for key, default, marks in (("coach", COACH, ("save_meeting_questions", "newTranscript", '"priority"')),
+                                ("speakerNames", SPEAKER_NAMES, ("speaker_names", "speakerNames")),
                                 ("keywords", KEYWORDS, ("search_keywords", '"keywords"')),
                                 ("answer", ANSWER, ("save_answer", '"citations"')),
                                 ("corrections", CORRECTIONS, ("corrections",))):

@@ -1,15 +1,15 @@
 import Foundation
 import os
 
-/// 本地 MCP 伺服器（design §44.1、D147）：`Shiyin --mcp`，stdio 一行一個 JSON-RPC 2.0 訊息。
-/// 只做 initialize、ping、tools/list、tools/call；stdout 只寫協定訊息，log 不寫參數和會議內容（N7）
+/// 本地 MCP 服务器（design §44.1、D147）：`Shiyin --mcp`，stdio 一行一个 JSON-RPC 2.0 消息。
+/// 只做 initialize、ping、tools/list、tools/call；stdout 只写协定消息，log 不写参数和会议内容（N7）
 enum MCPServer {
     static let protocolVersions = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"]
     static let fallbackProtocolVersion = "2025-06-18"
     private static let mlog = Logger(subsystem: "com.weiwei.shiyin", category: "mcp")
 
     static func run() -> Never {
-        // 客戶端先關掉 stdout 的管線時，寫入會收到 SIGPIPE；忽略之後寫入失敗，讀到 stdin 結束就離開
+        // 客户端先关掉 stdout 的管线时，写入会收到 SIGPIPE；忽略之后写入失败，读到 stdin 结束就离开
         signal(SIGPIPE, SIG_IGN)
         mlog.info("mcp server started")
         while let line = readLine(strippingNewline: true) {
@@ -19,7 +19,7 @@ enum MCPServer {
         exit(0)
     }
 
-    /// 處理一行，回傳要寫出的回應；通知、客戶端的回應不用回
+    /// 处理一行，回传要写出的回应；通知、客户端的回应不用回
     static func handle(_ line: String) -> [String: Any]? {
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }

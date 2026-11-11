@@ -1,9 +1,9 @@
 import Foundation
 
-/// 對會議提問（design §21.8、R19.6、D32）：單場用會議紀錄和逐字稿回答；跨會議先抽搜尋關鍵詞，再用全文搜尋找到的片段回答
+/// 对会议提问（design §21.8、R19.6、D32）：单场用会议记录和逐字稿回答；跨会议先抽搜索关键词，再用全文搜索找到的片段回答
 enum AskPrompt {
     struct Citation: Codable, Hashable {
-        /// 跨會議時是哪一場會議；單場時沒有
+        /// 跨会议时是哪一场会议；单场时没有
         var meetingId: Int64?
         var time: String
         var quote: String
@@ -11,24 +11,24 @@ enum AskPrompt {
 
     struct Answer: Codable, Hashable {
         var answer: String
-        /// 提供的內容裡有沒有提到
+        /// 提供的内容里有没有提到
         var found: Bool
         var citations: [Citation]
-        /// 跨會議：用了哪些關鍵詞、送了哪些會議（存起來給畫面顯示「參考了 N 場會議」）
+        /// 跨会议：用了哪些关键词、送了哪些会议（存起来给画面显示「参考了 N 场会议」）
         var keywords: [String]?
         var meetingIds: [Int64]?
     }
 
-    /// 跨會議時一場會議的資料：會議紀錄的摘要、決議，加上搜尋命中的段落（前後各一段）
+    /// 跨会议时一场会议的资料：会议记录的摘要、决议，加上搜索命中的段落（前后各一段）
     struct MeetingBlock {
         var id: Int64
         var title: String
         var date: String
         var summary: [String]
-        var lines: [String]      // [時間] 說話者：內容
+        var lines: [String]      // [时间] 说话者：内容
     }
 
-    // MARK: 輸出格式
+    // MARK: 输出格式
 
     private static let citationItems = #"{"type":"object","additionalProperties":false,"required":["time","quote"],"properties":{"time":{"type":"string"},"quote":{"type":"string"}}}"#
     private static let crossCitationItems = #"{"type":"object","additionalProperties":false,"required":["meetingId","time","quote"],"properties":{"meetingId":{"type":"integer"},"time":{"type":"string"},"quote":{"type":"string"}}}"#
@@ -37,15 +37,15 @@ enum AskPrompt {
     static let allSchema = #"{"type":"object","additionalProperties":false,"required":["answer","found","citations"],"properties":{"answer":{"type":"string"},"found":{"type":"boolean"},"citations":{"type":"array","items":"# + crossCitationItems + "}}}"
     static let keywordsSchema = #"{"type":"object","additionalProperties":false,"required":["keywords"],"properties":{"keywords":{"type":"array","items":{"type":"string"}}}}"#
 
-    /// 工具說明是給模型看的，不是介面文字
+    /// 工具说明是给模型看的，不是界面文字
     static let meetingFormat = LLMClient.OutputFormat(schema: meetingSchema, toolName: "save_answer", toolDescription: "Save the answer to the question")
     static let allFormat = LLMClient.OutputFormat(schema: allSchema, toolName: "save_answer", toolDescription: "Save the answer to the question")
     static let keywordsFormat = LLMClient.OutputFormat(schema: keywordsSchema, toolName: "save_search_keywords",
                                                       toolDescription: "Save the search keywords for the question")
 
-    // MARK: 提示詞（中文、英文、日文各一份）
+    // MARK: 提示词（中文、英文、日文各一份）
 
-    /// documents：有參考文件時加一條（design §39.3、R61.6）
+    /// documents：有参考文档时加一条（design §39.3、R61.6）
     static func meetingSystem(_ l: MeetingLanguage, documents: Bool = false) -> String {
         let base = meetingSystemBase(l)
         return documents ? base + "\n" + DocumentPrompt.askRule(l) : base
@@ -53,13 +53,13 @@ enum AskPrompt {
 
     private static func meetingSystemBase(_ l: MeetingLanguage) -> String {
         l.prompt(zh: """
-        你是會議助理，只根據提供的這場會議的內容（會議紀錄和逐字稿）回答使用者的問題。
+        你是会议助理，只根据提供的这场会议的内容（会议记录和逐字稿）回答用户的问题。
 
-        規則：
-        1. 只用提供的內容回答，不要推測，也不要補充外部知識。內容裡沒有提到，就說這場會議沒有提到，found 填 false。
-        2. 簡潔、直接回答問題；需要列點時每點用「- 」開頭。
-        3. 每個重點都要有依據，放在 citations：time 照逐字稿的 [mm:ss] 或 [h:mm:ss] 寫，quote 是那一段的原文（節錄，60 字以內）。
-        4. 用提問的語言回答。
+        规则：
+        1. 只用提供的内容回答，不要推测，也不要补充外部知识。内容里没有提到，就说这场会议没有提到，found 填 false。
+        2. 简洁、直接回答问题；需要列点时每点用「- 」开头。
+        3. 每个重点都要有依据，放在 citations：time 照逐字稿的 [mm:ss] 或 [h:mm:ss] 写，quote 是那一段的原文（节录，60 字以内）。
+        4. 用提问的语言回答；中文回答一律用简体中文（大陆用语），citations 的 quote 保留原文。
         """, en: """
         You are a meeting assistant. Answer the user's question using only the content provided from this meeting (the meeting notes and transcript).
 
@@ -81,13 +81,13 @@ enum AskPrompt {
 
     static func allSystem(_ l: MeetingLanguage) -> String {
         l.prompt(zh: """
-        你是會議助理，只根據提供的幾場會議的片段回答使用者的問題。每場會議有編號、標題、日期、會議紀錄的摘要，以及跟問題有關的逐字稿片段。
+        你是会议助理，只根据提供的几场会议的片段回答用户的问题。每场会议有编号、标题、日期、会议记录的摘要，以及跟问题有关的逐字稿片段。
 
-        規則：
-        1. 只用提供的內容回答，不要推測，也不要補充外部知識。都沒有提到，就說找不到相關的內容，found 填 false。
-        2. 簡潔、直接回答問題；不同會議的內容要說清楚是哪一場（標題或日期）。需要列點時每點用「- 」開頭。
-        3. 每個重點都要有依據，放在 citations：meetingId 是那場會議的編號，time 照逐字稿片段的 [mm:ss] 或 [h:mm:ss] 寫，quote 是原文（節錄，60 字以內）。
-        4. 用提問的語言回答。
+        规则：
+        1. 只用提供的内容回答，不要推测，也不要补充外部知识。都没有提到，就说找不到相关的内容，found 填 false。
+        2. 简洁、直接回答问题；不同会议的内容要说清楚是哪一场（标题或日期）。需要列点时每点用「- 」开头。
+        3. 每个重点都要有依据，放在 citations：meetingId 是那场会议的编号，time 照逐字稿片段的 [mm:ss] 或 [h:mm:ss] 写，quote 是原文（节录，60 字以内）。
+        4. 用提问的语言回答；中文回答一律用简体中文（大陆用语），citations 的 quote 保留原文。
         """, en: """
         You are a meeting assistant. Answer the user's question using only the excerpts provided from several meetings. Each meeting has an ID, title, date, a summary from its notes, and transcript excerpts related to the question.
 
@@ -109,12 +109,12 @@ enum AskPrompt {
 
     static func keywordsSystem(_ l: MeetingLanguage) -> String {
         l.prompt(zh: """
-        把使用者對會議的問題，轉成用來全文搜尋會議逐字稿的關鍵詞。
+        把用户对会议的问题，转成用来全文搜索会议逐字稿的关键词。
 
-        規則：
-        1. 3～8 個關鍵詞，最重要的放前面。
-        2. 包含同義詞、常見的說法、中英文寫法、簡稱（例如「寄信」也列「郵件」「mail」「SendGrid」）。
-        3. 每個關鍵詞是一個詞或短語，至少 2 個字，不要整句、不要「會議」「討論」這種每場都有的詞。
+        规则：
+        1. 3～8 个关键词，最重要的放前面。
+        2. 包含同义词、常见的说法、中英文写法、简称（例如「寄信」也列「邮件」「mail」「SendGrid」）。
+        3. 每个关键词是一个词或短语，至少 2 个字，不要整句、不要「会议」「讨论」这种每场都有的词。
         """, en: """
         Turn the user's question about their meetings into keywords for a full-text search of meeting transcripts.
 
@@ -137,14 +137,14 @@ enum AskPrompt {
         let l = meeting.meetingLanguage
         let colon = l.prompt(zh: "：", en: ": ", ja: "：")
         var out: [String] = []
-        out.append(l.prompt(zh: "會議標題", en: "Meeting title", ja: "会議タイトル") + colon + meeting.displayTitle)
-        out.append(l.prompt(zh: "會議日期", en: "Meeting date", ja: "会議の日付") + colon + meeting.meetingDate)
+        out.append(l.prompt(zh: "会议标题", en: "Meeting title", ja: "会議タイトル") + colon + meeting.displayTitle)
+        out.append(l.prompt(zh: "会议日期", en: "Meeting date", ja: "会議の日付") + colon + meeting.meetingDate)
         if !meeting.participantList.isEmpty {
-            out.append(l.prompt(zh: "參加者", en: "Participants", ja: "参加者") + colon + meeting.participantList.joined(separator: l.prompt(zh: "、", en: ", ", ja: "、")))
+            out.append(l.prompt(zh: "参加者", en: "Participants", ja: "参加者") + colon + meeting.participantList.joined(separator: l.prompt(zh: "、", en: ", ", ja: "、")))
         }
         if let notes {
             out.append("")
-            out.append(l.prompt(zh: "會議紀錄（JSON）", en: "Meeting notes (JSON)", ja: "議事録（JSON）") + colon)
+            out.append(l.prompt(zh: "会议记录（JSON）", en: "Meeting notes (JSON)", ja: "議事録（JSON）") + colon)
             out.append(notes.jsonString())
         }
         if !documents.isEmpty {
@@ -152,18 +152,18 @@ enum AskPrompt {
             out.append(DocumentPrompt.block(documents, language: l))
         }
         out.append("")
-        out.append(l.prompt(zh: "逐字稿（[時間] 說話者：內容）", en: "Transcript ([time] speaker: text)", ja: "文字起こし（[時刻] 話者：内容）") + colon)
+        out.append(l.prompt(zh: "逐字稿（[时间] 说话者：内容）", en: "Transcript ([time] speaker: text)", ja: "文字起こし（[時刻] 話者：内容）") + colon)
         out += lines
         if !history.isEmpty {
             out.append("")
-            out.append(l.prompt(zh: "之前的問答（追問時參考）", en: "Earlier questions and answers (for follow-ups)", ja: "これまでの質問と回答（追加の質問の参考）") + colon)
+            out.append(l.prompt(zh: "之前的问答（追问时参考）", en: "Earlier questions and answers (for follow-ups)", ja: "これまでの質問と回答（追加の質問の参考）") + colon)
             for item in history {
                 out.append("Q" + colon + item.question)
                 out.append("A" + colon + item.answer)
             }
         }
         out.append("")
-        out.append(l.prompt(zh: "問題", en: "Question", ja: "質問") + colon + question)
+        out.append(l.prompt(zh: "问题", en: "Question", ja: "質問") + colon + question)
         return out.joined(separator: "\n")
     }
 
@@ -171,9 +171,9 @@ enum AskPrompt {
         let colon = l.prompt(zh: "：", en: ": ", ja: "：")
         var out: [String] = []
         for block in blocks {
-            out.append(l.prompt(zh: "【會議 \(block.id)】", en: "[Meeting \(block.id)]", ja: "【会議 \(block.id)】") + " \(block.title)（\(block.date)）")
+            out.append(l.prompt(zh: "【会议 \(block.id)】", en: "[Meeting \(block.id)]", ja: "【会議 \(block.id)】") + " \(block.title)（\(block.date)）")
             if !block.summary.isEmpty {
-                out.append(l.prompt(zh: "摘要與決議", en: "Summary and decisions", ja: "要約と決定事項") + colon)
+                out.append(l.prompt(zh: "摘要与决议", en: "Summary and decisions", ja: "要約と決定事項") + colon)
                 out += block.summary.map { "- " + $0 }
             }
             if !block.lines.isEmpty {
@@ -182,12 +182,12 @@ enum AskPrompt {
             }
             out.append("")
         }
-        out.append(l.prompt(zh: "問題", en: "Question", ja: "質問") + colon + question)
+        out.append(l.prompt(zh: "问题", en: "Question", ja: "質問") + colon + question)
         return out.joined(separator: "\n")
     }
 
     static func keywordsPrompt(_ l: MeetingLanguage, question: String) -> String {
-        l.prompt(zh: "問題：", en: "Question: ", ja: "質問：") + question
+        l.prompt(zh: "问题：", en: "Question: ", ja: "質問：") + question
     }
 
     // MARK: 送出
@@ -200,8 +200,8 @@ enum AskPrompt {
         catch { throw LLMError.badOutput(error.localizedDescription + provider.badOutputHint) }
     }
 
-    /// 丟掉不能用的出處：時間格式不對、跨會議時不是提供的會議
-    /// documentCitations：這場會議有參考文件，time 是空的引用是文件的出處，留著（design §39.3）
+    /// 丢掉不能用的出处：时间格式不对、跨会议时不是提供的会议
+    /// documentCitations：这场会议有参考文档，time 是空的引用是文档的出处，留着（design §39.3）
     static func validate(_ answer: Answer, meetingIds: Set<Int64>?, documentCitations: Bool = false) -> Answer {
         var result = answer
         result.answer = answer.answer.trimmingCharacters(in: .whitespacesAndNewlines)

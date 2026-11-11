@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 底部播放列：播放鍵、時間、錄音時間軸（R5.3），有議題時上面加議題帶（R68）
+/// 底部播放列：播放键、时间、录音时间轴（R5.3），有议题时上面加议题带（R68）
 struct PlayerBar: View {
     @Environment(AppModel.self) private var model
     let detail: MeetingDetail
@@ -19,7 +19,7 @@ struct PlayerBar: View {
             }
             .buttonStyle(.plain)
             .disabled(!player.isLoaded)
-            .help(player.isPlaying ? "暫停（空白鍵）" : "播放（空白鍵）")
+            .help(player.isPlaying ? "暂停（空白键）" : "播放（空白键）")
 
             Text(TimeFormat.string(player.currentTime))
                 .font(.callout.monospacedDigit())
@@ -73,7 +73,7 @@ struct PlayerBar: View {
 }
 
 private extension VerticalAlignment {
-    /// 播放列的其他元件對齊時間軸的中間（上面有議題帶時也一樣）
+    /// 播放列的其他组件对齐时间轴的中间（上面有议题带时也一样）
     struct TimelineCenter: AlignmentID {
         static func defaultValue(in context: ViewDimensions) -> CGFloat { context[VerticalAlignment.center] }
     }
@@ -81,7 +81,7 @@ private extension VerticalAlignment {
     static let timelineCenter = VerticalAlignment(TimelineCenter.self)
 }
 
-/// 議題帶（design §43.2、R68）：時間軸上面每個議題一段，顏色同心智圖的那一支，點了從那個議題開始播放
+/// 议题带（design §43.2、R68）：时间轴上面每个议题一段，颜色同心智图的那一支，点了从那个议题开始播放
 struct TopicBand: View {
     let ranges: [MindMap.TopicRange]
     let duration: Double
@@ -105,11 +105,11 @@ struct TopicBand: View {
     private func segment(_ range: MindMap.TopicRange, width: CGFloat) -> some View {
         let color = Color(hex: MindMap.color(range.branch, dark: colorScheme == .dark))
         let isCurrent = currentTime >= range.start && currentTime < range.end
-        let label = "\(range.title)　\(TimeFormat.string(range.start))–\(TimeFormat.string(range.end))"  // l10n-skip：名稱和時間，不用翻譯
+        let label = "\(range.title)　\(TimeFormat.string(range.start))–\(TimeFormat.string(range.end))"  // l10n-skip：名称和时间，不用翻译
         return Button { onSeek(range.start) } label: {
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 4).fill(color.opacity(isCurrent ? 0.45 : 0.18))
-                // 整個標題放得下，或至少放得下一兩個字加「…」才寫字，不然只留色塊（只剩「…」看不出是什麼）
+                // 整个标题放得下，或至少放得下一两个字加「…」才写字，不然只留色块（只剩「…」看不出是什么）
                 if MindMap.width(range.title, size: 11) + 10 <= width || width >= 40 {
                     Text(range.title)
                         .font(.system(size: 11, weight: isCurrent ? .semibold : .regular))
@@ -127,8 +127,8 @@ struct TopicBand: View {
     }
 }
 
-/// 錄音時間軸（design §9.3）：整場會議畫成一條帶子，每段逐字稿一格；
-/// 格子高度依說話密度變化，低信心段落是琥珀色，待確認題目在上方有標記。點擊或拖曳就跳播。
+/// 录音时间轴（design §9.3）：整场会议画成一条带子，每段逐字稿一格；
+/// 格子高度依说话密度变化，低信心段落是琥珀色，待确认题目在上方有标记。点击或拖动就跳播。
 struct TimelineBar: View {
     let segments: [Segment]
     let reviewTimes: [Double]
@@ -150,7 +150,7 @@ struct TimelineBar: View {
             )
         }
         .accessibilityElement()
-        .accessibilityLabel("錄音時間軸")
+        .accessibilityLabel("录音时间轴")
         .accessibilityValue("\(TimeFormat.string(currentTime))／\(TimeFormat.string(duration))")
         .accessibilityAdjustableAction { direction in
             let step: Double = 10
@@ -170,10 +170,10 @@ struct TimelineBar: View {
         guard duration > 0 else { return }
         let scale = width / CGFloat(duration)
 
-        // 說話密度（每秒字數）決定格子高度，看起來像波形
+        // 说话密度（每秒字数）决定格子高度，看起来像波形
         let densities = segments.map { Double($0.text.count) / max(0.5, $0.end - $0.start) }
         let maxDensity = max(densities.max() ?? 1, 1)
-        // 上方留給待確認的三角形、下方留給重點的圓點，格子畫在中間
+        // 上方留给待确认的三角形、下方留给重点的圆点，格子画在中间
         let markerSpace: CGFloat = 6
         let barHeight = height - markerSpace * 2
         for (i, segment) in segments.enumerated() {
@@ -187,7 +187,7 @@ struct TimelineBar: View {
             context.fill(Path(roundedRect: rect, cornerRadius: 1), with: .color(color))
         }
 
-        // 待確認題目的位置：上方的小三角形
+        // 待确认题目的位置：上方的小三角形
         for t in reviewTimes {
             let x = CGFloat(t) * scale
             var marker = Path()
@@ -198,7 +198,7 @@ struct TimelineBar: View {
             context.fill(marker, with: .color(.signal))
         }
 
-        // 重點標記：下方的小圓點（R8.4）
+        // 重点标记：下方的小圆点（R8.4）
         for t in bookmarkTimes {
             let x = CGFloat(t) * scale
             context.fill(Path(ellipseIn: CGRect(x: x - 2.5, y: height - 5, width: 5, height: 5)), with: .color(.celadon))

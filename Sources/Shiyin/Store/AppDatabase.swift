@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// 列表用：會議加上推算狀態所需的資料
+/// 列表用：会议加上推算状态所需的资料
 struct MeetingRow: Identifiable, Hashable {
     var meeting: Meeting
     var latestJob: Job?
@@ -14,22 +14,22 @@ struct ReplaceResult {
     var notesChanged: Bool
 }
 
-/// 全文搜尋的一筆結果（R9.1）
+/// 全文搜索的一笔结果（R9.1）
 struct SearchHit: Identifiable, Hashable {
     enum Kind: String { case title, segment, notes, userNotes = "user_notes" }
     var meetingId: Int64
     var kind: Kind
-    var ref: Int64            // segment 的 id；其他種類是 0
+    var ref: Int64            // segment 的 id；其他种类是 0
     var snippet: String
     var id: String { "\(meetingId)-\(kind.rawValue)-\(ref)" }
 }
 
 final class AppDatabase: @unchecked Sendable {
     let pool: DatabasePool
-    /// 參考文件原始檔的資料夾（design §39.1）；nil 時刪除會議、文件不碰檔案（標準答案的暫存資料庫）
+    /// 参考文档源文件的文件夹（design §39.1）；nil 时删除会议、文档不碰文件（标准答案的暂存数据库）
     let documentsRoot: URL?
 
-    /// 開啟資料庫；有待執行的 migration 時，先把舊檔備份到 backups/（N3）
+    /// 打开数据库；有待执行的 migration 时，先把旧档备份到 backups/（N3）
     init(path: String, documentsRoot: URL? = nil) throws {
         self.documentsRoot = documentsRoot
         var config = Configuration()
@@ -50,14 +50,14 @@ final class AppDatabase: @unchecked Sendable {
     }
 
     enum ReadOnlyError: Error {
-        /// 還有沒跑的 migration：更新後還沒開過拾音
+        /// 还有没跑的 migration：更新后还没开过拾音
         case needsUpgrade
-        /// 資料庫比這版程式新
+        /// 数据库比这版程序新
         case newerDatabase
     }
 
-    /// 只讀（本地 MCP，design §44.1）：不跑 migration、不備份；資料庫的版本跟這版程式不同就丟出錯誤。
-    /// 旁邊沒有 -wal、-shm（拾音上次正常關閉）時唯讀連線打不開（SQLite 14），改用一般連線：一樣只讀，SQLite 自己建那兩個檔
+    /// 只读（本地 MCP，design §44.1）：不跑 migration、不备份；数据库的版本跟这版程序不同就丢出错误。
+    /// 旁边没有 -wal、-shm（拾音上次正常关闭）时唯读连接打不开（SQLite 14），改用一般连接：一样只读，SQLite 自己建那两个档
     init(readOnlyPath path: String) throws {
         documentsRoot = nil
         var config = Configuration()
@@ -163,7 +163,7 @@ final class AppDatabase: @unchecked Sendable {
             );
             CREATE VIRTUAL TABLE search USING fts5(meeting_id UNINDEXED, kind UNINDEXED, ref UNINDEXED, text, tokenize = 'trigram');
             """)
-            // 會議紀錄轉成 v2 格式（字串陣列 → 帶時間點的條目，時間點先留空）
+            // 会议记录转成 v2 格式（字符串数组 → 带时间点的条目，时间点先留空）
             for row in try Row.fetchAll(db, sql: "SELECT id, notes FROM meetings WHERE notes IS NOT NULL") {
                 let id: Int64 = row["id"]
                 guard let json: String = row["notes"], let notes = try? JSONDecoder().decode(MeetingNotes.self, from: Data(json.utf8))
@@ -172,15 +172,15 @@ final class AppDatabase: @unchecked Sendable {
             }
             try Self.rebuildSearch(db)
         }
-        // v3（design §16.3）：會議語言，舊會議都是中文
+        // v3（design §16.3）：会议语言，旧会议都是中文
         migrator.registerMigration("v3") { db in
             try db.execute(sql: "ALTER TABLE meetings ADD COLUMN language TEXT NOT NULL DEFAULT 'zh'")
         }
-        // 3.2：分聲道轉錄記錄每段來自哪個聲道（design §17.3）
+        // 3.2：分声道转录记录每段来自哪个声道（design §17.3）
         migrator.registerMigration("v4") { db in
             try db.execute(sql: "ALTER TABLE segments ADD COLUMN channel INTEGER")
         }
-        // 3.2：逐字稿校正建議（design §17.4），段落重新轉錄時一起刪掉；詞彙表建議被忽略的詞（§17.5）
+        // 3.2：逐字稿校正建议（design §17.4），段落重新转录时一起删掉；词汇表建议被忽略的词（§17.5）
         migrator.registerMigration("v5") { db in
             try db.execute(sql: """
                 CREATE TABLE corrections (
@@ -197,12 +197,12 @@ final class AppDatabase: @unchecked Sendable {
                 CREATE TABLE glossary_dismissed (term TEXT PRIMARY KEY COLLATE NOCASE);
                 """)
         }
-        // 3.4.1：工作執行時拾音意外結束的次數（design §20.5）；搜尋表的 rowid 改成可以推算，重建索引（§20.11）
+        // 3.4.1：工作执行时拾音意外结束的次数（design §20.5）；搜索表的 rowid 改成可以推算，重建索引（§20.11）
         migrator.registerMigration("v6") { db in
             try db.execute(sql: "ALTER TABLE jobs ADD COLUMN crashes INTEGER NOT NULL DEFAULT 0")
             try Self.rebuildSearch(db)
         }
-        // 3.5（design §21.1）：草稿紀錄、聲紋、猜說話者、提問、編輯草稿、回報問題用的錯誤種類
+        // 3.5（design §21.1）：草稿记录、声纹、猜说话者、提问、编辑草稿、反馈问题用的错误种类
         migrator.registerMigration("v7") { db in
             try db.execute(sql: """
                 ALTER TABLE meetings ADD COLUMN notes_draft INTEGER NOT NULL DEFAULT 0;
@@ -252,11 +252,11 @@ final class AppDatabase: @unchecked Sendable {
                 );
                 """)
         }
-        // 說話者辨識至少分出幾個人（design §23.2、R22.3）
+        // 说话者识别至少分出几个人（design §23.2、R22.3）
         migrator.registerMigration("v8") { db in
             try db.execute(sql: "ALTER TABLE meetings ADD COLUMN min_speakers INTEGER")
         }
-        // 說話者的修正、分不準的提示（design §24.1）
+        // 说话者的修正、分不准的提示（design §24.1）
         migrator.registerMigration("v9") { db in
             try db.execute(sql: """
                 ALTER TABLE segments ADD COLUMN speaker_manual INTEGER NOT NULL DEFAULT 0;
@@ -270,7 +270,7 @@ final class AppDatabase: @unchecked Sendable {
                 );
                 """)
         }
-        // 會議的參考文件（design §39.1、R61）
+        // 会议的参考文档（design §39.1、R61）
         migrator.registerMigration("v10") { db in
             try db.execute(sql: """
                 CREATE TABLE documents (
@@ -286,21 +286,30 @@ final class AppDatabase: @unchecked Sendable {
                 CREATE INDEX documents_meeting ON documents(meeting_id, id);
                 """)
         }
+        // 会前准备与会中提问助手（Mac 第一版，design §46）。
+        migrator.registerMigration("v11") { db in
+            try db.execute(sql: """
+                CREATE TABLE meeting_assistance (
+                  meeting_id INTEGER PRIMARY KEY REFERENCES meetings(id) ON DELETE CASCADE,
+                  state TEXT NOT NULL
+                );
+                """)
+        }
         return migrator
     }
 
-    // MARK: 會議
+    // MARK: 会议
 
     func meetingRows(trash: Bool = false) throws -> [MeetingRow] {
         try pool.read { db in
             let meetings = try Meeting
                 .filter(trash ? Column("deleted_at") != nil : Column("deleted_at") == nil)
                 .order(sql: "meeting_date DESC, id DESC").fetchAll(db)
-            // 背景的輔助工作（壓縮、逐字稿校正、猜說話者、重新辨識說話者）不算會議的狀態（design §21.2、§23.3）
+            // 背景的辅助工作（压缩、逐字稿校正、猜说话者、重新识别说话者）不算会议的状态（design §21.2、§23.3）
             let auxiliary = JobKind.allCases.filter(\.isAuxiliary).map { "'\($0.rawValue)'" }.joined(separator: ", ")
             let latest = try Job.fetchAll(db, sql: "SELECT * FROM jobs WHERE id IN (SELECT MAX(id) FROM jobs WHERE kind NOT IN (\(auxiliary)) GROUP BY meeting_id)")
             let byMeeting = Dictionary(uniqueKeysWithValues: latest.map { ($0.meetingId, $0) })
-            // 待確認的題數也算說話者的建議（R33.3）
+            // 待确认的题数也算说话者的建议（R33.3）
             let speakerQuestions = Dictionary(uniqueKeysWithValues: try Row.fetchAll(db, sql: """
                 SELECT meeting_id, COUNT(*) AS n FROM speakers WHERE name_source = 'default' AND suggested_name IS NOT NULL GROUP BY meeting_id
                 """).map { (Int64($0["meeting_id"] as Int64), Int($0["n"] as Int64)) })
@@ -321,7 +330,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 只讀這幾段（改一段文字、接受校正之後，design §21.12）
+    /// 只读这几段（改一段文字、接受校正之后，design §21.12）
     func segments(ids: [Int64]) throws -> [Segment] {
         try pool.read { db in try Segment.filter(ids.contains(Column("id"))).fetchAll(db) }
     }
@@ -337,7 +346,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 最後一次完成的轉錄只做到第幾秒（沒人說話太久而自動停止，design §35.3）；轉錄了全部是 nil
+    /// 最后一次完成的转录只做到第几秒（没人说话太久而自动停止，design §35.3）；转录了全部是 nil
     func transcribedUntil(_ meetingId: Int64) throws -> Double? {
         try pool.read { db in
             let payload = try String.fetchOne(db, sql: """
@@ -347,7 +356,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 建立會議並給定錄音檔名（需要先拿到 id 才能命名，所以在同一個交易裡做兩步）
+    /// 创建会议并给定录音文件名（需要先拿到 id 才能命名，所以在同一个交易里做两步）
     func insertMeeting(_ meeting: Meeting, audioExtension: String?) throws -> Meeting {
         try pool.write { db in
             var m = meeting
@@ -369,7 +378,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 資料夾（R9.2）：資料夾就是 meetings.folder 的值，空字串表示不在任何資料夾
+    /// 文件夹（R9.2）：文件夹就是 meetings.folder 的值，空字符串表示不在任何文件夹
     func setFolder(_ ids: [Int64], folder: String) throws {
         guard !ids.isEmpty else { return }
         try pool.write { db in
@@ -379,25 +388,25 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 改名或刪除（newName 為空字串）一個資料夾，垃圾桶裡的會議也一起改
+    /// 改名或删除（newName 为空字符串）一个文件夹，垃圾桶里的会议也一起改
     func renameFolder(_ old: String, to newName: String) throws {
         try pool.write { db in
             try db.execute(sql: "UPDATE meetings SET folder = ?, updated_at = ? WHERE folder = ?", arguments: [newName, Clock.now(), old])
         }
     }
 
-    /// 錄音中途當掉、連錄音檔都沒有的會議（design §20.6）
+    /// 录音中途当掉、连录音档都没有的会议（design §20.6）
     func emptyRecordingMeetings() throws -> [Int64] {
         try pool.read { db in
             try Int64.fetchAll(db, sql: "SELECT id FROM meetings WHERE source = 'recording' AND audio_file = '' AND deleted_at IS NULL")
         }
     }
 
-    /// 永久刪除（垃圾桶清除或使用者確認）；參考文件的原始檔一起刪（design §39.1）
+    /// 永久删除（垃圾桶清除或用户确认）；参考文档的源文件一起删（design §39.1）
     func deleteMeeting(_ id: Int64) throws {
         let files = try pool.write { db -> [String] in
             let files = try MeetingDocument.filter(Column("meeting_id") == id).fetchAll(db).map(\.file)
-            // 段落會跟著會議刪掉（ON DELETE CASCADE），所以先刪索引
+            // 段落会跟着会议删掉（ON DELETE CASCADE），所以先删索引
             try Self.unindexSegments(db, meetingId: id)
             try Self.unindexMeeting(db, meetingId: id)
             _ = try Meeting.deleteOne(db, key: id)
@@ -406,7 +415,7 @@ final class AppDatabase: @unchecked Sendable {
         files.forEach(removeDocumentFile)
     }
 
-    /// 移到垃圾桶或還原（R9.3）
+    /// 移到垃圾桶或还原（R9.3）
     func setTrashed(_ id: Int64, _ trashed: Bool) throws {
         try pool.write { db in
             try db.execute(sql: "UPDATE meetings SET deleted_at = ? WHERE id = ?", arguments: [trashed ? Clock.now() : nil, id])
@@ -420,7 +429,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 只改一個欄位（範本、會議語言）。不要用 updateMeeting 整列寫回：畫面上的 Meeting 可能是舊的（例如筆記另外存過），會把別的欄位蓋回去
+    /// 只改一个字段（模板、会议语言）。不要用 updateMeeting 整列写回：画面上的 Meeting 可能是旧的（例如笔记另外存过），会把别的字段盖回去
     func setTemplate(_ id: Int64, templateId: String) throws {
         try pool.write { db in
             try db.execute(sql: "UPDATE meetings SET template_id = ?, updated_at = ? WHERE id = ?", arguments: [templateId, Clock.now(), id])
@@ -448,38 +457,40 @@ final class AppDatabase: @unchecked Sendable {
 
     // MARK: 逐字稿
 
-    /// 「說話者 1」「Speaker 1」「話者 1」這種預設名稱
+    /// 「说话者 1」「Speaker 1」「話者 1」及旧版繁体默认名称。
     static func isDefaultSpeakerName(_ name: String) -> Bool {
         (try? defaultSpeakerPattern.wholeMatch(in: name)) != nil
     }
 
-    /// 語言檔裡每種語言的預設說話者名稱（design §41.1）：「說話者 %lld」→「說話者 \d+」，接成一個樣式
+    /// 语言档里每种语言的默认说话者名称（design §41.1）：「说话者 %lld」→「说话者 \d+」，接成一个样式
     private static let defaultSpeakerPattern: Regex<AnyRegexOutput> = {
-        let forms = LanguageProfiles.all.map { profile -> String in
-            let parts = profile.speaker.components(separatedBy: "%lld")
+        // 旧数据和导入封包仍可能使用繁体默认名称，不能当作真实人名（design §45.6）。
+        let formats = LanguageProfiles.all.map(\.speaker) + ["說話者 %lld"]  // l10n-skip
+        let forms = formats.map { format -> String in
+            let parts = format.components(separatedBy: "%lld")
             return parts.map { NSRegularExpression.escapedPattern(for: $0) }.joined(separator: "\\d+")
         }
         return try! Regex("^(?:" + forms.joined(separator: "|") + ")$")
     }()
 
-    /// 寫入正式逐字稿：取代舊的正式版，並刪掉即時預覽（design §5.3）
-    /// voices：每位說話者的聲紋、說話秒數、收音（design §21.4），寫進 speakers
-    /// transcribedWith：用哪個引擎轉錄的（breeze、japanese、system，design §21.17）；匯入的逐字稿不寫
+    /// 写入正式逐字稿：取代旧的正式版，并删掉实时预览（design §5.3）
+    /// voices：每位说话者的声纹、说话秒数、收音（design §21.4），写进 speakers
+    /// transcribedWith：用哪个引擎转录的（breeze、japanese、system，design §21.17）；导入的逐字稿不写
     func saveTranscript(_ meetingId: Int64, segments: [Segment], duration: Int, speakerCount: Int,
                         voices: [Int: SpeakerVoice] = [:], transcribedWith: String? = nil) throws {
         try pool.write { db in
             try Self.unindexSegments(db, meetingId: meetingId)
             try Segment.filter(Column("meeting_id") == meetingId).deleteAll(db)
-            // 逐字稿換掉了，說話者的復原資料對不上（design §24.2）
+            // 逐字稿换掉了，说话者的复原资料对不上（design §24.2）
             try db.execute(sql: "DELETE FROM speaker_undo WHERE meeting_id = ?", arguments: [meetingId])
             for var s in segments {
                 try s.insert(db)
                 try Self.indexSegment(db, meetingId: meetingId, id: s.id!, text: s.text)
             }
-            // 說話者：保留已改過的名字，新的編號補上預設名字（跟著會議語言）
+            // 说话者：保留已改过的名字，新的编号补上默认名字（跟着会议语言）
             let language = try Meeting.fetchOne(db, key: meetingId)?.meetingLanguage ?? .zh
             let existing = try SpeakerName.filter(Column("meeting_id") == meetingId).fetchAll(db)
-            // 預設名稱（任何語言的「說話者 1」）不算改過，換了會議語言後要用新語言的預設名稱
+            // 默认名称（任何语言的「说话者 1」）不算改过，换了会议语言后要用新语言的默认名称
             let named = Dictionary(uniqueKeysWithValues: existing.filter { !Self.isDefaultSpeakerName($0.name) }.map { ($0.idx, $0) })
             try SpeakerName.filter(Column("meeting_id") == meetingId).deleteAll(db)
             for idx in stride(from: 1, through: speakerCount, by: 1) {
@@ -506,7 +517,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 錄音中的即時預覽段落（kind = live）
+    /// 录音中的实时预览段落（kind = live）
     func appendLiveSegment(_ meetingId: Int64, start: Double, end: Double, text: String) throws {
         try pool.write { db in
             let seq = try Int.fetchOne(db, sql: "SELECT COALESCE(MAX(seq), -1) + 1 FROM segments WHERE meeting_id = ?",
@@ -524,9 +535,9 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    // MARK: 編輯中的草稿（design §21.15、R20.6）
+    // MARK: 编辑中的草稿（design §21.15、R20.6）
 
-    /// key：review:<題目>、review-skip:<題目>、segment:<段落 id>
+    /// key：review:<题目>、review-skip:<题目>、segment:<段落 id>
     func drafts(_ meetingId: Int64) throws -> [String: String] {
         try pool.read { db in
             Dictionary(try Row.fetchAll(db, sql: "SELECT key, text FROM drafts WHERE meeting_id = ?", arguments: [meetingId])
@@ -534,7 +545,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 最近改過、key 以 prefix 開頭的草稿
+    /// 最近改过、key 以 prefix 开头的草稿
     func latestDraft(_ meetingId: Int64, prefix: String) throws -> (key: String, text: String)? {
         try pool.read { db in
             try Row.fetchOne(db, sql: "SELECT key, text FROM drafts WHERE meeting_id = ? AND substr(key, 1, ?) = ? ORDER BY updated_at DESC LIMIT 1",
@@ -542,7 +553,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 存草稿；text 是空的就刪掉
+    /// 存草稿；text 是空的就删掉
     func setDraft(_ meetingId: Int64, key: String, text: String) throws {
         try pool.write { db in
             if text.isEmpty {
@@ -568,7 +579,7 @@ final class AppDatabase: @unchecked Sendable {
         try pool.read { db in try Correction.filter(Column("meeting_id") == meetingId).order(Column("id")).fetchAll(db) }
     }
 
-    /// 存一次校正的結果：之前還沒處理的建議換成這次的，已接受、已拒絕的保留
+    /// 存一次校正的结果：之前还没处理的建议换成这次的，已接受、已拒绝的保留
     func saveCorrections(_ meetingId: Int64, _ items: [Correction]) throws {
         try pool.write { db in
             try db.execute(sql: "DELETE FROM corrections WHERE meeting_id = ? AND status = 'pending'", arguments: [meetingId])
@@ -576,13 +587,13 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 接受：改段落文字（含搜尋索引）。段落之後被改過、找不到原文時回傳 false
+    /// 接受：改段落文字（含搜索索引）。段落之后被改过、找不到原文时回传 false
     @discardableResult
     func acceptCorrection(_ id: Int64) throws -> Bool {
         try pool.write { db in try Self.acceptCorrection(db, id) }
     }
 
-    /// 一次接受多則（同一個詞的每一處，或全部，design §21.11）：同一個交易；回傳沒套用的數量（段落之後改過）
+    /// 一次接受多则（同一个词的每一处，或全部，design §21.11）：同一个交易；回传没套用的数量（段落之后改过）
     func acceptCorrections(_ ids: [Int64]) throws -> Int {
         try pool.write { db in try ids.filter { try !Self.acceptCorrection(db, $0) }.count }
     }
@@ -598,7 +609,7 @@ final class AppDatabase: @unchecked Sendable {
         return true
     }
 
-    /// 還原已接受的建議：改回原文，回到待確認
+    /// 还原已接受的建议：改回原文，回到待确认
     @discardableResult
     func revertCorrection(_ id: Int64) throws -> Bool {
         try pool.write { db in
@@ -629,21 +640,21 @@ final class AppDatabase: @unchecked Sendable {
         try pool.read { db in try SpeakerName.filter(Column("meeting_id") == meetingId).order(Column("idx")).fetchAll(db) }
     }
 
-    /// 只改名字和名字的來源，不動聲紋等其他欄位（design §21.1）
+    /// 只改名字和名字的来源，不动声纹等其他字段（design §21.1）
     func renameSpeaker(_ meetingId: Int64, idx: Int, name: String) throws {
         try pool.write { db in
             try db.execute(sql: """
                 INSERT INTO speakers (meeting_id, idx, name, name_source) VALUES (?, ?, ?, ?)
                 ON CONFLICT (meeting_id, idx) DO UPDATE SET name = excluded.name, name_source = excluded.name_source
                 """, arguments: [meetingId, idx, name, Self.isDefaultSpeakerName(name) ? "default" : "manual"])
-            // 改名之後不能再復原合併、改句子（復原會把名字一起換回去，跟會議紀錄對不上，design §24.4）
+            // 改名之后不能再复原合并、改句子（复原会把名字一起换回去，跟会议记录对不上，design §24.4）
             try db.execute(sql: "DELETE FROM speaker_undo WHERE meeting_id = ?", arguments: [meetingId])
         }
     }
 
-    // MARK: 重點與筆記
+    // MARK: 重点与笔记
 
-    // MARK: 參考文件（design §39.1、R61）
+    // MARK: 参考文档（design §39.1、R61）
 
     func document(_ id: Int64) throws -> MeetingDocument? {
         try pool.read { db in try MeetingDocument.fetchOne(db, key: id) }
@@ -653,7 +664,7 @@ final class AppDatabase: @unchecked Sendable {
         try pool.read { db in try MeetingDocument.filter(Column("meeting_id") == meetingId).order(Column("id")).fetchAll(db) }
     }
 
-    /// 先插入、再用 id 填 file（documents/<id>/<檔名>），同一個交易
+    /// 先插入、再用 id 填 file（documents/<id>/<文件名>），同一个交易
     func addDocument(_ meetingId: Int64, name: String, kind: DocumentKind, pages: [String], ocr: Bool) throws -> MeetingDocument {
         try pool.write { db in
             var document = MeetingDocument(meetingId: meetingId, name: name, kind: kind.rawValue,
@@ -665,7 +676,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 刪掉一份文件，連同原始檔；回傳刪掉的那筆
+    /// 删掉一份文档，连同源文件；回传删掉的那笔
     @discardableResult
     func deleteDocument(_ id: Int64) throws -> MeetingDocument? {
         let document = try pool.write { db -> MeetingDocument? in
@@ -677,7 +688,7 @@ final class AppDatabase: @unchecked Sendable {
         return document
     }
 
-    /// 原始檔放在 documents/<id>/ 底下，整個資料夾刪掉。標準答案的暫存資料庫不碰檔案（documentsRoot 是 nil）
+    /// 源文件放在 documents/<id>/ 底下，整个文件夹删掉。标准答案的暂存数据库不碰文件（documentsRoot 是 nil）
     private func removeDocumentFile(_ file: String) {
         guard let documentsRoot, let folder = file.split(separator: "/").first, Int64(folder) != nil else { return }
         try? FileManager.default.removeItem(at: documentsRoot.appendingPathComponent(String(folder), isDirectory: true))
@@ -706,18 +717,18 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    // MARK: 會議紀錄
+    // MARK: 会议记录
 
-    /// 寫入新的會議紀錄，舊的那一版存進 notes_versions（R6.7）
-    /// 會議紀錄怎麼來的，決定草稿狀態和要不要留版本（design §21.3）
+    /// 写入新的会议记录，旧的那一版存进 notes_versions（R6.7）
+    /// 会议记录怎么来的，决定草稿状态和要不要留版本（design §21.3）
     enum NotesSource {
-        case edit        // 手動編輯、取代、略過待確認、匯入：草稿被改過就標成 2（改過的草稿）
-        case draft       // 用即時逐字稿整理的草稿：notes_draft = 1，不留版本
-        case generated   // 正式整理：取代沒改過的草稿不留版本；取代改過的草稿留一版（原因「草稿（改過）」）
-        case revised     // 校稿：在草稿上校稿，結果仍然是草稿（2）
+        case edit        // 手动编辑、取代、略过待确认、导入：草稿被改过就标成 2（改过的草稿）
+        case draft       // 用实时逐字稿整理的草稿：notes_draft = 1，不留版本
+        case generated   // 正式整理：取代没改过的草稿不留版本；取代改过的草稿留一版（原因「草稿（改过）」）
+        case revised     // 校稿：在草稿上校稿，结果仍然是草稿（2）
     }
 
-    /// 回傳是否取代了使用者改過的草稿（畫面要提示，design §21.3）
+    /// 回传是否取代了用户改过的草稿（画面要提示，design §21.3）
     @discardableResult
     func saveNotes(_ meetingId: Int64, notes: MeetingNotes, by provider: String?, reason: String, source: NotesSource = .edit) throws -> Bool {
         try pool.write { db in try Self.saveNotes(db, meetingId, notes: notes, by: provider, reason: reason, source: source) }
@@ -737,7 +748,7 @@ final class AppDatabase: @unchecked Sendable {
             m.notesDraft = 1
         case .generated:
             if wasDraft == 1 { keepVersion = false }
-            if wasDraft == 2 { versionReason = String(localized: "草稿（改過）") }
+            if wasDraft == 2 { versionReason = String(localized: "草稿（改过）") }
             m.notesDraft = 0
         case .revised: if wasDraft != 0 { m.notesDraft = 2 }
         }
@@ -757,7 +768,7 @@ final class AppDatabase: @unchecked Sendable {
         return source == .generated && wasDraft == 2
     }
 
-    /// 復原上一版：成功回傳 true
+    /// 复原上一版：成功回传 true
     func undoNotes(_ meetingId: Int64) throws -> Bool {
         try pool.write { db in try Self.undoNotes(db, meetingId) }
     }
@@ -766,7 +777,7 @@ final class AppDatabase: @unchecked Sendable {
         guard let version = try NotesVersion.filter(Column("meeting_id") == meetingId).order(Column("id").desc).fetchOne(db),
               var m = try Meeting.fetchOne(db, key: meetingId) else { return false }
         m.notes = version.notes
-        m.notesDraft = 0   // 復原的是之前的某一版，不再當草稿自動更新
+        m.notesDraft = 0   // 复原的是之前的某一版，不再当草稿自动更新
         if !m.titleLocked, let title = m.decodedNotes?.title, !title.isEmpty { m.title = title }
         m.updatedAt = Clock.now()
         try m.update(db)
@@ -776,7 +787,7 @@ final class AppDatabase: @unchecked Sendable {
         return true
     }
 
-    /// 全文取代：逐字稿＋會議紀錄（沿用第二版）
+    /// 全文取代：逐字稿＋会议记录（沿用第二版）
     func replace(_ meetingId: Int64, find: String, with replacement: String) throws -> ReplaceResult {
         try pool.write { db in
             var changed = 0
@@ -798,17 +809,17 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 只略過、不需要 LLM 的待確認題目：直接從會議紀錄移除
+    /// 只略过、不需要 LLM 的待确认题目：直接从会议记录移除
     func dismissReviewItems(_ meetingId: Int64, indexes: Set<Int>) throws {
         try resolveReviewItems(meetingId, confirmed: [], dismissed: indexes)
     }
 
-    /// 確認（是非題回答「是」）和略過的題目直接從紀錄移除（R41.4、design §31.3），留一個版本；兩種都沒有就不動
+    /// 确认（是非题回答「是」）和略过的题目直接从记录移除（R41.4、design §31.3），留一个版本；两种都没有就不动
     func resolveReviewItems(_ meetingId: Int64, confirmed: Set<Int>, dismissed: Set<Int>) throws {
         let indexes = confirmed.union(dismissed)
         guard !indexes.isEmpty else { return }
-        let reason = dismissed.isEmpty ? String(localized: "確認待確認")
-            : confirmed.isEmpty ? String(localized: "略過待確認") : String(localized: "確認、略過待確認")
+        let reason = dismissed.isEmpty ? String(localized: "确认待确认")
+            : confirmed.isEmpty ? String(localized: "略过待确认") : String(localized: "确认、略过待确认")
         try pool.write { db in
             guard let m = try Meeting.fetchOne(db, key: meetingId), var notes = m.decodedNotes else { return }
             notes.reviewItems = notes.reviewItems.enumerated().filter { !indexes.contains($0.offset) }.map(\.element)
@@ -816,11 +827,11 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    // MARK: 搜尋（R9.1）
+    // MARK: 搜索（R9.1）
 
-    /// 搜尋表的 rowid（design §20.11、D27）：段落用段落的 id；標題、會議紀錄、筆記用 2^50 + 會議 id × 4 + 種類，
-    /// 不會跟段落重疊。FTS5 只能用 MATCH 或 rowid 找列，用其他欄位刪改每次都要掃整張表，所以一律用 rowid。
-    /// 新增時一定要指定 rowid：自動編號會接在最大的 rowid 後面，之後可能跟推算出來的值撞在一起
+    /// 搜索表的 rowid（design §20.11、D27）：段落用段落的 id；标题、会议记录、笔记用 2^50 + 会议 id × 4 + 种类，
+    /// 不会跟段落重叠。FTS5 只能用 MATCH 或 rowid 找列，用其他字段删改每次都要扫整张表，所以一律用 rowid。
+    /// 添加时一定要指定 rowid：自动编号会接在最大的 rowid 后面，之后可能跟推算出来的值撞在一起
     private static let metaRowidBase: Int64 = 1 << 50
 
     private static func searchRowid(meetingId: Int64, kind: SearchHit.Kind) -> Int64 {
@@ -838,18 +849,18 @@ final class AppDatabase: @unchecked Sendable {
                        arguments: [id, meetingId, id, text])
     }
 
-    /// 刪掉這場會議所有段落的索引（段落還在資料庫裡的時候呼叫）
+    /// 删掉这场会议所有段落的索引（段落还在数据库里的时候调用）
     private static func unindexSegments(_ db: Database, meetingId: Int64) throws {
         try db.execute(sql: "DELETE FROM search WHERE rowid IN (SELECT id FROM segments WHERE meeting_id = ?)", arguments: [meetingId])
     }
 
-    /// 刪掉這場會議的標題、會議紀錄、筆記的索引
+    /// 删掉这场会议的标题、会议记录、笔记的索引
     private static func unindexMeeting(_ db: Database, meetingId: Int64) throws {
         let ids = [SearchHit.Kind.title, .notes, .userNotes].map { searchRowid(meetingId: meetingId, kind: $0) }
         try db.execute(sql: "DELETE FROM search WHERE rowid IN (?, ?, ?)", arguments: StatementArguments(ids))
     }
 
-    /// 標題、會議紀錄、筆記（ref 是 0）
+    /// 标题、会议记录、笔记（ref 是 0）
     private static func index(_ db: Database, meetingId: Int64, kind: SearchHit.Kind, ref: Int64, text: String) throws {
         let rowid = searchRowid(meetingId: meetingId, kind: kind)
         try db.execute(sql: "DELETE FROM search WHERE rowid = ?", arguments: [rowid])
@@ -861,7 +872,7 @@ final class AppDatabase: @unchecked Sendable {
     private static func rebuildSearch(_ db: Database) throws {
         try db.execute(sql: "DELETE FROM search")
         try db.execute(sql: "INSERT INTO search (rowid, meeting_id, kind, ref, text) SELECT id, meeting_id, 'segment', id, text FROM segments")
-        // 只讀需要的欄位，不要整筆解碼成 Meeting：migration 裡呼叫時，後面版本才加的欄位還不存在（design §21.1）
+        // 只读需要的字段，不要整笔解码成 Meeting：migration 里调用时，后面版本才加的字段还不存在（design §21.1）
         let rows = try Row.fetchAll(db, sql: "SELECT id, title, source_filename, user_notes, notes FROM meetings")
         for row in rows {
             let m = Meeting(id: row["id"], title: row["title"], meetingDate: "", sourceFilename: row["source_filename"],
@@ -876,7 +887,7 @@ final class AppDatabase: @unchecked Sendable {
         try pool.write { try Self.rebuildSearch($0) }
     }
 
-    /// trigram 至少要 3 個字；1～2 個字改用 LIKE
+    /// trigram 至少要 3 个字；1～2 个字改用 LIKE
     func search(_ query: String, limit: Int = 200) throws -> [SearchHit] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return [] }
@@ -912,9 +923,9 @@ final class AppDatabase: @unchecked Sendable {
             + (end < text.endIndex ? "…" : "")
     }
 
-    // MARK: 範本
+    // MARK: 模板
 
-    /// 內建範本依固定順序（一般會議在最前面），自訂範本接在後面依名稱排序
+    /// 内置模板依固定顺序（一般会议在最前面），自订模板接在后面依名称排序
     func templates() throws -> [TemplateRecord] {
         let order = BuiltinTemplates.all.map(\.id)
         return try pool.read { db in try TemplateRecord.fetchAll(db) }.sorted { a, b in
@@ -944,7 +955,7 @@ final class AppDatabase: @unchecked Sendable {
     @discardableResult
     func enqueue(_ meetingId: Int64, kind: JobKind, payload: String? = nil) throws -> Job {
         #if DEBUG
-        // 啟動參數 -debugFailEnqueue YES：排工作失敗，驗證失敗時不會刪掉錄音（design §20.6）
+        // 启动参数 -debugFailEnqueue YES：排工作失败，验证失败时不会删掉录音（design §20.6）
         if UserDefaults.standard.bool(forKey: "debugFailEnqueue") {
             throw DatabaseError(resultCode: .SQLITE_FULL, message: "debugFailEnqueue")
         }
@@ -956,7 +967,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 取出下一個排隊的工作，改成 running。模型還沒下載好的語言也照樣轉錄（先用 macOS 內建辨識，design §21.17）
+    /// 取出下一个排队的工作，改成 running。模型还没下载好的语言也照样转录（先用 macOS 内置识别，design §21.17）
     func claimNext(lane: JobLane) throws -> Job? {
         let kinds = JobKind.allCases.filter { $0.lane == lane }.map(\.rawValue)
         return try pool.write { db in
@@ -969,7 +980,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// errorKind：錯誤的種類（Error.logSummary），回報問題時用，不含內容（design §21.9）
+    /// errorKind：错误的种类（Error.logSummary），反馈问题时用，不含内容（design §21.9）
     func finish(_ jobId: Int64, status: JobStatus, error: String? = nil, errorKind: String? = nil) throws {
         try pool.write { db in
             try db.execute(sql: "UPDATE jobs SET status = ?, error = ?, error_kind = ?, finished_at = ? WHERE id = ?",
@@ -977,33 +988,33 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 工作的 payload 換掉（企業伺服器的工作 id，design §36.3）
+    /// 工作的 payload 换掉（企业服务器的工作 id，design §36.3）
     func setJobPayload(_ jobId: Int64, _ payload: String?) throws {
         try pool.write { db in
             try db.execute(sql: "UPDATE jobs SET payload = ? WHERE id = ?", arguments: [payload, jobId])
         }
     }
 
-    /// app 啟動時：上次沒跑完的工作改回排隊
-    /// 啟動時：還是 running 的工作表示上次執行時拾音意外結束（design §20.5、D26）。
-    /// 意外結束累計 2 次就標成失敗，不再自動重跑；不到 2 次才改回排隊
+    /// app 启动时：上次没跑完的工作改回排队
+    /// 启动时：还是 running 的工作表示上次执行时拾音意外结束（design §20.5、D26）。
+    /// 意外结束累计 2 次就标成失败，不再自动重跑；不到 2 次才改回排队
     func requeueRunning() throws {
         try pool.write { db in
             try db.execute(sql: "UPDATE jobs SET crashes = crashes + 1 WHERE status = 'running'")
             try db.execute(sql: "UPDATE jobs SET status = 'failed', error = ?, finished_at = ? WHERE status = 'running' AND crashes >= 2",
-                           arguments: [String(localized: "執行這個工作時拾音意外結束了 2 次，已經停止自動重試。可以按「重試」再試一次。"), Clock.now()])
+                           arguments: [String(localized: "执行这个工作时拾音意外结束了 2 次，已经停止自动重试。可以按「重试」再试一次。"), Clock.now()])
             try db.execute(sql: "UPDATE jobs SET status = 'queued', started_at = NULL WHERE status = 'running'")
         }
     }
 
-    /// 正常結束拾音時：執行中的工作改回排隊，下次開啟從頭重跑，不算意外結束（design §20.5）
+    /// 正常结束拾音时：执行中的工作改回排队，下次打开从头重跑，不算意外结束（design §20.5）
     func releaseRunning() throws {
         try pool.write { db in
             try db.execute(sql: "UPDATE jobs SET status = 'queued', started_at = NULL WHERE status = 'running'")
         }
     }
 
-    /// 取消這場會議所有排隊中、執行中的工作，回傳原本執行中的工作 id
+    /// 取消这场会议所有排队中、执行中的工作，回传原本执行中的工作 id
     func cancelJobs(_ meetingId: Int64) throws -> [Int64] {
         try pool.write { db in
             let running = try Int64.fetchAll(db, sql: "SELECT id FROM jobs WHERE meeting_id = ? AND status = 'running'",
@@ -1016,7 +1027,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 這場會議有沒有排隊中或執行中的某種工作
+    /// 这场会议有没有排队中或执行中的某种工作
     func hasActiveJob(_ meetingId: Int64, kind: JobKind) throws -> Bool {
         try pool.read { db in
             try Job.filter(Column("meeting_id") == meetingId && Column("kind") == kind.rawValue
@@ -1024,7 +1035,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    /// 有沒有某個語言的會議在排隊等轉錄
+    /// 有没有某个语言的会议在排队等转录
     func hasQueuedTranscribe(language: MeetingLanguage) throws -> Bool {
         try pool.read { db in
             try Bool.fetchOne(db, sql: """
@@ -1044,7 +1055,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    // MARK: 詞彙表
+    // MARK: 词汇表
 
     func glossary() throws -> [GlossaryTerm] {
         try pool.read { db in try GlossaryTerm.order(Column("id")).fetchAll(db) }
@@ -1062,8 +1073,8 @@ final class AppDatabase: @unchecked Sendable {
         _ = try pool.write { db in try GlossaryTerm.deleteOne(db, key: id) }
     }
 
-    /// 詞彙表建議（design §17.5、R14.5）：從參加者、改過名字的說話者、接受過的校正、中文會議標題裡的英文詞找。
-    /// 已經在詞彙表裡、被忽略過的不建議；出現越多次排越前面
+    /// 词汇表建议（design §17.5、R14.5）：从参加者、改过名字的说话者、接受过的校正、中文会议标题里的英文词找。
+    /// 已经在词汇表里、被忽略过的不建议；出现越多次排越前面
     func glossarySuggestions(limit: Int = 12) throws -> [GlossarySuggestion] {
         try pool.read { db in
             var found: [String: (term: String, source: GlossarySuggestion.Source, count: Int)] = [:]
@@ -1081,7 +1092,7 @@ final class AppDatabase: @unchecked Sendable {
             for name in names where !Self.isDefaultSpeakerName(name) { add(name, .speaker) }
             let accepted = try String.fetchAll(db, sql: "SELECT suggestion FROM corrections WHERE status = 'accepted'")
             for term in accepted where term.contains(where: { $0.isASCII && $0.isLetter }) { add(term, .correction) }
-            // 中文、日文會議標題裡的英文詞通常是產品名、專案名；英文會議的標題就不拆了
+            // 中文、日文会议标题里的英文词通常是产品名、项目名；英文会议的标题就不拆了
             let word = #/[A-Za-z][A-Za-z0-9.+\-]{2,}/#
             for meeting in meetings where !meeting.meetingLanguage.profile.spaced {
                 for match in meeting.title.matches(of: word) { add(String(match.output), .title) }
@@ -1100,7 +1111,7 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
-    // MARK: 儲存空間
+    // MARK: 保存空间
 
     func setAudioFile(_ meetingId: Int64, _ filename: String) throws {
         try pool.write { db in

@@ -7,17 +7,17 @@ enum WAVRepairError: LocalizedError {
     }
 }
 
-/// 修復沒有正常結束的 WAV：用實際檔案大小改寫 RIFF 與 data 的大小（design §8）
+/// 修复没有正常结束的 WAV：用实际文件大小改写 RIFF 与 data 的大小（design §8）
 enum WAVRepair {
     static func repair(_ url: URL) throws {
         let handle = try FileHandle(forUpdating: url)
         defer { try? handle.close() }
         let size = try handle.seekToEnd()
-        guard size > 44 else { throw WAVRepairError.invalid(String(localized: "錄音檔太小，沒有內容")) }
+        guard size > 44 else { throw WAVRepairError.invalid(String(localized: "录音档太小，没有内容")) }
         try handle.seek(toOffset: 0)
         let header = try handle.read(upToCount: 12) ?? Data()
         guard header.count == 12, header.prefix(4) == Data("RIFF".utf8), header.suffix(4) == Data("WAVE".utf8) else {
-            throw WAVRepairError.invalid(String(localized: "不是 WAV 檔"))
+            throw WAVRepairError.invalid(String(localized: "不是 WAV 档"))
         }
         var offset: UInt64 = 12
         while offset + 8 <= size {
@@ -33,7 +33,7 @@ enum WAVRepair {
             }
             offset += 8 + chunkSize + (chunkSize % 2)
         }
-        throw WAVRepairError.invalid(String(localized: "找不到音訊資料區段"))
+        throw WAVRepairError.invalid(String(localized: "找不到音频资料区段"))
     }
 
     private static func write(_ value: UInt32, at offset: UInt64, _ handle: FileHandle) throws {

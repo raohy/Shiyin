@@ -1,38 +1,38 @@
 import Foundation
 import QwenShim
 
-/// Qwen3-ASR（llama.cpp，design §32.4、D107）：先依說話者片段和安靜處分段，每段各自轉錄，段落的時間就是分段的時間。
-/// 跳針（同一個字重複到截斷）時先加重複懲罰重試，再切半，最後修剪並標成低信心（R43.5）。
+/// Qwen3-ASR（llama.cpp，design §32.4、D107）：先依说话者片段和安静处分段，每段各自转录，段落的时间就是分段的时间。
+/// 跳针（同一个字重复到截断）时先加重复惩罚重试，再切半，最后修剪并标成低信心（R43.5）。
 enum QwenEngine {
-    /// 一段要轉錄的音訊（取樣的範圍）
+    /// 一段要转录的音频（采样的范围）
     struct Chunk: Equatable {
         var range: Range<Int>
     }
 
-    /// 每段最長幾秒（評估：15 秒跟 30 秒的錯誤率一樣，短一點說話者標得細）
+    /// 每段最长几秒（评估：15 秒跟 30 秒的错误率一样，短一点说话者标得细）
     static let maxChunkSeconds = 15.0
-    /// 文字＋音訊 token 的上限：15 秒音訊約 190 個 token，加提示詞和輸出綽綽有餘；分段最長 120 秒時也夠
+    /// 文字＋音频 token 的上限：15 秒音频约 190 个 token，加提示词和输出绰绰有余；分段最长 120 秒时也够
     static let contextTokens: Int32 = 4096
 
     // MARK: 分段
 
-    /// 在安靜處切、優先切在換人說話的地方（design §32.4）：
-    /// - 每個換人的時間點前後 1 秒內最安靜的 0.3 秒，能量低於整段中位數的 15% 才切（真的有停頓才切，不切在字中間）
-    /// - 超過 maxSeconds 的段在預定位置前後 5 秒內最安靜的 0.5 秒切開（同 §21.16 的規則）
-    /// - 短於 0.5 秒的併進前一段（模型的最短輸入）
-    /// 沒有說話者片段時只做後兩步
-    /// splitMixed（預設開）：混到第二個人 ≥ 1.5 秒且 ≥ 25% 的段，照片段邊界再切，說話者才標得準（§32.4 第三步）；
-    /// anyChange（評估用）：換人處不看能量門檻，一律在最安靜點切
+    /// 在安静处切、优先切在换人说话的地方（design §32.4）：
+    /// - 每个换人的时间点前后 1 秒内最安静的 0.3 秒，能量低于整段中位数的 15% 才切（真的有停顿才切，不切在字中间）
+    /// - 超过 maxSeconds 的段在预定位置前后 5 秒内最安静的 0.5 秒切开（同 §21.16 的规则）
+    /// - 短于 0.5 秒的并进前一段（模型的最短输入）
+    /// 没有说话者片段时只做后两步
+    /// splitMixed（默认开）：混到第二个人 ≥ 1.5 秒且 ≥ 25% 的段，照片段边界再切，说话者才标得准（§32.4 第三步）；
+    /// anyChange（评估用）：换人处不看能量门槛，一律在最安静点切
     static func chunks(_ samples: [Float], turns: [Diarizer.Turn], maxSeconds: Double = maxChunkSeconds,
                        anyChange: Bool = false, splitMixed: Bool = true) -> [Chunk] {
         let rate = Int(AudioDecoder.sampleRate)
         let n = samples.count
         guard n > 0 else { return [] }
-        // 能量的前綴和，任何一段的能量都能 O(1) 算出來
+        // 能量的前缀和，任何一段的能量都能 O(1) 算出来
         var prefix = [Double](repeating: 0, count: n + 1)
         for i in 0..<n { prefix[i + 1] = prefix[i] + Double(samples[i] * samples[i]) }
         func energy(_ a: Int, _ b: Int) -> Double { prefix[min(b, n)] - prefix[max(a, 0)] }
-        /// [lo, hi) 裡最安靜的 window 個取樣的中點和能量
+        /// [lo, hi) 里最安静的 window 个采样的中点和能量
         func quietest(lo: Int, hi: Int, window: Int) -> (center: Int, energy: Double)? {
             guard hi - window > lo else { return nil }
             var best = lo, bestEnergy = Double.greatestFiniteMagnitude
@@ -47,7 +47,7 @@ enum QwenEngine {
 
         var cuts = Set<Int>()
         if turns.count > 1 {
-            // 整段的能量中位數（每 0.1 秒一格）
+            // 整段的能量中位数（每 0.1 秒一格）
             let frame = rate / 10
             var frames: [Double] = []
             var p = 0
@@ -69,7 +69,7 @@ enum QwenEngine {
         var pieces: [Range<Int>] = []
         for (a, b) in zip(bounds, bounds.dropFirst()) where b > a {
             var start = a
-            // 剩下超過一段半才切（最後一段不短於半段）
+            // 剩下超过一段半才切（最后一段不短于半段）
             while b - start > maxLength + maxLength / 2 {
                 let target = start + maxLength
                 let cut = quietest(lo: max(start + rate / 2, target - 5 * rate), hi: min(b - rate / 2, target + 5 * rate), window: rate / 2)?.center ?? target
@@ -87,7 +87,7 @@ enum QwenEngine {
             }
         }
         guard splitMixed, !turns.isEmpty else { return merged.map { Chunk(range: $0) } }
-        /// 每位說話者在 [a, b) 裡講了幾秒
+        /// 每位说话者在 [a, b) 里讲了几秒
         func overlap(_ a: Int, _ b: Int) -> [Int: Double] {
             var out: [Int: Double] = [:]
             let (lo, hi) = (Double(a) / Double(rate), Double(b) / Double(rate))
@@ -100,7 +100,7 @@ enum QwenEngine {
             guard ranked.count >= 2, ranked[1] >= 1.5, ranked[1] >= 0.25 * Double(piece.count) / Double(rate) else {
                 result.append(Chunk(range: piece)); continue
             }
-            // 照片段的起點切，太短的併進前一段
+            // 照片段的起点切，太短的并进前一段
             let points = Set(turns.map { Int($0.start * Double(rate)) }.filter { $0 > piece.lowerBound && $0 < piece.upperBound }).sorted()
             var parts: [Range<Int>] = []
             for (a, b) in zip([piece.lowerBound] + points, points + [piece.upperBound]) where b > a {
@@ -111,16 +111,16 @@ enum QwenEngine {
         return result
     }
 
-    // MARK: 轉錄
+    // MARK: 转录
 
-    /// 每段的結果：文字和是不是經過修剪（低信心）
+    /// 每段的结果：文字和是不是经过修剪（低信心）
     struct Piece {
         var range: Range<Int>
         var text: String
         var trimmed: Bool
     }
 
-    /// 詞彙表當作提示（Qwen3-ASR 的 contextual biasing）：跟 whisper 的提示詞同樣的上限（中文 150 字、英文 400 個字元）
+    /// 词汇表当作提示（Qwen3-ASR 的 contextual biasing）：跟 whisper 的提示词同样的上限（中文 150 字、英文 400 个字符）
     static func context(glossary: [String], language: MeetingLanguage) -> String {
         let limit = language.profile.whisperPrompt.limit, separator = language.profile.whisperPrompt.separator
         var picked: [String] = []
@@ -132,10 +132,10 @@ enum QwenEngine {
         return picked.joined(separator: separator)
     }
 
-    /// 語言檔的 transcription.qwen；Qwen3-ASR 不能用的語言不會走到這裡（ModelStore.transcription(for:)）
+    /// 语言档的 transcription.qwen；Qwen3-ASR 不能用的语言不会走到这里（ModelStore.transcription(for:)）
     static func languageName(_ language: MeetingLanguage) -> String { language.profile.transcription.qwen ?? "Chinese" }
 
-    /// 每 0.1 秒一格的能量中位數（只算有聲音的格）：分段和幻覺防線都用它當「有聲音」的基準
+    /// 每 0.1 秒一格的能量中位数（只算有声音的格）：分段和幻觉防线都用它当「有声音」的基准
     static func medianFrameEnergy(_ samples: UnsafeBufferPointer<Float>) -> Double {
         let frame = Int(AudioDecoder.sampleRate) / 10
         var frames: [Double] = []
@@ -151,7 +151,7 @@ enum QwenEngine {
         return frames[frames.count / 2]
     }
 
-    /// 這一段裡有聲音的秒數：能量超過整段中位數一半的 0.1 秒格數
+    /// 这一段里有声音的秒数：能量超过整段中位数一半的 0.1 秒格数
     static func speechSeconds(_ samples: UnsafeBufferPointer<Float>, range: Range<Int>, median: Double) -> Double {
         let frame = Int(AudioDecoder.sampleRate) / 10
         let threshold = median * 0.5
@@ -166,18 +166,18 @@ enum QwenEngine {
         return Double(count) * 0.1
     }
 
-    /// 文字的長度單位：英文算字數，其他算字母和數字的個數
+    /// 文字的长度单位：英文算字数，其他算字母和数字的个数
     static func units(_ text: String, language: String) -> Int {
         language == "English" ? text.split(whereSeparator: { $0.isWhitespace }).count : text.filter { $0.isLetter || $0.isNumber }.count
     }
 
-    /// 輸出比有聲音的秒數能講的還多（英文 5 字／秒、中日文 8 字／秒，加一點餘裕）：短而吵的段落常會編出整段沒說過的話
+    /// 输出比有声音的秒数能讲的还多（英文 5 字／秒、中日文 8 字／秒，加一点余裕）：短而吵的段落常会编出整段没说过的话
     static func tooLong(_ text: String, language: String, speechSeconds: Double) -> Bool {
         let cap = language == "English" ? speechSeconds * 5 + 3 : speechSeconds * 8 + 4
         return Double(units(text, language: language)) > cap
     }
 
-    /// 兩段文字的相似度（difflib 的 ratio：2 × 最長共同子序列 ÷ 兩段長度和）
+    /// 两段文字的相似度（difflib 的 ratio：2 × 最长共同子序列 ÷ 两段长度和）
     static func similarity(_ a: String, _ b: String) -> Double {
         let x = Array(a), y = Array(b)
         guard !x.isEmpty || !y.isEmpty else { return 1 }
@@ -191,7 +191,7 @@ enum QwenEngine {
         return 2 * Double(prev[y.count]) / Double(x.count + y.count)
     }
 
-    /// 載入模型、逐段轉錄、釋放模型。回傳的段落時間是分段的時間（秒）。中文會議的文字已經轉成台灣繁體
+    /// 加载模型、逐段转录、释放模型。回传的段落时间是分段的时间（秒）。粤语的文字已经转成繁体并套用 scriptFixes，最后由 TranscriptionPipeline 统一转简体（design §45）
     static func transcribe(samples: [Float], chunks: [Chunk], modelPath: String, encoderPath: String, language: MeetingLanguage,
                            glossary: [String], control: WhisperEngine.Control, retry: Bool = true, guard useGuard: Bool = true) throws -> [TranscribedSegment] {
         let threads = Int32(max(2, min(8, ProcessInfo.processInfo.activeProcessorCount - 2)))
@@ -221,14 +221,14 @@ enum QwenEngine {
         return segments
     }
 
-    /// 一段：壞掉（到達 max_tokens、壓縮比 > 2.4、同一片段連續重複 5 次以上）就重試、切半、修剪（§32.4）
+    /// 一段：坏掉（到达 max_tokens、压缩比 > 2.4、同一片段连续重复 5 次以上）就重试、切半、修剪（§32.4）
     private static func run(_ engine: OpaquePointer, buffer: UnsafeBufferPointer<Float>, range: Range<Int>, context: String, language: String,
                             control: WhisperEngine.Control, retry: Bool, guardMedian: Double?, depth: Int) throws -> [Piece] {
         let rate = Int(AudioDecoder.sampleRate)
         let seconds = Double(range.count) / Double(rate)
         var params = qwen_params_default()
         params.max_tokens = Int32(seconds * 12) + 64
-        /// 幻覺防線（§32.4 第 4 步）：輸出比有聲音的秒數能講的還多，就加溫度重解一次；兩次差很多就是編的，丟掉；差不多就留短的
+        /// 幻觉防线（§32.4 第 4 步）：输出比有声音的秒数能讲的还多，就加温度重解一次；两次差很多就是编的，丢掉；差不多就留短的
         func guarded(_ text: String) throws -> Piece {
             guard let median = guardMedian, tooLong(text, language: language, speechSeconds: speechSeconds(buffer, range: range, median: median)) else {
                 return Piece(range: range, text: text, trimmed: false)
@@ -244,7 +244,7 @@ enum QwenEngine {
         if !retry || !looksBad(first.text, truncated: first.truncated) {
             return [try guarded(first.text)]
         }
-        // 1. 加重複懲罰和一點溫度再來一次
+        // 1. 加重复惩罚和一点温度再来一次
         params.repeat_penalty = 1.3
         params.repeat_last_n = 128
         params.temperature = 0.2
@@ -253,7 +253,7 @@ enum QwenEngine {
         if !looksBad(second.text, truncated: second.truncated) {
             return [try guarded(second.text)]
         }
-        // 2. 夠長就切成兩半各自再來
+        // 2. 够长就切成两半各自再来
         if seconds >= 6 && depth < 3 {
             let half = chunks(Array(buffer[range]), turns: [], maxSeconds: seconds / 2)
             if half.count >= 2 {
@@ -266,7 +266,7 @@ enum QwenEngine {
                 return pieces
             }
         }
-        // 3. 留壓縮比較低的那次，重複的片段縮成 3 次，標成低信心
+        // 3. 留压缩比较低的那次，重复的片段缩成 3 次，标成低信心
         let best = WhisperEngine.compressionRatio(first.text) <= WhisperEngine.compressionRatio(second.text) ? first.text : second.text
         return [Piece(range: range, text: trimRepeats(best), trimmed: true)]
     }
@@ -293,7 +293,7 @@ enum QwenEngine {
         return (clean(String(cString: out)), rc == 1 || rc == -5)
     }
 
-    /// 去掉 tokenizer 漏出來的私用區字元和前後空白；模型把縮寫一個字母一個字母拆開（「A P P」「O T P」），併回去
+    /// 去掉 tokenizer 漏出来的私用区字符和前后空白；模型把缩写一个字母一个字母拆开（「A P P」「O T P」），并回去
     static func clean(_ text: String) -> String {
         let stripped = String(text.unicodeScalars.filter { !(0xE000...0xF8FF).contains($0.value) }.map { Character($0) })
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -302,7 +302,7 @@ enum QwenEngine {
 
     private static let spelled = try! NSRegularExpression(pattern: "(?<![A-Za-z0-9])(?:[A-Z] )+[A-Z](?![A-Za-z0-9])")
 
-    /// 「A P P」→「APP」：兩個以上單獨的大寫字母用空白隔開時併成一個字
+    /// 「A P P」→「APP」：两个以上单独的大写字母用空白隔开时并成一个字
     static func joinSpelledAcronyms(_ text: String) -> String {
         let ns = text as NSString
         var result = text
@@ -313,7 +313,7 @@ enum QwenEngine {
         return result
     }
 
-    /// 同一個 1～6 字的片段連續出現 5 次以上
+    /// 同一个 1～6 字的片段连续出现 5 次以上
     private static let repeats = try! NSRegularExpression(pattern: "(.{1,6}?)\\1{4,}", options: [.dotMatchesLineSeparators])
 
     static func looksBad(_ text: String, truncated: Bool) -> Bool {
@@ -321,7 +321,7 @@ enum QwenEngine {
             || repeats.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
     }
 
-    /// 連續重複的片段縮成 3 次（「對對對對對對對對」→「對對對」）
+    /// 连续重复的片段缩成 3 次（「对对对对对对对对」→「对对对」）
     static func trimRepeats(_ text: String) -> String {
         let ns = text as NSString
         var result = text

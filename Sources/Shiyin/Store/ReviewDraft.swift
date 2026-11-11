@@ -1,25 +1,25 @@
 import Foundation
 import Observation
 
-/// 待確認的回答（design §31.2、R41.2）：待確認分頁和紀錄旁的就地回答共用同一份，兩邊看到的一樣。
-/// 草稿存在資料庫（§21.15、R20.6）：打字停 0.8 秒存一次；換分頁、換會議、結束拾音都還在，直到送出。
-/// 回答是照題號存的：題目換了（依回答修正、重新整理、復原上一版）就清掉，不然會配到別的題目（`sync`）
+/// 待确认的回答（design §31.2、R41.2）：待确认标签页和记录旁的就地回答共用同一份，两边看到的一样。
+/// 草稿存在数据库（§21.15、R20.6）：打字停 0.8 秒存一次；换标签页、换会议、结束拾音都还在，直到送出。
+/// 回答是照题号存的：题目换了（依回答修正、刷新、复原上一版）就清掉，不然会配到别的题目（`sync`）
 @MainActor
 @Observable
 final class ReviewDraft {
     let meetingId: Int64
-    /// 題號 → 回答（是非題是 `YesNoAnswer` 的文字）
+    /// 题号 → 回答（是非题是 `YesNoAnswer` 的文字）
     var answers: [Int: String] = [:] { didSet { scheduleSave() } }
     var dismissed: Set<Int> = [] { didSet { scheduleSave() } }
-    /// 說話者編號 → 回答（「是」「不是，名字」）
+    /// 说话者编号 → 回答（「是」「不是，名字」）
     var speakerAnswers: [Int: String] = [:] { didSet { scheduleSave() } }
     var speakerSkipped: Set<Int> = [] { didSet { scheduleSave() } }
-    /// 就地回答展開中的那一條紀錄（R41.2），同時只展開一條
+    /// 就地回答展开中的那一条记录（R41.2），同时只展开一条
     var expanded: NoteItemRef?
 
     @ObservationIgnored private unowned let model: AppModel
     @ObservationIgnored private var questions: [String] = []
-    /// 說話者編號 → 草稿的 key（建議換了人就是新的題目）
+    /// 说话者编号 → 草稿的 key（建议换了人就是新的题目）
     @ObservationIgnored private var speakerKeys: [Int: String] = [:]
     @ObservationIgnored private var loaded = false
     @ObservationIgnored private var muted = false
@@ -29,7 +29,7 @@ final class ReviewDraft {
     init(meetingId: Int64, model: AppModel) {
         self.meetingId = meetingId
         self.model = model
-        // 拾音要結束了：馬上存（design §21.15）
+        // 拾音要结束了：马上存（design §21.15）
         observer = NotificationCenter.default.addObserver(forName: .flushDrafts, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.flush() }
         }
@@ -39,8 +39,8 @@ final class ReviewDraft {
         if let observer { NotificationCenter.default.removeObserver(observer) }
     }
 
-    /// 載入會議、會議紀錄或說話者換掉時呼叫：第一次從資料庫讀草稿；題目變了就清掉回答；
-    /// 說話者的建議被套用或清掉（例如從「猜到幾位說話者」那邊）就不留那位的回答
+    /// 加载会议、会议记录或说话者换掉时调用：第一次从数据库读草稿；题目变了就清掉回答；
+    /// 说话者的建议被套用或清掉（例如从「猜到几位说话者」那边）就不留那位的回答
     func sync(items: [MeetingNotes.ReviewItem], suggestions: [Int: SpeakerNaming.Suggestion]) {
         let newQuestions = items.map(\.question)
         let newKeys = Dictionary(uniqueKeysWithValues: suggestions.map { ($0.key, "\($0.key):\($0.value.name)") })
@@ -63,8 +63,8 @@ final class ReviewDraft {
             return
         }
         if newQuestions != questions {
-            // 題目換了（送出一部分、依回答修正、重新整理、復原上一版）：草稿是照題目文字存的，
-            // 還在的題目把回答照文字接回來，不在的刪掉草稿（design §31.2）
+            // 题目换了（送出一部分、依回答修正、刷新、复原上一版）：草稿是照题目文字存的，
+            // 还在的题目把回答照文字接回来，不在的删掉草稿（design §31.2）
             saveTask?.cancel()
             var answerByText: [String: String] = [:], skippedTexts: Set<String> = []
             for (index, question) in questions.enumerated() {
@@ -96,7 +96,7 @@ final class ReviewDraft {
         }
     }
 
-    /// 「全部略過」（R41.5）：還沒回答的題目都標成略過，已經有回答的不動
+    /// 「全部略过」（R41.5）：还没回答的题目都标成略过，已经有回答的不动
     func skipAllUnanswered(questionCount: Int, speakers: [Int]) {
         var skipQuestions = dismissed
         for index in 0..<max(0, questionCount) where (answers[index] ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
@@ -108,13 +108,13 @@ final class ReviewDraft {
         speakerSkipped = skipSpeakers
     }
 
-    /// 還有沒回答也沒略過的題目（「全部略過」才有東西可以略）
+    /// 还有没回答也没略过的题目（「全部略过」才有东西可以略）
     func hasUnanswered(questionCount: Int, speakers: [Int]) -> Bool {
         (0..<max(0, questionCount)).contains { !dismissed.contains($0) && (answers[$0] ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
             || speakers.contains { !speakerSkipped.contains($0) && (speakerAnswers[$0] ?? "").isEmpty }
     }
 
-    /// 送出後：草稿刪掉、回答清空
+    /// 送出后：草稿删掉、回答清空
     func clear() {
         saveTask?.cancel()
         model.deleteDrafts(meetingId, prefix: "review")
@@ -123,7 +123,7 @@ final class ReviewDraft {
         expanded = nil
     }
 
-    /// 卡片只送了這幾題（R41.2）：只清這幾題的回答，其他留著；題目消失後 `sync` 會把它們的草稿刪掉
+    /// 卡片只送了这几题（R41.2）：只清这几题的回答，其他留着；题目消失后 `sync` 会把它们的草稿删掉
     func clear(indexes: Set<Int>) {
         withoutSaving {
             for index in indexes { answers[index] = nil }
@@ -132,15 +132,15 @@ final class ReviewDraft {
         expanded = nil
     }
 
-    /// 馬上存（結束拾音、換會議）
+    /// 马上存（结束拾音、换会议）
     func flush() {
         saveTask?.cancel()
         save()
     }
 
-    // MARK: 題數、送出鈕（待確認分頁和就地回答共用）
+    // MARK: 题数、送出钮（待确认标签页和就地回答共用）
 
-    /// 已回答的題數；`only` 給了就只算這幾題（卡片）
+    /// 已回答的题数；`only` 给了就只算这几题（卡片）
     func answeredCount(only: Set<Int>? = nil) -> Int {
         answers.filter { (only?.contains($0.key) ?? true) && !dismissed.contains($0.key) && !$0.value.trimmingCharacters(in: .whitespaces).isEmpty }.count
     }
@@ -155,7 +155,7 @@ final class ReviewDraft {
         speakerAnswers.filter { !speakerSkipped.contains($0.key) && !$0.value.isEmpty }.count
     }
 
-    /// 待確認分頁：全部的題目（含說話者題目）；卡片（`only`）：只有這幾題
+    /// 待确认标签页：全部的题目（含说话者题目）；卡片（`only`）：只有这几题
     func hasSomethingToSubmit(only: Set<Int>? = nil) -> Bool {
         if let only { return answeredCount(only: only) + dismissedCount(only: only) > 0 }
         return answeredCount + speakerAnsweredCount > 0 || !dismissed.isEmpty || !speakerSkipped.isEmpty
@@ -168,9 +168,9 @@ final class ReviewDraft {
         let skipped = dismissedCount(only: only) + (only == nil ? speakerSkipped.count : 0)
         switch (answered, skipped) {
         case (0, 0): return String(localized: "送出")
-        case (0, let d): return String(localized: "略過 \(d) 題")
-        case (let a, 0): return String(localized: "送出 \(a) 題回答")
-        case (let a, let d): return String(localized: "送出 \(a) 題回答、略過 \(d) 題")
+        case (0, let d): return String(localized: "略过 \(d) 题")
+        case (let a, 0): return String(localized: "送出 \(a) 题回答")
+        case (let a, let d): return String(localized: "送出 \(a) 题回答、略过 \(d) 题")
         }
     }
 

@@ -2,15 +2,15 @@ import AppKit
 import SwiftUI
 
 extension EnvironmentValues {
-    /// DEBUG 截圖（ImageRenderer）時為 true：不包 ScrollView，內容才畫得出來（design §13）
+    /// DEBUG 截屏（ImageRenderer）时为 true：不包 ScrollView，内容才画得出来（design §13）
     @Entry var snapshotMode = false
-    /// 正在看的會議的語言：決定會議內容的字形和標題字型（design §18.6）
+    /// 正在看的会议的语言：决定会议内容的字形和标题字体（design §18.6）
     @Entry var meetingLanguage: MeetingLanguage = .zh
-    /// 會議內容的文字大小倍率（design §38.5、R59）：`contentFont`、`contentTitleFont` 和內容的欄寬乘上它
+    /// 会议内容的文字大小倍率（design §38.5、R59）：`contentFont`、`contentTitleFont` 和内容的栏宽乘上它
     @Entry var textScale: CGFloat = 1
 }
 
-/// 會議內容的文字大小（design §38.5、R59、D131）：設定存 −1～5，0 是 100%
+/// 会议内容的文字大小（design §38.5、R59、D131）：设置存 −1～5，0 是 100%
 enum TextSize {
     static let levels = -1...5
     static let scales: [CGFloat] = [0.85, 1, 1.15, 1.3, 1.5, 1.75, 2]
@@ -22,27 +22,27 @@ enum TextSize {
     }
 
     static func label(_ level: Int) -> String {
-        level == 0 ? String(localized: "100%（標準）") : "\(Int((scale(level) * 100).rounded()))%"
+        level == 0 ? String(localized: "100%（标准）") : "\(Int((scale(level) * 100).rounded()))%"
     }
 
-    /// 放大（+1）、縮小（−1）、實際大小（nil）；到頭就不動
+    /// 放大（+1）、缩小（−1）、实际大小（nil）；到头就不动
     static func change(_ step: Int?) {
         let next = step.map { min(max(level + $0, levels.lowerBound), levels.upperBound) } ?? 0
         UserDefaults.standard.set(next, forKey: AppSettings.textSizeKey)
     }
 }
 
-/// 視覺 token（design §9.3）
+/// 视觉 token（design §9.3）
 extension Color {
-    /// 青瓷綠：主要動作、目前播放的段落
+    /// 青瓷绿：主要动作、目前播放的段落
     static let celadon = Color(nsColor: .dynamic(light: 0x2D6A5D, dark: 0x6DB2A1))
-    /// VU 琥珀：低信心、待確認、進行中
+    /// VU 琥珀：低信心、待确认、进行中
     static let signal = Color(nsColor: .dynamic(light: 0xB97F06, dark: 0xE2AD3B))
 }
 
 extension Color {
-    /// 說話者的顏色（8 色循環，深淺色模式都看得清楚）。
-    /// 青瓷綠是時間點按鈕的顏色、琥珀色代表低信心，所以這兩種排在最後，人少的會議不會用到
+    /// 说话者的颜色（8 色循环，深浅色模式都看得清楚）。
+    /// 青瓷绿是时间点按钮的颜色、琥珀色代表低信心，所以这两种排在最后，人少的会议不会用到
     static func speaker(_ idx: Int) -> Color {
         let palette: [(UInt32, UInt32)] = [
             (0x3F5BA9, 0x8FA8EE), (0x8E3B6B, 0xE08BBE), (0x4F7A28, 0x9BCB6E), (0x7A4FB5, 0xBFA0EE),
@@ -64,14 +64,14 @@ extension NSColor {
 }
 
 extension Font {
-    /// 會議標題、會議紀錄段落標題：宋體-繁，讓紀錄讀起來像一份文件
+    /// 界面通用标题使用简体宋体（design §45.4）。
     static func songti(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-        .custom("Songti TC", size: size).weight(weight)
+        .custom("Songti SC", size: size).weight(weight)
     }
 }
 
-/// 會議內容的文字（逐字稿、會議紀錄的條目、筆記）：字形跟著會議語言，日文會議用日文字形（design §18.6）。
-/// 只套在內容上，介面的說明文字、按鈕維持繁中字形
+/// 会议内容的文字（逐字稿、会议记录的条目、笔记）：字形跟着会议语言，日文会议用日文字形（design §18.6）。
+/// 只套在内容上，界面的说明文字、按钮使用简体字形
 private struct MeetingText: ViewModifier {
     @Environment(\.meetingLanguage) private var language
 
@@ -81,7 +81,7 @@ private struct MeetingText: ViewModifier {
 }
 
 /// 會議內容的標題（會議標題、段落、議題）：宋體-繁；日文會議改用ヒラギノ明朝，宋體的漢字是中文寫法（design §18.6）。
-/// 字級跟著文字大小（design §38.5）
+/// 字级跟着文字大小（design §38.5）
 private struct ContentTitleFont: ViewModifier {
     @Environment(\.meetingLanguage) private var language
     @Environment(\.textScale) private var scale
@@ -89,12 +89,12 @@ private struct ContentTitleFont: ViewModifier {
 
     func body(content: Content) -> some View {
         let size = size * scale
-        return content.font(.custom(language.profile.fonts.titleMac, size: size).weight(.semibold))   // 語言檔（design §41.5）
+        return content.font(.custom(language.profile.fonts.titleMac, size: size).weight(.semibold))   // 语言档（design §41.5）
             .meetingText()
     }
 }
 
-/// 會議內容的字級（design §38.5）：macOS 的字級乘上文字大小的倍率。
+/// 会议内容的字级（design §38.5）：macOS 的字级乘上文字大小的倍率。
 /// macOS 的 SwiftUI 不理 `dynamicTypeSize`，所以自己算（D131）
 private struct ContentFont: ViewModifier {
     @Environment(\.textScale) private var scale
@@ -108,7 +108,7 @@ private struct ContentFont: ViewModifier {
         return content.font(font)
     }
 
-    /// macOS 的字級（NSFont.preferredFont(forTextStyle:)，2026-10-30 在 macOS 26 量的）
+    /// macOS 的字级（NSFont.preferredFont(forTextStyle:)，2026-10-30 在 macOS 26 量的）
     static func size(_ style: Font.TextStyle) -> CGFloat {
         switch style {
         case .largeTitle: return 26
@@ -123,7 +123,7 @@ private struct ContentFont: ViewModifier {
     }
 }
 
-/// 依設定把文字大小的倍率放進 environment（會議頁、問所有會議）
+/// 依设置把文字大小的倍率放进 environment（会议页、问所有会议）
 private struct TextScaleFromSettings: ViewModifier {
     @AppStorage(AppSettings.textSizeKey) private var level = 0
 
@@ -141,28 +141,28 @@ extension View {
     func contentTextScale() -> some View { modifier(TextScaleFromSettings()) }
 }
 
-/// 可以點的時間點：跳到錄音的那個位置播放（R4.2、R5.2）
+/// 可以点的时间点：跳到录音的那个位置播放（R4.2、R5.2）
 struct TimeButton: View {
     @Environment(AppModel.self) private var model
     let time: String
-    /// 要跳到的秒數；沒給就照顯示的時間。逐字稿的段落給真正的開始時間（24.4 秒的段落顯示 00:24，跳到 24.0 高亮會落在上一段）
+    /// 要跳到的秒数；没给就照显示的时间。逐字稿的段落给真正的开始时间（24.4 秒的段落显示 00:24，跳到 24.0 高亮会落在上一段）
     var seek: Double? = nil
 
     var body: some View {
-        // 沒有錄音的會議（例如匯入逐字稿）點了也沒辦法播，顯示成一般文字
+        // 没有录音的会议（例如导入逐字稿）点了也没办法播，显示成一般文字
         if let seconds = seek ?? TimeFormat.seconds(time), model.player.isLoaded {
             Button(time) { model.player.seek(to: seconds) }
                 .buttonStyle(.plain)
-                .contentFont(.callout, monospacedDigit: true)   // 跟著文字大小（design §38.5）
+                .contentFont(.callout, monospacedDigit: true)   // 跟着文字大小（design §38.5）
                 .foregroundStyle(Color.celadon)
-                .help("從 \(time) 開始播放")
+                .help("从 \(time) 开始播放")
         } else if !time.isEmpty {
             Text(time).contentFont(.callout, monospacedDigit: true).foregroundStyle(.secondary)
         }
     }
 }
 
-/// 錄音音量表：模仿 VU 表的分段 LED，滿格的地方是琥珀色（design §9.3）
+/// 录音音量表：模仿 VU 表的分段 LED，满格的地方是琥珀色（design §9.3）
 struct VUMeter: View {
     var level: Float
     var segments = 14
@@ -187,8 +187,8 @@ struct VUMeter: View {
     }
 }
 
-/// 跟 VUMeter 長得一樣的音量條，但用 AppKit 的圖層畫、自己每 0.08 秒讀一次音量（design §25）：
-/// SwiftUI 的 view 每變一次，整個視窗都要重新排版、重算最小尺寸，錄音時音量一直在變，CPU 會多用三成
+/// 跟 VUMeter 长得一样的音量条，但用 AppKit 的图层画、自己每 0.08 秒读一次音量（design §25）：
+/// SwiftUI 的 view 每变一次，整个窗口都要重新排版、重算最小尺寸，录音时音量一直在变，CPU 会多用三成
 struct LevelMeter: NSViewRepresentable {
     var segments = 14
     let level: @MainActor () -> Float
@@ -249,7 +249,7 @@ final class LevelMeterView: NSView {
         refresh()
     }
 
-    /// 亮的格數變了才改顏色（跟 VUMeter 同樣的規則：最後三格是琥珀色）
+    /// 亮的格数变了才改颜色（跟 VUMeter 同样的规则：最后三格是琥珀色）
     private func refresh() {
         let value = level()
         let count = (0..<segments).filter { Float($0) < value * Float(segments) }.count
@@ -270,7 +270,7 @@ final class LevelMeterView: NSView {
     }
 }
 
-/// 錄音經過時間，每秒更新
+/// 录音经过时间，每秒更新
 struct ElapsedText: View {
     let since: Date
 
