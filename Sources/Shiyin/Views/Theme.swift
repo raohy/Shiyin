@@ -76,7 +76,7 @@ private struct MeetingText: ViewModifier {
     @Environment(\.meetingLanguage) private var language
 
     func body(content: Content) -> some View {
-        content.typesettingLanguage(Locale.Language(identifier: language.profile.fonts.typesetting))
+        content.typesettingLanguage(Locale.Language(identifier: language.contentTypesetting))
     }
 }
 
@@ -89,7 +89,7 @@ private struct ContentTitleFont: ViewModifier {
 
     func body(content: Content) -> some View {
         let size = size * scale
-        return content.font(.custom(language.profile.fonts.titleMac, size: size).weight(.semibold))   // 语言档（design §41.5）
+        return content.font(.custom(language.contentTitleFont, size: size).weight(.semibold))   // 语言档（design §41.5），简体跟着「中文的字」（§48.2）
             .meetingText()
     }
 }

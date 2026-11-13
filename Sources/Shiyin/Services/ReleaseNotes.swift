@@ -34,7 +34,8 @@ enum ReleaseNotes {
     static func text(_ notes: String?, english: Bool) -> String {
         guard let notes else { return "" }
         let (items, more) = brief(notes, english: english)
-        var out = items.map { "• " + $0 }
+        // 简体界面：说明只有繁体、英文两段，中文那段执行时转（design §48.2）
+        var out = items.map { "• " + (!english && MeetingLanguage.simplifiedInterface ? ChineseScript.toSimplifiedUI($0) : $0) }
         if more > 0 { out.append(String(localized: "……还有 \(more) 项，完整说明在官网。")) }
         let text = out.joined(separator: "\n")
         return english ? text : ChineseScript.toSimplified(text)

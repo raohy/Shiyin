@@ -234,6 +234,8 @@ final class AppModel {
     var searchResults: [SearchHit] = []
     /// 搜索结果点进来时要高亮的逐字稿段落
     var highlightSegment: Int64?
+    /// 逐字稿要进入拆成两句的模式（design §46.2）：右键菜单、DEBUG 的 splitmode 设，逐字稿标签页接手后清掉
+    var splitRequest: Int64?
 
     var pendingImport: [URL] = []
     var showImportSheet = false
@@ -367,6 +369,7 @@ final class AppModel {
             if let self, let id = self.recorder.meetingId { self.coach.begin(id) }
         }
         recorder.onLevelHint = { [weak self] hint in self?.levelHintAppeared(hint) }
+        recorder.microphoneUser = { [weak self] in self?.meetingDetector.microphoneUser() }
         recorder.onMicHint = { [weak self] hint in self?.micHintAppeared(hint) }
         // 忘了停止录音（design §35、R48）：提醒一出现就送通知（人多半不在电脑前）
         recorder.onIdlePrompt = { [weak self] in
@@ -496,7 +499,7 @@ final class AppModel {
         detail = loaded
         syncReviewDraft()
         if forceAudio || previous?.id != meeting.id || previous?.audioFile != meeting.audioFile {
-            if meeting.hasAudio { player.load(meeting.audioURL) } else { player.unload() }
+            if meeting.hasAudio { player.load(meeting.audioURL, mixChannels: meeting.channels == "both") } else { player.unload() }
         }
     }
 
@@ -564,7 +567,7 @@ final class AppModel {
     /// 每场每种最多一次由 Recorder 管；拾音在前面时只有录音画面和菜单列的提示
     private func levelHintAppeared(_ hint: Recorder.LevelHint) {
         guard let id = recorder.meetingId, !mainWindowInFront else { return }
-        notifier.levelHint(hint.text, kind: hint.rawValue, meetingId: id)
+        notifier.levelHint(recorder.text(for: hint), kind: hint.rawValue, meetingId: id)
     }
 
     /// 用蓝牙耳机的麦克风录现场会议（design §38.4、R58.3）：通知的规则同收音提醒
@@ -1073,6 +1076,21 @@ final class AppModel {
         }
     }
 
+    /// 「拆成两句…」（R70、design §46）：at 是 UTF-16 的位置，to 是后半句的说话者（nil 是新的说话者）
+    func splitSegment(_ segmentId: Int64, at: Int, to idx: Int?) {
+        guard let id = selection else { return }
+        if let problem = speakerEditProblem(id) {
+            noticeMessage = problem
+            return
+        }
+        let target = idx.flatMap { detail?.speakerName($0) } ?? String(localized: "新的说话者")
+        perform(.detail([.speakers, .segments, .corrections])) {
+            if try db.splitSegment(id, id: segmentId, at: at, to: idx, label: String(localized: "把一句拆成两句（后半句是「\(target)」说的）")) != nil {
+                noticeMessage = String(localized: "已拆成两句。要复原的话，在逐字稿按右键选「复原」。")
+            }
+        }
+    }
+
     /// 「复原说话者的调整」（改名小窗口、逐字稿右键菜单）：只复原最近一次合并或改句子
     func undoSpeakerEdit() {
         guard let id = selection else { return }
@@ -1084,7 +1102,7 @@ final class AppModel {
             noticeMessage = String(localized: "没有可以复原的说话者调整（改名、重新识别说话者之后就不能复原之前的调整）")
             return
         }
-        perform(.detail([.speakers, .segments, .meeting])) {
+        perform(.detail([.speakers, .segments, .meeting, .corrections])) {
             if try db.undoSpeakerEdit(id) { noticeMessage = String(localized: "已复原：\(label)") }
         }
     }
@@ -1581,9 +1599,9 @@ final class AppModel {
         switch item {
         case .notes:
             switch format {
-            case "pdf": try await HTML.pdf(NotesExporter.html(b), to: url)
-            case "docx": try await HTML.docx(NotesExporter.html(b)).write(to: url)
-            default: try NotesExporter.markdown(b).write(to: url, atomically: true, encoding: .utf8)
+            case "pdf": try await HTML.pdf(ExportScript.html(NotesExporter.html(b), b), to: url)
+            case "docx": try await HTML.docx(ExportScript.html(NotesExporter.html(b), b)).write(to: url)
+            default: try ExportScript.text(NotesExporter.markdown(b), b).write(to: url, atomically: true, encoding: .utf8)
             }
         case .mindMap:
             // 心智图（design §42.4）：段落名称跟着会议语言，同其他导出
@@ -1597,11 +1615,12 @@ final class AppModel {
                 try data.write(to: url)
             }
         case .transcript:
-            if format == "docx" { try await HTML.docx(TranscriptExporter.html(b, times: times, speakers: speakers)).write(to: url) }
+            if format == "docx" { try await HTML.docx(ExportScript.html(TranscriptExporter.html(b, times: times, speakers: speakers), b)).write(to: url) }
             else {
                 // 文字格式、封包在背景写，长会议不卡住画面（design §21.13）；Word、PDF 用异步的 HTML 转换
                 try await Task.detached(priority: .userInitiated) {
-                    try TranscriptExporter.text(b, format: format, times: times, speakers: speakers).write(to: url, atomically: true, encoding: .utf8)
+                    try ExportScript.text(TranscriptExporter.text(b, format: format, times: times, speakers: speakers), b)
+                        .write(to: url, atomically: true, encoding: .utf8)
                 }.value
             }
         case .audio:
@@ -1643,12 +1662,12 @@ final class AppModel {
         switch style {
         case .plain:
             NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(NotesExporter.plain(b), forType: .string)
+            NSPasteboard.general.setString(ExportScript.text(NotesExporter.plain(b), b), forType: .string)
         case .markdown:
             NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(NotesExporter.markdown(b), forType: .string)
+            NSPasteboard.general.setString(ExportScript.text(NotesExporter.markdown(b), b), forType: .string)
         case .rich:
-            HTML.copy(plain: NotesExporter.plain(b), html: NotesExporter.html(b))
+            HTML.copy(plain: ExportScript.text(NotesExporter.plain(b), b), html: ExportScript.html(NotesExporter.html(b), b))
         }
         noticeMessage = String(localized: "已复制会议记录")
     }

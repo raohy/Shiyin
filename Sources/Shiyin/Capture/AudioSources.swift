@@ -1,7 +1,9 @@
 import AVFoundation
 import CoreAudio
 import Foundation
+import ObjCCatch
 import Observation
+import os
 
 /// 所有音源输出的统一格式：16 kHz、单声道、Float32（design §5.1）
 enum CaptureFormat {
@@ -34,17 +36,29 @@ protocol MicrophoneInput: AudioSource {
     var current: AudioDevices.Device? { get }
 }
 
-/// 把任意格式的 buffer 持续转成 16 kHz 单声道（保留重采样的状态，适合串流）
+/// 把任意格式的 buffer 持续转成 16 kHz 单声道（保留重采样的状态，适合串流）。
+/// buffer 的格式跟上一个不同（设备在收音中换了采样率、声道数）就重建（design §50.3）
 final class StreamConverter {
-    private let converter: AVAudioConverter
+    private var converter: AVAudioConverter?
 
+    /// 从第一个 buffer 的格式开始
+    init() {}
+
+    /// 先确认这个格式转得过去
     init?(from format: AVAudioFormat) {
-        guard let converter = AVAudioConverter(from: format, to: CaptureFormat.mono) else { return nil }
-        converter.downmix = true
+        guard let converter = Self.make(format) else { return nil }
         self.converter = converter
     }
 
+    private static func make(_ format: AVAudioFormat) -> AVAudioConverter? {
+        let converter = AVAudioConverter(from: format, to: CaptureFormat.mono)
+        converter?.downmix = true
+        return converter
+    }
+
     func convert(_ buffer: AVAudioPCMBuffer) -> [Float] {
+        if converter?.inputFormat != buffer.format { converter = Self.make(buffer.format) }
+        guard let converter, buffer.format.sampleRate > 0 else { return [] }
         let ratio = CaptureFormat.sampleRate / buffer.format.sampleRate
         let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio + 64)
         guard let output = AVAudioPCMBuffer(pcmFormat: CaptureFormat.mono, frameCapacity: capacity) else { return [] }
@@ -77,40 +91,58 @@ final class MicrophoneSource: MicrophoneInput {
         self.deviceUID = deviceUID
     }
 
-    /// 每次开始都用新的 engine：重新开始时重读输入格式；指定的设备不在了，新的 engine 就跟着系统默认（design §20.2）
+    /// 每次开始都用新的 engine：重新开始时重读输入格式；指定的设备不在了，新的 engine 就跟着系统默认（design §20.2）。
+    /// 重新开始在 Recorder 的背景队列（design §50.2）
     func start() throws {
-        engine = AVAudioEngine()
-        let input = engine.inputNode
-        if !deviceUID.isEmpty, let id = AudioDevices.deviceID(forUID: deviceUID) {
-            try input.auAudioUnit.setDeviceID(id)
+        let engine = AVAudioEngine()
+        self.engine = engine
+        let uid = deviceUID
+        var failure: Error?
+        // 设备的格式在这段中间改变时（蓝牙耳机切换成通话模式）AVAudioEngine 会丢 Objective-C 的例外，当成开始失败（design §50.3）
+        let exception = ShiyinCatch {
+            do {
+                let input = engine.inputNode
+                if !uid.isEmpty, let id = AudioDevices.deviceID(forUID: uid) {
+                    try input.auAudioUnit.setDeviceID(id)
+                }
+                guard input.outputFormat(forBus: 0).sampleRate > 0 else { throw CaptureError.noInput }
+                // format 给 nil：用 input node 当下的格式，不先读出来再传进去（两次之间格式变了会丢例外）；
+                // 转换照每个 buffer 实际的格式
+                let converter = StreamConverter()
+                input.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
+                    let samples = converter.convert(buffer)
+                    if !samples.isEmpty { self?.onSamples?(samples) }
+                }
+                // 接上或拔掉耳机、蓝牙换协定、采样率改变时，engine 会自己停下来并送出这个通知
+                observer = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil) { [weak self] _ in
+                    self?.onInterruption?()
+                }
+                engine.prepare()
+                try engine.start()
+                current = AudioDevices.device(id: input.auAudioUnit.deviceID)
+            } catch {
+                failure = error
+            }
         }
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, let converter = StreamConverter(from: format) else {
-            throw CaptureError.noInput
-        }
-        input.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
-            let samples = converter.convert(buffer)
-            if !samples.isEmpty { self?.onSamples?(samples) }
-        }
-        // 接上或拔掉耳机、蓝牙换协定、采样率改变时，engine 会自己停下来并送出这个通知
-        observer = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil) { [weak self] _ in
-            self?.onInterruption?()
-        }
-        engine.prepare()
-        do {
-            try engine.start()
-        } catch {
+        if let exception {
+            log.error("microphone engine exception: \(exception, privacy: .public)")
             stop()
-            throw error
+            throw CaptureError.engine(exception)
         }
-        current = AudioDevices.device(id: input.auAudioUnit.deviceID)
+        if let failure {
+            stop()
+            throw failure
+        }
     }
 
     func stop() {
         if let observer { NotificationCenter.default.removeObserver(observer) }
         observer = nil
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
+        let engine = engine
+        _ = ShiyinCatch {
+            engine.inputNode.removeTap(onBus: 0)
+            engine.stop()
+        }
     }
 }
 
@@ -218,6 +250,9 @@ final class FileSource: MicrophoneInput {
     private var samples: [Float]?
     private var position = 0
     private var stalledUntil: [Int: Double] = [:]   // 声道 → 恢复送资料的时间（systemUptime）
+    /// recordflap（design §50.4）：接下来几次开始收音后 0.5 秒送出「设备变了」；在背景重新开始时要花几秒（模拟蓝牙）
+    private var flapsLeft = 0
+    private var slowStart: Double = 0
 
     init(url: URL, speed: Double) {
         self.url = url
@@ -227,7 +262,16 @@ final class FileSource: MicrophoneInput {
     /// 从上次停下的位置接着送，所以 restart()（stop 再 start）等于继续送
     func start() throws {
         let uid = deviceUID
-        current = MainActor.assumeIsolated { MicrophoneMonitor.shared.resolve(uid) }
+        // 重新开始在 Recorder 的背景队列（design §50.2）：那里读麦克风清单的快照
+        current = Thread.isMainThread ? MainActor.assumeIsolated { MicrophoneMonitor.shared.resolve(uid) } : MicrophoneMonitor.resolveSnapshot(uid)
+        let (flap, slow) = lock.withLock { () -> (Bool, Double) in
+            defer { flapsLeft = max(0, flapsLeft - 1) }
+            return (flapsLeft > 0, slowStart)
+        }
+        if slow > 0 && !Thread.isMainThread { Thread.sleep(forTimeInterval: slow) }
+        if flap {
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.onInterruption?() }
+        }
         let url = url, speed = speed
         task = Task.detached { [weak self] in
             guard let self else { return }
@@ -266,6 +310,12 @@ final class FileSource: MicrophoneInput {
     func stall(channel: Int, seconds: Double?) {
         lock.withLock { stalledUntil[channel] = seconds.map { ProcessInfo.processInfo.systemUptime + $0 } }
     }
+
+    /// recordflap：接下来 times 次开始收音后都送出「设备变了」，每次在背景重新开始花 seconds 秒；马上先送一次（design §50.4）
+    func flap(times: Int, seconds: Double) {
+        lock.withLock { (flapsLeft, slowStart) = (times, seconds) }
+        onInterruption?()
+    }
 }
 
 /// 只负责接收 FileSource 转送的音频，自己不产生资料
@@ -282,6 +332,8 @@ enum CaptureError: LocalizedError {
     case noOutputDevice
     case unsupportedFormat
     case coreAudio(String, OSStatus)
+    /// AVAudioEngine 丢的 Objective-C 例外（design §50.3）
+    case engine(String)
 
     var errorDescription: String? {
         switch self {
@@ -289,6 +341,7 @@ enum CaptureError: LocalizedError {
         case .noOutputDevice: return String(localized: "找不到输出设备，没办法截取系统声音")
         case .unsupportedFormat: return String(localized: "不支持这个音频格式")
         case .coreAudio(let step, let status): return String(localized: "\(step)失败（错误代码 \(status)）。请确认已允许拾音「录制系统音频」")
+        case .engine(let reason): return String(localized: "麦克风没办法开始收音（\(reason)）")
         }
     }
 }
@@ -408,6 +461,15 @@ final class MicrophoneMonitor {
     var fakeDefault: String? { didSet { refresh() } }
     #endif
 
+    /// 录音的音源在背景重新开始（design §50.2），模拟录音的 FileSource 在那里读这份；`refresh()` 时更新
+    private nonisolated static let snapshot = OSAllocatedUnfairLock<(inputs: [AudioDevices.Device], defaultInput: AudioDevices.Device?)>(
+        initialState: ([], nil))
+
+    nonisolated static func resolveSnapshot(_ uid: String) -> AudioDevices.Device? {
+        let (inputs, preset) = snapshot.withLock { $0 }
+        return (uid.isEmpty ? nil : inputs.first { $0.uid == uid }) ?? preset
+    }
+
     private init() {
         refresh()
         for selector in [kAudioHardwarePropertyDevices, kAudioHardwarePropertyDefaultInputDevice] {
@@ -429,6 +491,8 @@ final class MicrophoneMonitor {
         #endif
         if list != inputs { inputs = list }
         if preset != defaultInput { defaultInput = preset }
+        let current = (list, preset)
+        Self.snapshot.withLock { $0 = current }
     }
 
     /// 这个设置实际会用哪一支：指定的在就用它，不在或没指定就是系统默认

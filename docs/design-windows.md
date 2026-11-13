@@ -436,6 +436,38 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 - 會議連結：`NotificationLinks.Parse` 也認得 `shiyin://open?meeting=…&t=…`（`open` 是主機名稱、路徑是空的；通知用的 `shiyin:open?…` 照舊），`Link.Open` 多了 `Seconds`。有時間點時 `AppHost.ShowMeetingAt`：打開那場、切到逐字稿、從那裡開始（同「問所有會議」點出處）；沒有時同點通知（選到那場，分頁不變）。會議已經永久刪掉了（舊的連結、舊的通知）：打開主視窗、提示「找不到這場會議，可能已經刪掉了」（同 Mac），不選那個 id。
 - 驗證：`dotnet test`（標準答案、協定、開關、唯讀、企業伺服器的 `mcp`、`McpSetup` 的參數和設定檔）；Mac 上 `shiyin-mcp.dll` 用 stdin 送協定訊息、跟 Mac 的 `Shiyin --mcp` 讀同一份資料庫逐字比；虛擬機裡 Claude Code 沒有登入時只驗設定檔寫對。
 
+### 11.13 把一句拆成兩句（R70，M§46）
+
+- `AppDatabase.SplitSegment`：同 Mac（UTF-16 的位置、時間的比例、快照的 `split`、校正建議移到後半句、復原時接回），標準答案 `db/35～38` 逐欄比。
+- 逐字稿的右鍵選單在「這句是誰說的」上面加「拆成兩句…」；按了打開 `ContentDialog`（先收起已經開著的）：唯讀的 `TextBox`（`SelectionStart`）、預覽的前後半句、「後半句是」`ComboBox`、「拆開」「取消」。「拆開」照 R70.2 啟用。
+- DEBUG 控制通道（對目前選取的會議）：`splitsegment <段落 id> <位置> <說話者|new>`、`splitmode <段落 id>`（打開對話框）、`splitcaret <位置>`（對話框的游標）、`undospeaker`。
+
+### 11.14 中文逐字稿、會議紀錄用簡體（R71，M§47）
+
+- `ChineseScript.ToSimplified`：同 Mac，字表內嵌同一份 `Resources/opencc/*.tsv`（多 `TSCharacters`、`TSPhrases`、`TWVariantsRevPhrases`），標準答案 `util/tw2s.json` 逐字比。
+- `settings.json` 的 `chineseScript`；轉的地方同 Mac 的表（正式轉錄、即時逐字稿、整理、校正、猜說話者、匯出）。設定頁「錄音與轉錄」同一個位置。
+
+### 11.15 簡體中文的介面（R72，M§48）
+
+- 介面語言：`AppHost.InterfaceLanguage(setting)` 回傳 `zh`／`zh-Hans`／`en`（取代 `UsesEnglish`）；設定「進階」的選單：跟著 Windows、繁體中文、简体中文、English（選單裡的語言名稱用各自的寫法）。
+- `L.Use(table, plurals, simplified)`：簡體時讀兩份 xcstrings 的 `zh-Hans`，查不到的鍵 `ChineseScript.ToSimplifiedUI`；`L.Simplified`。用語表 `Resources/l10n/zh-Hans-terms.tsv` 內嵌在 Shiyin.Core（同 opencc 的字表）。
+- 字型：視窗的根元素（`Ui.WindowBackground`）、對話框（`Ui.InterfaceLanguage`）的 `Language = "zh-CN"`（簡體介面）；`Ui.ContentLanguage(language)` 對中文會議看「中文的字」。
+- 執行時轉（`L.Ui`）：`MeetingLanguages.Ui`、語言名稱、內建範本的名稱和說明（設定裡的範本內容只顯示）、會議長度、心智圖和播放條的段落名稱、更新說明、存起來的失敗原因。`MeetingLanguages.SimplifiedChineseContent`（AppHost 接到設定）：中文會議用簡體時新增的預設說話者是「说话者 N」；`AppController.MindMapLayout(b, settings)` 匯出的心智圖段落名稱同匯出轉。
+- `sync.sh` 帶 `Resources/l10n`。
+- 驗證：`dotnet test`（`util/ui-hans.json`）；虛擬機 `--set interfaceLanguage=zh-Hans` 截圖主視窗、設定四頁、引導、對話框。
+
+### 11.16 雙聲道的錄音兩耳都聽得到（R73，M§49）
+
+- 混音：`Shiyin.Services.Capture.ChannelMix.Mix(ReadOnlySpan<float> interleaved, int channels, Span<float> mono)`：2 個聲道時 m = (L + R) × 0.7071、超過 ±1 截掉（同 M§49.1）；其他聲道數取平均。單元測試在 `UtilTests`。
+- 播放：`Player.Load(path, mixChannels)`，`MainState` 傳 `meeting.Channels == "both"`。要混音時 `MediaPlayer.Source` 是 `MediaStreamSource`（`MixedAudioSource`）：NAudio 讀原檔（wav 用 `WaveFileReader`，其他用 `MediaFoundationReader`），PCM 16-bit 單聲道、原檔的取樣率，`SampleRequested` 每次讀 0.1 秒混好送出，`Starting` 時跳到要求的位置（`CurrentTime`）。`MediaPlayer.MediaFailed` 時改回直接播原檔（兩耳分開，至少聽得到）。
+- 匯出（`MediaFoundationCompressor.Export(…, mixChannels)`）：`both` 的會議即使原檔是同一種格式也重新轉。m4a：讀原檔 → 混成單聲道（`ChannelMix.ToMono`）→ 照舊升頻到 48 kHz、AAC；wav 照舊解碼成 16 kHz 單聲道（原本原檔是 wav 時直接複製）。`.shiyin` 照舊。
+- 驗證：`dotnet test`（混音）；虛擬機沒有音效裝置，`MediaPlayer` 播不出來（§15），播放要真的 Windows 電腦；匯出 m4a 在虛擬機上做、讀回來看兩邊一樣。
+
+### 11.17 錄音中麥克風一直重新連接（R74，M§50）
+
+- `Recorder` 的重新連接節奏同 M§50.1（`restarts`、`Delay(n)`、看門狗在重新連接完先等 5 秒、提示）。Windows 的重新連接本來就在背景（thread pool），沒有 M§50.2、§50.3 的問題。
+- 驗證：`RecorderTests` 用會一直送通知、開始收音很慢的假音源（`IAudioSource`）。
+
 ## 12. 系統整合
 
 ### 12.1 單一執行個體、開檔

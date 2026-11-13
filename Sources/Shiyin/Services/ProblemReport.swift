@@ -30,7 +30,7 @@ enum ProblemReport {
         let osVersion = "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
         lines.append(String(localized: "- macOS \(osVersion)（\(sysctl("kern.osversion") ?? "?")）"))
         lines.append(String(localized: "- \(sysctl("machdep.cpu.brand_string") ?? "Apple Silicon")，内存 \(memory)"))
-        lines.append(String(localized: "- 界面语言：\(MeetingLanguage.interface.uiName)"))
+        lines.append(String(localized: "- 界面语言：\(MeetingLanguage.interfaceCode)"))
         let engine = AppSettings.usesEnterpriseTranscription ? String(localized: "企业服务器")
             : ["system": String(localized: "macOS 内置识别"), "qwen": "Qwen3-ASR 1.7B"][AppSettings.transcriptionEngine] ?? "Breeze ASR 25"
         lines.append(String(localized: "- 转录：\(engine)；说话者识别：\(AppSettings.diarize ? on : off)；声纹：\(AppSettings.voiceprints ? on : off)"))

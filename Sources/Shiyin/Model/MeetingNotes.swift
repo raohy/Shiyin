@@ -162,6 +162,9 @@ struct MeetingNotes: Codable, Hashable {
         return mappingText { regex.stringByReplacingMatches(in: $0, range: NSRange($0.startIndex..., in: $0), withTemplate: template) }
     }
 
+    /// 每一个文字字段转成简体（design §47.2）
+    func simplified() -> MeetingNotes { mappingText(ChineseScript.toSimplified) }
+
     /// 每一个文字字段都套用 transform（时间点不变）
     private func mappingText(_ r: (String) -> String) -> MeetingNotes {
         func ri(_ i: Item) -> Item { Item(text: r(i.text), time: i.time) }
@@ -292,15 +295,20 @@ enum TimeFormat {
     }
 
     /// 会议长度的口语说法，例如「9 分钟」「1 小时 5 分钟」；界面用界面语言，导出用会议语言
-    static func duration(_ seconds: Int?, language: MeetingLanguage = .interface) -> String {
+    /// language 是 nil 时用界面语言（画面上），简体界面转成简体（design §48.2）；导出给会议语言
+    static func duration(_ seconds: Int?, language: MeetingLanguage? = nil) -> String {
         guard let seconds else { return "" }
+        let l = language ?? .interface
         let minutes = max(1, Int((Double(seconds) / 60).rounded()))
         let h = minutes / 60, m = minutes % 60
+        let text: String
         if minutes >= 60 {
-            return m == 0 ? language.format(zh: "%lld 小时", en: "%lld hr", ja: "%lld 時間", h)
-            : language.format(zh: "%lld 小时 %lld 分钟", en: "%lld hr %lld min", ja: "%lld 時間 %lld 分", h, m)
+            text = m == 0 ? l.format(zh: "%lld 小时", en: "%lld hr", ja: "%lld 時間", h)
+            : l.format(zh: "%lld 小时 %lld 分钟", en: "%lld hr %lld min", ja: "%lld 時間 %lld 分", h, m)
+        } else {
+            text = l.format(zh: "%lld 分钟", en: "%lld min", ja: "%lld 分", minutes)
         }
-        return language.format(zh: "%lld 分钟", en: "%lld min", ja: "%lld 分", minutes)
+        return language == nil && MeetingLanguage.simplifiedInterface ? ChineseScript.toSimplifiedUI(text) : text
     }
 
     /// srt 用 00:01:02,345；vtt 用 00:01:02.345

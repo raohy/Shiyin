@@ -63,7 +63,7 @@ struct RecordingPanel: View {
             if let hint = recorder.levelHint {
                 // 收音提醒（design §26.1）
                 HStack(spacing: 12) {
-                    Label(Self.levelHintText(hint), systemImage: hint == .noisy ? "waveform.badge.exclamationmark" : "mic.badge.xmark")
+                    Label(recorder.text(for: hint), systemImage: hint == .noisy ? "waveform.badge.exclamationmark" : "mic.badge.xmark")
                     Spacer()
                     Button("知道了") { recorder.dismissLevelHint() }
                         .help("这场录音不再提示这件事")
@@ -95,9 +95,6 @@ struct RecordingPanel: View {
             }
         }
     }
-
-    /// 提示的文字在 `Recorder.LevelHint.text`（录音画面、菜单列、通知共用，R42）
-    static func levelHintText(_ hint: Recorder.LevelHint) -> String { hint.text }
 
     private func controls(_ recorder: Recorder) -> some View {
         HStack(spacing: 14) {

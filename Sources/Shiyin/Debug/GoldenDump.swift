@@ -358,6 +358,13 @@ enum GoldenDump {
             w.text(dir + "transcript-f.srt", TranscriptExporter.text(bundle, format: "srt", times: true, speakers: false))
             w.text(dir + "transcript-t.vtt", TranscriptExporter.text(bundle, format: "vtt", times: true, speakers: true))
             w.text(dir + "transcript-f.vtt", TranscriptExporter.text(bundle, format: "vtt", times: true, speakers: false))
+            // 中文会议用简体（design §47.2）：整份转，HTML 的字体各平台不同，只比文字格式
+            if fx.key == "zh" {
+                w.text(dir + "simplified/notes.md", ChineseScript.toSimplified(NotesExporter.markdown(bundle)))
+                w.text(dir + "simplified/notes.txt", ChineseScript.toSimplified(NotesExporter.plain(bundle)))
+                w.text(dir + "simplified/transcript-tt.txt", ChineseScript.toSimplified(TranscriptExporter.text(bundle, format: "txt", times: true, speakers: true)))
+                w.text(dir + "simplified/transcript-t.srt", ChineseScript.toSimplified(TranscriptExporter.text(bundle, format: "srt", times: true, speakers: true)))
+            }
             // 没有会议记录、空的会议记录
             var empty = bundle
             empty.notes = MeetingNotes(title: "x")
@@ -720,6 +727,10 @@ enum GoldenDump {
 
         // 简体转台湾繁体（design §32.5）：Windows 读同一份字表、同一套最长匹配，要逐字相同
         w.json("util/s2tw.json", (f["s2twCases"] as? [String] ?? []).map { ["in": $0, "out": ChineseScript.toTaiwan($0)] as Object })
+        // 繁转简（design §47.1）
+        w.json("util/tw2s.json", (f["tw2sCases"] as? [String] ?? []).map { ["in": $0, "out": ChineseScript.toStandardSimplified($0)] as Object })
+        // 简体界面的用语（design §48.1）：l10n.py 也拿这份核对
+        w.json("util/ui-hans.json", (f["uiHansCases"] as? [String] ?? []).map { ["in": $0, "out": ChineseScript.toSimplifiedUI($0)] as Object })
 
         // 更新说明的摘要（R10.6、design §12）：询问更新的窗口只列前几项，取段落、取条目的规则两边相同
         w.json("util/release-notes.json", (f["releaseNotesCases"] as? [Object] ?? []).map { c -> Object in
@@ -908,6 +919,11 @@ enum GoldenDump {
                 let segmentIds = try (op["seqs"] as? [Int] ?? []).map { try segmentId(mid, seq: $0) }
                 let target = try db.reassignSegments(mid, ids: segmentIds, to: op["to"] as? Int, label: op["label"] as? String ?? "")
                 w.json(file!, ["speaker": target])
+            case "splitSegment":   // 拆成两句（design §46.1）
+                let mid = id(op)
+                let newId = try db.splitSegment(mid, id: try segmentId(mid, seq: op["seq"] as? Int ?? 0), at: op["at"] as? Int ?? 0,
+                                                to: op["to"] as? Int, label: op["label"] as? String ?? "")
+                w.json(file!, ["segmentId": newId.map { $0 as Any } ?? NSNull()])
             case "replace":
                 let r = try db.replace(id(op), find: op["find"] as? String ?? "", with: op["with"] as? String ?? "")
                 w.json(file!, ["segmentsChanged": r.segmentsChanged, "notesChanged": r.notesChanged])

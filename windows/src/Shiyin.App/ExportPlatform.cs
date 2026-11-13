@@ -13,12 +13,15 @@ namespace Shiyin.App;
 public sealed class ExportPlatform(AppHost host) : IExportPlatform
 {
     public Task NotesDocx(ExportBundle b, string path, CancellationToken cancel) =>
-        Task.Run(() => DocxWriter.Write(NotesExporter.Html(b, ExportFonts.Windows), path, b.Meeting.MeetingLanguage), cancel);
+        Task.Run(() => DocxWriter.Write(ExportScript.Html(host.Settings, b, NotesExporter.Html(b, ExportFonts.Windows)), path, b.Meeting.MeetingLanguage,
+            host.Settings.SimplifiedChinese(b.Meeting.MeetingLanguage)), cancel);
 
     public Task TranscriptDocx(ExportBundle b, bool times, bool speakers, string path, CancellationToken cancel) =>
-        Task.Run(() => DocxWriter.Write(TranscriptExporter.Html(b, times, speakers, ExportFonts.Windows), path, b.Meeting.MeetingLanguage), cancel);
+        Task.Run(() => DocxWriter.Write(ExportScript.Html(host.Settings, b, TranscriptExporter.Html(b, times, speakers, ExportFonts.Windows)), path,
+            b.Meeting.MeetingLanguage, host.Settings.SimplifiedChinese(b.Meeting.MeetingLanguage)), cancel);
 
-    public Task NotesPdf(ExportBundle b, string path, CancellationToken cancel) => Pdf.Print(NotesExporter.Html(b, ExportFonts.Windows), path, cancel);
+    public Task NotesPdf(ExportBundle b, string path, CancellationToken cancel) =>
+        Pdf.Print(ExportScript.Html(host.Settings, b, NotesExporter.Html(b, ExportFonts.Windows)), path, cancel);
 
     public async Task MindMapPng(Notes.MindMap.Layout layout, Model.MeetingLanguage language, string path, CancellationToken cancel)
     {
@@ -31,7 +34,8 @@ public sealed class ExportPlatform(AppHost host) : IExportPlatform
         Pdf.Print($"<!doctype html><html><head><meta charset=\"utf-8\"><style>html,body{{margin:0;padding:0}}svg{{display:block}}</style></head><body>{Notes.MindMap.Svg(layout, language)}</body></html>",
             path, cancel, layout.Width / 96, layout.Height / 96, 0);
 
-    public Task Audio(string source, string format, string path, CancellationToken cancel) => host.Compressor.Export(source, format, path, cancel);
+    public Task Audio(string source, string format, string path, bool mixChannels, CancellationToken cancel) =>
+        host.Compressor.Export(source, format, path, cancel, mixChannels);
 }
 
 /// <summary>

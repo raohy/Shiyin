@@ -48,6 +48,9 @@ ditto "$BIN_DIR/llama.framework" "$APP/Contents/Frameworks/llama.framework"
 ditto Resources/opencc "$APP/Contents/Resources/opencc"
 # 会议语言的语言档（design §41.1），Windows 内嵌同一份
 cp Resources/languages.json "$APP/Contents/Resources/languages.json"
+# 簡體介面的用語表（design §48.2）：執行時轉不查表的中文
+mkdir -p "$APP/Contents/Resources/l10n"
+cp Resources/l10n/zh-Hans-terms.tsv "$APP/Contents/Resources/l10n/zh-Hans-terms.tsv"
 for bundle in "$BIN_DIR"/*.bundle; do ditto "$bundle" "$APP/Contents/Resources/$(basename "$bundle")"; done
 chmod -R u+w "$APP"
 if [ -f Resources/AppIcon.icns ]; then

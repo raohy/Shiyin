@@ -106,6 +106,13 @@ enum AppSettings {
     @MainActor static var usesEnterpriseTranscription: Bool {
         transcriptionEngine == "server" && EnterpriseServer.shared.hasAccount
     }
+    /// 本 fork 的中文和粤语统一使用大陆简体，与转录语言档保持一致。
+    static func simplifiedChinese(for language: MeetingLanguage) -> Bool {
+        language.profile.transcription.simplified == true
+    }
+    static func script(_ text: String, for language: MeetingLanguage) -> String {
+        language.outputScript(text)
+    }
     /// 新会议的会议语言（design §16.3）；没设置时跟着界面语言
     static var defaultMeetingLanguage: MeetingLanguage {
         MeetingLanguage(rawValue: d.string(forKey: defaultMeetingLanguageKey) ?? "") ?? .systemDefault
@@ -377,8 +384,10 @@ final class JobRunner {
         let (transcribed, speakers, duration) = (result.segments, result.speakers, result.duration)
         // 只转录前段时，会议长度维持整个录音（播放、信息列用）
         let savedDuration = trimmed != nil ? max(Double(meeting.durationSeconds ?? 0), duration) : duration
+        // 中文会议用简体时，存档前才转（design §47.2、D154）
+        let simplified = AppSettings.simplifiedChinese(for: meeting.meetingLanguage)
         let segments = transcribed.enumerated().map { i, s in
-            Segment(meetingId: job.meetingId, seq: i, start: s.start, end: s.end, text: s.text,
+            Segment(meetingId: job.meetingId, seq: i, start: s.start, end: s.end, text: simplified ? ChineseScript.toSimplified(s.text) : s.text,
                     lowConfidence: s.lowConfidence, speaker: speakers[i], kind: "final", channel: result.channels[i])
         }
         try db.saveTranscript(job.meetingId, segments: segments, duration: Int(savedDuration.rounded()),
@@ -544,10 +553,19 @@ final class JobRunner {
                 knownPeople: try db.peopleNames(), glossary: try glossaryTerms(), unnamed: unnamed,
                 speakerName: { names[$0] ?? language.defaultSpeaker($0) },
                 segments: segments.map { ($0.start, $0.speaker, $0.text) })
-            let suggestions = try await callLLM(lane) { onStart in
+            var suggestions = try await callLLM(lane) { onStart in
                 try await SpeakerNaming.suggest(context, provider: provider, model: AppSettings.model, onStart: onStart)
             }
             guard isStillRunning(job) else { return }
+            // 中文会议用简体时，原因、名字转成简体（design §47.2）
+            if AppSettings.simplifiedChinese(for: language) {
+                suggestions = suggestions.map { s in
+                    var s = s
+                    s.name = ChineseScript.toSimplified(s.name)
+                    s.reason = ChineseScript.toSimplified(s.reason)
+                    return s
+                }
+            }
             try db.saveSpeakerSuggestions(job.meetingId, suggestions)
             log.info("speaker names suggested: \(suggestions.count)")
         } catch {
@@ -582,9 +600,11 @@ final class JobRunner {
                     onProgress: { [weak self] value in self?.running[lane]?.progress = value })
             }
             guard isStillRunning(job) else { return }
+            // 中文会议用简体时，建议和原因转成简体（原文照逐字稿，已经对过，design §47.2）
+            let script = { (text: String) in AppSettings.script(text, for: language) }
             try db.saveCorrections(job.meetingId, suggestions.compactMap { s in
                 segments[s.segment].id.map {
-                    Correction(meetingId: job.meetingId, segmentId: $0, original: s.original, suggestion: s.suggestion, reason: s.reason)
+                    Correction(meetingId: job.meetingId, segmentId: $0, original: s.original, suggestion: script(s.suggestion), reason: script(s.reason))
                 }
             })
         } catch {
@@ -641,11 +661,13 @@ final class JobRunner {
             prompt = NotesPrompt.summarize(context)
         }
         let system = NotesPrompt.system(meeting.meetingLanguage, documents: !context.documents.isEmpty)
-        let notes = try await callLLM(lane) { onStart in
+        var notes = try await callLLM(lane) { onStart in
             try await LLMClient.generate(provider: provider, model: AppSettings.model, system: system, prompt: prompt, onStart: onStart)
                 .outputScript(meeting.meetingLanguage)
         }
         guard isStillRunning(job) else { return false }
+        // 中文会议用简体时，整理完才转（提示词照旧，design §47.2、D154）
+        if AppSettings.simplifiedChinese(for: meeting.meetingLanguage) { notes = notes.simplified() }
         if draft {
             // 整理草稿的期间正式逐字稿好了、或已经有会议记录：丢掉草稿
             guard try db.segments(job.meetingId).isEmpty, try db.meeting(job.meetingId)?.notes == nil else { return false }

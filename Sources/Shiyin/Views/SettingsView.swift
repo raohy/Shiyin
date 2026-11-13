@@ -300,7 +300,7 @@ struct ProviderSettings: View {
         case .enterpriseSignedOut?: return String(localized: "公司的服务器还没登录或登录已失效：到「高级 → 企业服务器」登录。设置好之前不会自动整理。")
         case .enterpriseNoModels?: return String(localized: "公司的服务器还没有提供整理用的模型：请管理者在服务器后台的「整理模型」加上模型。")
         case .paused(_, let detail)?:
-            let reason = detail.trimmingCharacters(in: CharacterSet(charactersIn: "。. "))   // l10n-skip
+            let reason = MeetingLanguage.uiStored(detail.trimmingCharacters(in: CharacterSet(charactersIn: "。. ")))   // l10n-skip
             return String(localized: "上次整理失败：\(reason)。改好设置，或按「测试整理工具」成功之后，才会再自动整理。")
         }
     }
@@ -571,6 +571,8 @@ struct TemplateSettings: View {
     private func load(_ id: String?) {
         guard let template = model.templates.first(where: { $0.id == id }) else { draft = nil; return }
         draft = template.definition(for: .interface)
+        // 内置模板不能改、不会存档：简体界面显示简体（design §48.2）
+        if template.builtin, MeetingLanguage.simplifiedInterface { draft = draft?.mappingText(ChineseScript.toSimplifiedUI) }
         draftName = template.displayName
     }
 

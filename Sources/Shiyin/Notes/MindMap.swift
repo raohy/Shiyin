@@ -15,16 +15,17 @@ enum MindMap {
         let summary, decisions, actionItems, openQuestions, topics, untitled, colon: String
         let paren: (String) -> String
 
-        init(_ language: MeetingLanguage) {
+        /// script：中文会议用简体时转成简体（同导出，design §47.2）
+        init(_ language: MeetingLanguage, script: @escaping (String) -> String = { $0 }) {
             let x = ExportText(language)
-            summary = x.section("summary")
-            decisions = x.section("decisions")
-            actionItems = x.section("actionItems")
-            openQuestions = x.section("openQuestions")
-            topics = MindMap.topicLabel(language)
-            untitled = language.text(zh: "会议", en: "Meeting", ja: "会議")  // l10n-skip：会议语言的文字
+            summary = script(x.section("summary"))
+            decisions = script(x.section("decisions"))
+            actionItems = script(x.section("actionItems"))
+            openQuestions = script(x.section("openQuestions"))
+            topics = script(MindMap.topicLabel(language))
+            untitled = script(language.text(zh: "会议", en: "Meeting", ja: "会議"))  // l10n-skip：会议语言的文字
             colon = x.colon
-            paren = x.paren
+            paren = { script(x.paren($0)) }
         }
     }
 

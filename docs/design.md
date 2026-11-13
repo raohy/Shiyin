@@ -2148,20 +2148,193 @@ id 42 · shiyin://open?meeting=42 · transcript: get_transcript(meeting_id: 42)
 - 設定頁的按鈕用 AX 按（暫存的 `CLAUDE_CONFIG_DIR`、`CODEX_HOME`、`SHIYIN_CLAUDE_DESKTOP_CONFIG`），確認三邊的設定檔寫對、再按一次不會重複。
 - DEBUG：`shiyinctl mcpsetup claudecode|codex|desktop <輸出.json>` 等於按「加到…」；`mcpcopy command|json` 等於按「複製」選單的兩項（測試前後用 `pbsnap` 之類的工具存、還原使用者的剪貼簿）；`enterprise info <網址> <輸出.json>` 只讀伺服器的 `info`、寫出解析結果（不改帳號：完整的重新取得會把帳號寫回共用設定，蓋掉使用者正式的登入）；`openlink <shiyin://open?…>` 等於點會議連結（不拉到前面）；`state` 的 `mcp`（開關、啟動檔）。從系統送網址要對 DEBUG 版的 pid 送 GURL 的 Apple Event，**不要用 `open <網址>`**：所有拾音都是同一個 bundle id，網址可能交給使用者正式的拾音。
 
-## 45. 简体中文（R70，D151）
+## 45. 麥克風被別的 app 的語音處理佔住（R57，D151；GitHub #4）
 
-### 45.1 原则
+只有 Mac（R57.6）。在收音提醒（§26.1）上加一種提示，量法、顯示、通知都沿用。
+
+### 45.1 怎麼判斷
+
+- **幾乎沒聲音**：麥克風最近 8 秒（80 格，每格 100 毫秒）有 72 格以上的音量在 −119～−70 dBFS 之間。完全是 0 的格（−120）不算，那是「麥克風沒有收到聲音」（R24.3）。被佔住時量到 −78～−92 dBFS（requirements 第 39 節），一般錄音的 8 秒第 90 百分位最低 −57 dBFS（下面的評估），−70 兩邊各留 8、13 dB。
+- 光看音量不夠：外接的好麥克風、輸入音量調低的麥克風，沒人說話時本來就可以低於 −70（線上會議聽對方講 10 秒以上很常見）。所以還要符合下面其中一條：
+  - **正在收音的是這台 Mac 的內建麥克風**（`micDevice.isBuiltIn`）：內建麥克風在一般的房間不會這麼小聲。這一條不用等，會議比錄音早開始也抓得到（GitHub #4 就是這樣）。
+  - **這場錄音稍早是正常的**：稍早的背景（§26.1 的 30 秒第 10 百分位，取這場錄音到目前的最低值）比現在這 8 秒的第 90 百分位高 12 dB 以上。同一支麥克風的底噪不會自己掉 12 dB，掉了就是內容被換掉。任何麥克風都適用，抓的是錄到一半才被佔住。
+- 稍早的背景要晚 10 秒才算數：剛被佔住的那幾秒還沒判定，低的音量會混進背景。出現「幾乎沒聲音」就清掉還沒算數的；恢復正常後 30 秒內的背景也不算（30 秒的音量裡還有被佔住時的）。暫停、換麥克風後重新開始記（可能換了地方、換了一支）。
+- 外接麥克風、從錄音一開始就被佔住：分不出來是被佔住還是麥克風本來就安靜，不提示（寧可漏掉，不誤報）。這時候「聲音有點小」也不會出現（下面 45.3）。
+- 評估（2026-11-12，`afconvert` 轉 16 kHz、numpy 照同樣的算法；原本的評估資料被清掉，AMI 重新下載 3 場遠場麥克風 ES2002a、IS1009a、TS3003a）：
+
+| 錄音 | 8 秒第 90 百分位最低 | 提示 |
+|---|---|---|
+| 使用者的 11 場錄音（共 11 小時） | −57～−30 dBFS | 0 次 |
+| AMI 3 場 | −56～−47 dBFS | 0 次 |
+| 調小 20、30 dB（模擬安靜的外接麥克風、輸入音量調低） | −87～−64 dBFS | 7 場裡 5 場（調小 20 dB）、7 場（調小 30 dB）「幾乎沒聲音」會成立（所以只有內建麥克風才光看音量）；「稍早是正常的」0 次 |
+| 第 300 秒起換成 −85 dBFS 的雜訊（模擬錄到一半被佔住） | −85 dBFS | 第 308 秒出現 |
+
+- 已知的限制：內建麥克風的輸入音量被調得很低時，沒人說話 8 秒也會符合，原因會講錯（其實是音量太小）；這種設定很少見，而且錄音確實太小聲，照樣提示。
+
+### 45.2 是哪個 app
+
+- 提示出現的那一刻讀一次 Core Audio 的程序物件（同 §21.7：`kAudioProcessPropertyIsRunningInput`），加讀 `kAudioProcessPropertyPID`。拾音自己不算。
+- 名稱依序找：已知的會議 app、瀏覽器（§21.7 的名單，helper 歸到主程式；瀏覽器只寫名稱，不加「可能是 Google Meet」）→ `com.apple.WebKit.GPU`（Safari 的網頁是這個程序在收音，GitHub #4 的 log）寫 Safari → 其他一般的 app（`NSRunningApplication` 的 `activationPolicy == .regular`）用它的名稱 → 都沒有就寫「其他 app」（R57.2）。系統的背景程序（語音喚醒等）不算。
+- 名稱在提示出現時決定，之後不跟著變（提示列的字不要跳）。
+
+### 45.3 顯示
+
+- `Recorder.LevelHint` 加 `.suppressed`。優先順序：沒有收到聲音 → 被佔住 → 聲音太小 → 背景太吵。
+- 文字（錄音畫面的提示列、選單列、通知同一句，R42）：
+  - 瀏覽器、找不到是誰：「麥克風幾乎收不到聲音：<app> 可能正在用這支麥克風做回音消除（例如用 Safari 開的 Google Meet），拾音收不到你的聲音。請改用 Chrome 開會，或讓會議和拾音用不同的麥克風。」
+  - 其他 app（FaceTime 等，叫人改用 Chrome 不對）：「麥克風幾乎收不到聲音：<app> 可能正在用這支麥克風做回音消除，拾音收不到你的聲音。請讓 <app> 和拾音用不同的麥克風。」
+- 「幾乎沒聲音」的時候，「聲音太小」的秒數歸零（R57.3），不管上面兩條符不符合、使用者按過「知道了」沒有。
+- 麥克風恢復正常（不再「幾乎沒聲音」）就收起來；再發生會再出現在提示列，通知一場只送一次；按「知道了」這場不再出現（都同 §26.1、§31.5）。
+- 拾音不開語音處理、不自動換麥克風（R57.4、D104）。
+- 常見問題（R57.5）：官網首頁的常見問題加一條（中、英、日）。
+
+### 45.4 驗證
+
+- DEBUG：state 的 `recorder.levelCheck` 加 `nearSilent`、`floor`（稍早的背景）、`suppressedApp`；`record-sim` 的麥克風不是真的裝置，啟動參數 `-debugMicBuiltIn YES` 當成內建麥克風；哪個 app 在用麥克風用 `meetingapp <bundleID> on` 模擬。
+- 離線：`afconvert` 加 numpy（§26.1 的做法）。實際的語音處理：`scripts/dev/vpio-hold.swift` 對內建麥克風開語音處理時用真的麥克風錄音（要使用者在電腦前）。
+
+## 46. 把一句拆成兩句（R70，D152；GitHub #6）
+
+### 46.1 資料庫（`AppDatabase.splitSegment`，Mac、Windows 同一套，標準答案 `db/35～38`）
+
+- `splitSegment(meetingId, id, at, to, label) -> 後半句的 id?`：`at` 是拆開的位置，用 UTF-16 的位置（Mac 的 `NSString`、Windows 的 `string` 都是這個單位，兩邊一樣）；`to` 是後半句的說話者，nil 是新的說話者（同 `reassignSegments`）。
+- 拆開：前半句是 `text[..<at]`、後半句是 `text[at...]`，各自去掉頭尾的空白（空白、tab、換行、全形空白 U+3000）；任一邊是空的就不拆、回傳 nil。只拆 `kind = final`。
+- 時間：兩邊各算「不是空白的 UTF-16 字數」a、b，拆開的時間 = start + (end − start) × a ÷ (a + b)，四捨五入到 0.01 秒（Windows 用 `MidpointRounding.AwayFromZero`）。
+- 寫入（同一個交易）：先存復原（`saveSpeakerUndo`，快照多一個 `split`）；後面的段落 `seq + 1`；原本的段落改成前半句（文字、`end`）；新增後半句（`seq` 是原本的 + 1，`start` 是拆開的時間，`end`、`low_confidence`、`channel` 同原本，說話者是 `to`，`speaker_manual = 1`）；搜尋索引改前半句、加後半句；校正建議（`corrections`）：待確認的看 `original`、已接受的看 `suggestion`，只在後半句找得到的移到後半句。沒有段落的說話者拿掉（同 `reassignSegments`）。
+- 復原快照的 `split`：`{"id", "newId", "gap"}`，`gap` 是兩句中間被去掉的空白（英文是一個空格，中文通常是空的）。復原時先處理 `split`：後半句的校正建議移回前半句；前半句的文字 = 前半句現在的文字 + gap + 後半句現在的文字（R70.5：拆開後改過的字也留著），`end` = 後半句的 `end`；刪掉後半句和它的索引；後面的段落 `seq − 1`。再照原本的快照還原說話者。
+
+### 46.2 畫面（Mac）
+
+- 逐字稿的右鍵選單在「這句是誰說的」上面加「拆成兩句…」（只有正式逐字稿、有說話者的會議）。
+- 按了那一句變成拆開的模式（像「編輯這一段」）：文字放在可以放游標的 `TextEditor`（`selection` 綁定，打字不會改內容），下面一行「後半句是」選單（其他說話者、同一位（名字後面加「（同一位）」）、新的說話者）、「取消」「拆開」。上面一行小字說明「把游標放在要拆開的地方」，並顯示前半句、後半句各多少字的預覽：「前半句：…最後幾個字｜後半句：開頭幾個字…」。
+- 「拆開」在 R70.2 不成立時不能按。按了用 `AppModel.splitSegment`，提示「已拆成兩句。要復原的話，在逐字稿按右鍵選「復原」。」。
+- DEBUG：`splitsegment <會議 id> <段落 id> <位置> <說話者|new>`（Windows 的指令沒有會議 id，對目前選取的會議）。`splitmode <會議 id> <段落 id>` 進入拆開的模式（等於右鍵選單），`splitcaret <位置>` 把文字框的游標放到那裡（背景的視窗點不到文字框）。
+
+### 46.3 Windows
+
+右鍵選單同一個位置；按了打開 `ContentDialog`（同時只能一個，先收起其他的）：唯讀的 `TextBox`（游標的位置是 `SelectionStart`）、說話者的 `ComboBox`、「拆開」「取消」。DEBUG 指令 `splitsegment <段落 id> <位置> <說話者|new>`。
+
+## 47. 中文逐字稿、會議紀錄用簡體（R71，D153、D154；GitHub #3）
+
+### 47.1 繁轉簡（`ChineseScript.toSimplified`，Mac、Windows 同一套，標準答案 `util/tw2s.json`）
+
+- 跟 OpenCC 的 tw2s 一樣兩步：先把台灣用字換回一般的繁體（`TWVariantsRevPhrases.tsv` 詞組最長匹配，沒有就用 `TWVariants.tsv` 反過來查單字），再轉簡體（`TSPhrases.tsv` 詞組最長匹配，沒有就查 `TSCharacters.tsv`）。字表取自 OpenCC（Apache-2.0）`data/dictionary/`，只留第一個候選（同 §32.5）。
+- 只換字，不換用語（D153）。英文、數字、標點不動。字表讀不到時原樣回傳、寫 log。
+
+### 47.2 什麼時候轉
+
+設定 `chineseScript`（`traditional`／`simplified`，預設 `traditional`；Windows 在 `settings.json`），`AppSettings.simplifiedChinese(for: language)` 只有會議語言是中文、設定是簡體時為真。整個流程照舊用繁體做，存進資料庫之前才轉（D154）：
+
+| 地方 | 轉什麼 |
+|---|---|
+| 正式轉錄存檔（`saveTranscript` 前，伺服器轉錄也是） | 每一句的文字 |
+| 即時逐字稿（`Recorder` 收到的每一句、錄音中的預覽） | 文字 |
+| 整理存檔（草稿、正式、校稿） | 會議紀錄每一個文字欄位（`MeetingNotes.mappingText`） |
+| 校正建議存檔 | `original`、`suggestion`、`reason` |
+| AI 猜的說話者存檔 | 原因（名字照轉） |
+| 匯出（會議紀錄的 Markdown、純文字、HTML／PDF／Word、拷貝；逐字稿的 txt、Markdown、srt、vtt、HTML／Word） | 整份輸出；HTML 的 `lang="zh-Hant"` 改成 `zh-Hans`，字型換成簡體的（Mac：PingFang SC、Songti SC；Windows：Microsoft YaHei、SimSun） |
+
+- 用的是做這件事那時候的設定（轉錄、整理、匯出各自看）。以前的會議不動（R71.5）。
+- 不轉：提問（回答用問題的語言，R71.7）、介面文字、本地 MCP（回傳資料庫裡的內容，簡體的會議本來就是簡體）、心智圖的圖片匯出。
+
+### 47.3 設定頁
+
+「錄音與轉錄」的會議語言下面加一列「中文的字」：選單「繁體（台灣）」「簡體」，說明「只影響中文會議的逐字稿、會議紀錄和匯出，介面文字不變。已經做好的會議不會變，重新轉錄或重新整理後才會換。」Windows 同一個位置。
+
+## 48. 簡體中文的介面（R72，D155～D157；GitHub #3）
+
+### 48.1 翻譯怎麼來（D155）
+
+- 不手寫：簡體從繁體的介面文字自動產生，三步：
+  1. **用語表** `Resources/l10n/zh-Hans-terms.tsv`（台灣的介面用語 → 大陸的介面用語，已經是簡體，例如 `設定→设置`、`檔案→文件`、`文件→文档`、`匯出→导出`、`預設→默认`、`伺服器→服务器`、`軟體→软件`、`視窗→窗口`、`登入→登录`、`紀錄→记录`），在繁體的原文上做最長匹配（同一個位置用最長的詞，換過的字不再換第二次，所以「文件→文档」「檔案→文件」不會連鎖）。
+  2. 剩下的字用 `ChineseScript.toSimplified`（§47.1，只換字）。
+  3. **手動指定** `Resources/l10n/zh-Hans-overrides.json`（`{"繁體原文": "简体"}`）：自動轉得不自然的條目，優先於前兩步。
+- `scripts/dev/l10n.py`：`hans`（重新產生 Localizable.xcstrings、Windows.xcstrings 所有條目的 `zh-Hans`），`check`、`windows-check` 先跑 `hans`，所以新增、改過的介面文字自動有簡體（R72.6）。另外檢查：產生出來的簡體裡沒有繁體字（再做一次繁轉簡結果不變）、插值（`%@`、`%lld`、`%1$@`）跟原文一樣。複數條目（英文的 `variations.plural`）的簡體只有一種寫法。
+- Python 的轉換跟 Swift、C# 的同一套（同樣的字表、同樣的最長匹配）；`check` 用標準答案 `util/ui-hans.json`（Mac 的 `ChineseScript.toSimplifiedUI` 算的）核對 Python 算的一樣。
+
+### 48.2 Mac
+
+- `Info.plist` 的 `CFBundleLocalizations` 加 `zh-Hans`；`Resources/zh-Hans.lproj/InfoPlist.strings`（app 名稱、權限說明、檔案類型名稱，由 `l10n.py hans` 從繁體那份產生）；`build-app.sh` 的 Credits.html 多一份 `zh-Hans`。xcstringstool 會編出 `zh-Hans.lproj/Localizable.strings`。
+- 介面語言：`MeetingLanguage.interface` 照舊只分中文、英文（決定用哪一份手寫的文字）；另外 `MeetingLanguage.simplifiedInterface`（`Bundle.main.preferredLocalizations.first` 是 `zh-Hans`）。系統的偏好語言是 `zh-Hans`、`zh-CN`、`zh-SG` 時 macOS 會選 `zh-Hans`；`zh-HK`、`zh-TW` 照舊是 `zh-Hant`。
+- 不查翻譯表的中文（寫死在程式裡的兩種語言）在簡體介面執行時轉：`ChineseScript.toSimplifiedUI`（用語表＋繁轉簡，同 48.1 的前兩步；用語表放進 app 的 Resources）。地方：`MeetingLanguage.ui(zh:en:)`、`uiName`（語言檔的中文名稱）、內建範本的名稱和說明（`displayName`、`displayDescription`）、app 裡顯示的更新說明（`ReleaseNotes.text` 的中文那段）、問題回報裡的介面語言名稱（「简体中文」）。`uiNames` 的 `ListFormatter` 用 `zh-Hans`。
+- 字形：所有視窗套的 `.chineseGlyphs()` 在簡體介面用 `zh-Hans`（簡體的標點位置）；會議標題、段落標題的宋體用 `Songti SC`。會議內容（中文會議）的字形、標題字型跟著「中文的字」（R72.5）：簡體用 `zh-Hans`、`Songti SC`，繁體照舊（`MeetingLanguage.contentTypesetting`、`contentTitleFont`，取代直接讀語言檔的 `fonts.typesetting`、`fonts.titleMac`）。
+- 「中文的字」的預設（R72.5）：`chineseScript` 沒有值時，簡體介面是 `simplified`、其他是 `traditional`（`AppSettings.chineseScript`）；設定頁的選單顯示的也是這個值。
+- 跟著「中文的字」的還有：中文會議新增的預設說話者名稱（`defaultSpeaker`，簡體時「说话者 N」；`isDefaultSpeakerName` 兩種寫法都認得）、心智圖的段落名稱（畫面上用介面語言、簡體介面轉；匯出用會議語言、同匯出轉）。存起來的失敗原因（`MeetingLanguage.uiStored`，失敗當時的介面語言寫的）、畫面上的會議長度（`TimeFormat.duration` 不帶語言時）、播放條的「議題」、設定裡範本的段落名稱和內建範本的內容（只顯示，內建範本不能改）在簡體介面轉。
+- DEBUG：state 的 `languages` 加 `interfaceScript`（`zh-Hant`／`zh-Hans`／`en`）；簡體介面用 `-AppleLanguages "(zh-Hans)"` 啟動。
+
+### 48.3 Windows（design-windows §11.15）
+
+- 介面語言的設定值多一個 `zh-Hans`；沒設定時 `CurrentUICulture` 是 `zh-CN`、`zh-SG` 或 `zh-Hans*` 的用簡體，`zh-TW`、`zh-HK`、`zh-MO`、`zh-Hant*` 用繁體，其他英文。
+- `L`：多一個簡體模式，查兩份 xcstrings 的 `zh-Hans`；表裡沒有的鍵（動態組出來的文字）執行時用 `ChineseScript.ToSimplifiedUI` 轉，不會漏出繁體。`MeetingLanguages.Ui(zh, en)` 同 Mac。
+- 字型：每個視窗的根元素 `Language` 設成 `zh-CN`（WinUI 依語言挑中文字型：微軟雅黑），會議內容同 Mac 跟著「中文的字」（`zh-CN`／`zh-TW`）。
+- 統計的介面語言送 `zh-Hans`。
+
+### 48.4 驗證
+
+- `l10n.py check`、`windows-check` 通過（沒有缺簡體、沒有繁體字、插值相同）；標準答案 `util/ui-hans.json`（Mac 產生、Windows 和 l10n.py 比對）。
+- Mac DEBUG 版 `-AppleLanguages "(zh-Hans)"`：主視窗（紀錄、逐字稿、提問）、錄音畫面、選單列、設定四頁（`preview settings`）、首次使用引導、使用說明、匯出對話框截圖，找不到繁體字、版面沒有跑掉；「中文的字」沒選過時是簡體。繁體、英文介面截圖跟改之前一樣。
+- Windows 虛擬機 `--set interfaceLanguage=zh-Hans`：同樣的畫面。
+
+## 49. 雙聲道的錄音兩耳都聽得到（R73，D158；GitHub #7）
+
+### 49.1 混音（`Services/ChannelMix.swift`）
+
+- `ChannelMix.audioMix(for: AVAsset) async -> AVAudioMix?`：音軌是 2 個聲道時，回傳一個裝了 `MTAudioProcessingTap` 的 `AVAudioMix`；其他（單聲道、讀不到音軌）回傳 nil，照原樣播。
+- tap 的 process：`MTAudioProcessingTapGetSourceAudio` 取來源音訊，處理格式是 2 個聲道、非交錯的 Float32 時，每個取樣 m = (L + R) × 0.7071（同 AVAssetReader 混成單聲道的 −3 dB，量過：左聲道 0.5、右聲道 0 混出 0.354），超過 ±1 截掉，寫回兩個聲道。其他格式（prepare 時看 ASBD）不動。
+- 只在會議的 `channels` 是 `both` 時用（R73.5）：`Player.load(_:mixChannels:)`，`AppModel` 傳 `meeting.channels == "both"`。`load` 照舊馬上建好 `AVPlayerItem`，音軌讀到後才設 `item.audioMix`（可以中途設）。
+- 匯出（`AudioExporter`）：`both` 的會議即使原檔是同一種格式也重新轉。m4a 用 `AVAssetExportSession`（AppleM4A），`session.audioMix` 設成同一個混音，輸出還是雙聲道、兩個聲道一樣；wav 照舊解碼成 16 kHz 單聲道（原本原檔是 wav 時直接複製，左右分開）。`.shiyin` 照舊。
+
+### 49.2 Windows（design-windows §11.16）
+
+`both` 的會議用 `MediaStreamSource` 播：NAudio 讀原檔、每次送 0.1 秒、混成單聲道 16-bit PCM 交給 `MediaPlayer`；匯出 m4a 先混成單聲道再壓縮。混音的算法同 49.1（`ChannelMix.Mix`）。
+
+### 49.3 驗證
+
+- DEBUG：tap 記下處理過的取樣數、混音後兩個聲道的峰值（state 的 `player.mix`）；`shiyinctl playvolume <0～1>`（AVPlayer 的音量，在 tap 之後，設 0 時 tap 照樣處理、使用者聽不到）。
+- 暫存的 `SHIYIN_HOME` 匯入一個左聲道有聲音、右聲道靜音的 WAV，用 sqlite3 把那場的 `channels` 改成 `both`（等於「麥克風＋電腦聲音」錄到的）：播放後 `player.mix` 兩個聲道的峰值相同、≈ 原本左聲道 × 0.71；改回 `mic` 時沒有混音。匯出 m4a 後讀兩個聲道，兩邊相同、≈ 原本左聲道 × 0.71。
+
+## 50. 錄音中麥克風一直重新連接（R74，D159、D160；GitHub #8）
+
+### 50.1 重新連接的節奏（Mac、Windows 的 `Recorder` 同一套）
+
+- 每個聲道記下重新連接的時間（`restarts[channel]`；裝置變了、看門狗觸發的都算，使用者換麥克風不算），只留 60 秒內的；n 是 60 秒內的次數。
+- `delay(n)`：n < 3 是 0.3 秒，之後是 2^(n−2) 秒（n = 3 是 2 秒、4 是 4 秒、5 是 8 秒、6 是 16 秒），最多 30 秒。
+- 裝置變了（`onInterruption`）：等 `delay(n)` 秒沒有新的通知再重新連接（原本固定 0.3 秒）。
+- 看門狗：超過 3 秒沒送資料時照舊提示；距離上次重新連接完至少 5 秒、沒有正在進行的重新連接，才重新連接（R74.1）；之後重試的間隔是 max(5, `delay(n)`) 秒。
+- 提示（`deviceWarning`，每秒重算）：重新連接失敗的原因 ＞ 一直在重新連接（n ≥ 3，R74.3）＞ 正在重新連接…。n 掉到 3 以下（60 秒沒再重新連接）時「一直在重新連接」那句消失。
+
+### 50.2 Mac：重新連接在背景（D160）
+
+- `Recorder` 多一個序列佇列 `deviceQueue`：重新連接（`restart()`）在這裡做，做完回主執行緒更新正在收音的麥克風、失敗的原因、提示。同一個聲道正在重新連接時又要重新連接（換麥克風）：記下來，做完再做一次。
+- 停止錄音時在 `deviceQueue` 上停掉音源（`deviceQueue.sync`）：等正在進行的重新連接做完，不會跟它同時動 AVAudioEngine。開始錄音照舊在主執行緒（還沒有別的工作）。重新連接做完時錄音已經停了（音源不是現在的），結果丟掉。
+- 模擬錄音的 `FileSource`（DEBUG）原本在 `start()` 用 `MainActor.assumeIsolated` 讀麥克風清單，背景會當掉：改讀 `MicrophoneMonitor` 上鎖的快照（`resolveSnapshot(_:)`，`refresh()` 時更新）。
+
+### 50.3 Mac：收音的格式（R74.5）
+
+- `installTap(onBus: 0, bufferSize: 4096, format: nil)`：用 input node 當下的格式。原本先讀 `outputFormat(forBus:)` 再傳進去，兩次之間裝置換了取樣率時 AVAudioEngine 丟 NSException（格式跟硬體不符）。`outputFormat` 只用來確認有輸入（取樣率 > 0）。
+- `StreamConverter` 看每個 buffer 的格式，跟上一個不同就重建 `AVAudioConverter`。
+- Objective-C 的例外：新的 C 系 target `Sources/ObjCCatch`（一個 `.m`，`ShiyinCatch(block) -> NSString?` 用 `@try/@catch` 包住，回傳例外的原因），包住 `inputNode`、`setDeviceID`、`installTap`、`prepare`、`start`；接到例外就停掉 engine、丟 `CaptureError.engine(原因)`，當成重新連接失敗（看門狗照常重試，開始錄音時就失敗則照舊顯示「沒辦法開始錄音」）。
+
+### 50.4 驗證
+
+- DEBUG：`shiyinctl recordflap <次數> [秒數]`：模擬錄音的麥克風（`FileSource`）接下來 N 次開始收音後 0.5 秒送出「裝置變了」，每次開始收音花 <秒數>（模擬藍牙），state 的 `recorder.restarts`（每個聲道 60 秒內重新連接的秒數）。驗證：重新連接的間隔照 50.1 拉長、提示換成「一直在重新連接」、停止後再開始恢復；開始收音花 3 秒時 `metrics` 的 `maxMainGapMs` 不到 0.5 秒（畫面不卡）、錄音沒停。
+- 真的裝置：內建麥克風錄音、錄音中換到別的麥克風再換回來（格式不同），錄音照常；AirPods 要回報的人或使用者實測。
+- Windows：`RecorderTests` 用會一直送通知、開始收音很慢的假音源，驗證同樣的節奏和提示。
+
+## F45. 简体中文（RF70，DF151）
+
+### F45.1 原则
 
 - 「中文」就是大陆简体：原始码里的中文（界面字串、提示词、导出标签）直接写简体，`Localizable.xcstrings` 的 `sourceLanguage` 是 `zh-Hans`，键是简体原文；`Resources/zh-Hans.lproj/InfoPlist.strings` 放 app 名称、权限说明。
 - 日文的字（`ja:` 参数、`("中文", "English", "日本語")` 第三个位置、日文模板和 `Labels.ja`）一个字都不能动。
 - 转换工具：`scripts/dev/t2s.py`（一般文字）、`scripts/dev/t2s-swift.py`（Swift 原始码：含假名的字串和注释、`ja:` 位置、前后都是日文的字串跳过）。
 
-### 45.2 繁转简的做法
+### F45.2 繁转简的做法
 
 - 字表在 `Resources/opencc/`，取自 OpenCC（Apache-2.0）：`TSCharacters`、`TSPhrases`、`TWPhrasesRev`、`TWVariantsRevPhrases`（只留第一个候选，tab 分隔），加上拾音自己的 `CNOverrides.tsv`（优先：例如「资料」不换成「数据」、「复制」不换成「拷贝」、「预设」换成「默认」、「投影片」换成「幻灯片」）。
 - 两轮：第一轮台湾用词→大陆用词（CNOverrides、TWPhrasesRev、TWVariantsRevPhrases、反查 TWVariants），第二轮繁→简（TSPhrases、TSCharacters）；每一轮由左往右找最长匹配。Swift 的 `ChineseScript.toSimplified` 跟 Python 的 `t2s.py` 做法一样。
 
-### 45.3 转录
+### F45.3 转录
 
 - 语言文件的 `transcription.simplified: true`（中文、广东话）：`TranscriptionPipeline.run` 最后把每一段转简体（`MeetingLanguage.outputScript`），Breeze、Qwen3-ASR、macOS 内置、企业服务器的结果都经过这里；实时逐字稿（`LiveTranscriber`）的暂定和定稿文字也转。
 - 中文：`locale`、`live.mac` 改成 `zh_CN`；`traditional: false`（Qwen3-ASR 不再转台湾繁体）；Whisper 的提示词改成简体（「以下是简体中文的工作会议录音…」）。Breeze 是台湾的模型，提示词是简体时输出可能仍是繁体，由上面的转换统一。
@@ -2169,30 +2342,30 @@ id 42 · shiyin://open?meeting=42 · transcript: get_transcript(meeting_id: 42)
 - 广东话：照旧 Qwen3-ASR → 台湾繁体 → `scriptFixes`，最后再转简体；`locale`、实时逐字稿维持 `zh_HK`。
 - OCR（参考文件）先认 `zh-Hans`。
 
-### 45.4 字体
+### F45.4 字体
 
-- 会议内容的字形 `typesettingLanguage(zh-Hans)`；语言文件中文、广东话的 `fonts`：`typesetting`、`lang` 是 `zh-Hans`，标题 `Songti SC`，HTML 用 `PingFang SC`／`Songti SC`。Windows 的字段（`titleWindows`、`htmlWindows`、`docx`、`contentWindows`、`live.windowsConvert`）这一版不动（R70.6）。
+- 会议内容的字形 `typesettingLanguage(zh-Hans)`；语言文件中文、广东话的 `fonts`：`typesetting`、`lang` 是 `zh-Hans`，标题 `Songti SC`，HTML 用 `PingFang SC`／`Songti SC`。Windows 的字段（`titleWindows`、`htmlWindows`、`docx`、`contentWindows`、`live.windowsConvert`）这一版不动（RF70.6）。
 - 界面通用标题的 `Font.songti` 也使用 `Songti SC`；英文会议继续使用自己的字体配置。
 - 更新提示从远端读取的旧版中文说明在显示时转简体；原始说明和英文段落保留。
 
-### 45.5 跟 Windows 的关系
+### F45.5 跟 Windows 的关系
 
 - 语言文件是共用的：中文的 Whisper 提示词、说话者名称（「说话者 %lld」）、广东话的 transcriptNote 改了之后，Windows 的标准答案会对不上，要等 Windows 跟上时一起重跑 `dump-golden`。
 
-### 45.6 旧数据兼容
+### F45.6 旧数据兼容
 
 - 历史数据库 migration 中识别旧默认说话者的 SQL 保留原来的「說話者」「話者」；运行时的默认名称判断同时接受旧繁体和当前语言文件里的名称，避免升级后把「說話者 1」当成真实人名写进声纹名单。
 - 只规范化新生成的文本，不批量改写已有会议、用户笔记或导入原文。回归检查：`scripts/dev/simplified-check.swift`；应用端用临时 `SHIYIN_HOME` 跑 `dump-golden` 核对默认名称与日文、英文、韩文输出。
 
-## 46. 会前准备与会中提问助手（R71）
+## F46. 会前准备与会中提问助手（RF71）
 
-### 46.1 数据与入口
+### F46.1 数据与入口
 
 - v11 新增 `meeting_assistance(meeting_id PRIMARY KEY REFERENCES meetings(id) ON DELETE CASCADE, state TEXT)`，state 是版本内 Codable JSON，含会前背景、目标、角色、初始问题、启用开关、累计摘要、分析游标、持久化问题（UUID、文字、理由、来源时间和原文、优先级、pending/asked/ignored）。不向 Meeting 添加必填字段，不改写历史内容；迁移前沿用数据库备份。
 - “准备会议”创建 `source=prepared`、无录音文件的会议。保存后可重新打开编辑、点开始录音复用同一 id；录音中不允许改会前资料，避免进行中的分析混用目标。有准备的空录音失败时恢复 prepared，启动复原也保留这些准备。
 - 新增 PreparationEditor；录音画面右侧增加建议提问区域，笔记和建议各自可滚动；会后在提问页查看准备和全部问题。英文本地化继续维护。
 
-### 46.2 分析数据与可靠性
+### F46.2 分析数据与可靠性
 
 - MeetingCoach 独立于 JobRunner，接上 Recorder 的开始/结束回调，每 30 秒检查录音状态、暂停状态、启用开关、整理工具就绪状态和新定稿。每轮最多 12000 字符、累计摘要最多 4000 字符；游标为逐字稿 seq 和字符偏移，大段文字可分批消费，不能截断后跳过。
 - 复用 LLMClient、JSON schema 和当前 provider/model。输入包括会前资料、累计摘要、已有问题及状态、新增定稿（seq、开始时间、文字）。输出 summary 和 questions(text, reason, segment, priority)。segment 必须指向本轮真实输入，否则丢弃该建议；时间、依据原文从输入查回，不信模型自造的引用。
@@ -2201,7 +2374,7 @@ id 42 · shiyin://open?meeting=42 · transcript: get_transcript(meeting_id: 42)
 - 问题先去标点与空白统一字形做精确匹配，再以字符二元组相似度过滤高度相似的提问；模型同时收到已有清单进行语义去重。最多保留 100 条，默认显示 5 条 pending。原有问题不因模型漏返回而删除。
 - 会后 NotesContext 增加可选 assistance 文本（无助手数据时提示词保持原样），把准备和未忽略问题作为非事实参考。第一版不将助手数据加入跨平台 .shiyin 封包，原设备会后清单继续保留。
 
-### 46.3 验证
+### F46.3 验证
 
 - 用纯逻辑回归检查长段游标、简体规范化、引用验证、去重与用户状态保留。DEBUG 增加隔离用的准备、注入定稿、分析、读取/标记问题命令；调试通知通道可用 `SHIYIN_DEBUG_CHANNEL` 隔离，避免广播给用户正在使用的测试版。
 - 临时 SHIYIN_HOME、独立调试通道、本地假模型验证会前保存/重启、增量分析、无新增不请求、并发不重叠、错误重试、超时与停止迟到响应、会后上下文和删除级联。构建及 l10n 检查必须通过；真实麦克风与真实模型效果另列人工验证。
@@ -2302,6 +2475,24 @@ id 42 · shiyin://open?meeting=42 · transcript: get_transcript(meeting_id: 42)
 | D148 | Mac 在 `SHIYIN_HOME/bin/shiyin-mcp` 放一個啟動檔，AI 工具登記的都是它，拾音每次啟動時改寫成目前的路徑（§44.3） | 直接登記 app 裡的執行檔：使用者把拾音拖到別的資料夾（例如桌面）後設定就斷了。符號連結指到執行檔：`Bundle.main` 會變成連結所在的資料夾，讀不到 app 的設定（UserDefaults 的網域）。做成 Claude Desktop 的 `.mcpb` 擴充：只有 Claude Desktop 用得到，裡面還是要指到 app 的路徑 |
 | D149 | 工具回傳 Markdown 文字、英文的固定標籤，會議內容照原本的語言（§44.2） | 回 JSON（`structuredContent`）：AI 也讀得懂，但中文內容加上欄位名稱、跳脫字元，長度多三成；會議紀錄本來就有匯出用的 Markdown。標籤跟著介面語言：讀的是 AI，不是人，換介面語言時回傳的內容不該跟著變（標準答案也要多一份） |
 | D150 | 寫本地 MCP 的啟動檔時，拿掉 app 自己的隔離屬性（§44.3；2026-11-09 驗證時發現） | 不處理、靠使用者第一次打開時的放行：放行之後 AI 工具直接執行 bundle 裡的執行檔會不會再被擋，要使用者在系統設定裡輸入密碼按「仍要打開」才驗得到，沒辦法確定；還沒放行時實測會跳出提示、程序卡住，AI 工具只看到逾時。叫使用者自己在終端機跑 `xattr -dr`：一般使用者不會，也不該教他們關掉安全機制。啟動檔改成用 `open -a` 透過 LaunchServices 開：stdio 接不起來 |
-| D151 | 简体中文直接取代台湾繁体（§45；2026-11-10 使用者决定） | 新增「简体中文」会议语言、界面加 zh-Hans 翻译表、繁体照留：可以跟上游合并，但每个提示词、导出标签、字串都要多维护一份，工作量约两倍；使用者只给简体用户用。转录结果在每个引擎里各自转：Breeze、macOS 内置、企业服务器都要改，漏一个就有繁体，所以统一在 `TranscriptionPipeline.run` 最后转 |
+| D151 | 麥克風被語音處理佔住：內建麥克風光看音量（8 秒幾乎沒聲音），其他麥克風要這場錄音稍早是正常的才提示（§45.1；2026-11-12，GitHub #4） | 所有麥克風都光看音量：外接的好麥克風、輸入音量調低時，沒人說話就低於 −70 dBFS，線上會議聽對方講話時會誤報（調小 20 dB 的 7 場錄音有 5 場會）。看「有沒有別的 app 在用麥克風」：線上會議本來就有，分不出來。看內建麥克風變成 3 聲道：只在 MacBook Pro 量過，其他機型不確定。自己開語音處理、自動換麥克風：R57.4、D104 |
+| D152 | 拆句的時間照字數比例估，位置用 UTF-16（§46.1；2026-11-12，GitHub #6） | 用每個字的時間：Qwen3-ASR 不給、Breeze 給的是 token 的時間，存檔時就沒留；要留得改轉錄流程和資料庫。位置用 `Character`：Swift 和 C# 算法不同（C# 沒有字素），emoji 會差一格，兩邊結果對不起來 |
+| D153 | 簡體只換字、不換用語（tw2s，不是 tw2sp）（§47.1；2026-11-12，GitHub #3） | 連用語一起換（軟體→软件）：字表大很多、換錯時（專有名詞、產品名）使用者很難察覺；回報的人要的是字體，Qwen3-ASR 原本輸出的簡體也不換用語 |
+| D154 | 繁體做完、存檔前才轉簡體（§47.2） | 提示詞改成要求簡體：中文提示詞要跟 3.0 一字不差，繁體使用者的結果會變；Breeze 本來就輸出繁體，還是要轉。存繁體、顯示時才轉：搜尋要用繁體字才找得到，使用者打簡體編輯又會混在一起 |
+| D155 | 簡體介面的翻譯從繁體自動產生（用語表＋繁轉簡＋少數手動指定），不手寫一份（§48.1；2026-11-12） | 手寫或找人翻一份：一千多條，之後每次改介面都要記得改，一定會漏；繁體跟簡體大部分只差字，用語差異可以列表。只換字不換用語（同 D153）：介面上「設定」「檔案」「匯出」在大陸讀起來不對，介面跟逐字稿不同，介面是使用者天天看的 |
+| D156 | 不查表的中文在簡體介面執行時轉，Windows 查不到的鍵也執行時轉（§48.2、§48.3） | 這些地方全部改成查表：寫死兩種語言的地方本來就是因為同一句中文要不同的英文（D12 的例外），改查表要多一套鍵；範本名稱、語言名稱、更新說明不是介面字串 |
+| D157 | 簡體介面時「中文的字」預設簡體，會議內容的字形跟著「中文的字」（§48.2；2026-11-12 使用者同意） | 預設維持繁體：用簡體介面的人幾乎都要簡體的逐字稿，還要自己去找設定。內容字形跟著介面：繁體介面的人選了簡體逐字稿，會用繁體字形顯示簡體字，標點位置不對 |
+| D158 | 雙聲道的錄音在播放、匯出 m4a 時才混音（MTAudioProcessingTap；Windows 是 MediaStreamSource），錄音檔不變（§49；2026-11-12，GitHub #7） | 錄成單聲道、壓縮時混成單聲道：分聲道轉錄、判斷誰是我（§17.3）就沒有資料了。另外產生一份混好的播放檔：多一倍空間，長會議點了播放要等。用 AVAudioEngine 自己寫播放器：倍速、跳播、時間都要重寫。混音的音量用相加乘 0.71 而不是平均：跟轉錄時 AVAssetReader 混成單聲道一樣，只有一邊有聲音（最常見）時不會小一半 |
+| D159 | 重新連接的間隔逐漸拉長，看門狗在重新連接完先等 5 秒（§50.1；2026-11-12，GitHub #8） | 藍牙的裝置不重新連接：AVAudioEngine 收到裝置變了之後會自己停下來，不重開就一直沒聲音。一直重新連接時自動改用內建麥克風：D104 不自動換麥克風，使用者可能就是要用耳機的麥克風。原因是推測的（沒有 AirPods 4、還沒拿到當機報告），這兩個改動對所有裝置都安全：正常換裝置時前兩次照舊 0.3 秒 |
+| D160 | Mac 的重新連接在背景佇列做，AVAudioEngine 的 Objective-C 例外用一個小的 `.m` 接住（§50.2、§50.3） | 留在主執行緒：藍牙開始收音要好幾秒，畫面卡住（回報的「卡死一會」）。整個錄音（含開始、停止）都搬到背景：Recorder 的狀態都在主執行緒，改動太大。不接例外：格式在中途改變時直接當掉，Swift 的 `do/catch` 接不到 NSException |
+| DF151 | 简体中文直接取代台湾繁体（§F45；2026-11-10 使用者决定） | 新增「简体中文」会议语言、界面加 zh-Hans 翻译表、繁体照留：可以跟上游合并，但每个提示词、导出标签、字串都要多维护一份，工作量约两倍；使用者只给简体用户用。转录结果在每个引擎里各自转：Breeze、macOS 内置、企业服务器都要改，漏一个就有繁体，所以统一在 `TranscriptionPipeline.run` 最后转 |
 
 沿用 v2 的決策：資料放 Application Support（v2 D3）、GRDB（v2 D5）、會議紀錄存 JSON 加版本（v2 D6）、DEBUG 控制通道（v2 §13）。
+
+## Fork 同步约定（2026-11-13，合并上游 4.8.1）
+
+Mac 保留 RF70 的大陆简体输出及 RF71 的会中助手；上游 R71 的繁简切换不覆盖本 fork 的统一简体策略，因此不显示该设置。上游新增的拆句、双声道播放与导出、音源重连修复照常合入。`meeting_assistance` 的 v11 migration 保持不变；拆句沿用上游现有的 `speaker_undo`，无需增加数据库版本。
+
+Mac 翻译表以简体为源语言，同时保留 Windows 正在引用的繁体键和英文翻译；本地化抽取不能删除这些跨平台共享键。生成简体时，Mac 的简体源键直接使用原文，Windows 的繁体源键仍使用上游用语表。Mac 权限文案继续使用本 fork 的简体资源。
+
+共享转换夹具使用 `ChineseScript.toStandardSimplified`（只换字）和上游 `toSimplifiedUI`（界面用语表），对应 Windows 的原有语义；Mac 的会议输出继续使用 `toSimplified`（大陆用词）。

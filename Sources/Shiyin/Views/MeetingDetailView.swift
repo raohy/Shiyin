@@ -326,7 +326,8 @@ struct StatusBanner: View {
                 default: Text("正在用 \(provider) 整理会议记录…")
                 }
             })
-        case .failed(let kind, let message):
+        case .failed(let kind, let stored):
+            let message = MeetingLanguage.uiStored(stored)
             return AnyView(Label {
                 Text(kind == .transcribe ? String(localized: "转录失败：\(message)") : String(localized: "整理失败：\(message)")).lineLimit(3).textSelection(.enabled)
             } icon: {

@@ -1921,6 +1921,14 @@
     "search"
    ]
   },
+  {"op": "splitSegment", "key": "zh", "seq": 6, "at": 5, "to": null, "label": "拆成兩句", "file": "db/35-split-result.json"},
+  {"op": "dumpTables", "file": "db/36-split.json", "tables": ["segments", "speakers", "corrections", "search", "speaker_undo"]},
+  {"op": "undoSpeakerEdit", "key": "zh", "file": "db/37-unsplit-result.json"},
+  {"op": "dumpTables", "file": "db/38-unsplit.json", "tables": ["segments", "speakers", "corrections", "search", "speaker_undo"]},
+  {"op": "splitSegment", "key": "zh", "seq": 5, "at": 0, "to": 1, "label": "拆不開：開頭", "file": "db/39-split-none.json"},
+  {"op": "splitSegment", "key": "zh", "seq": 5, "at": 17, "to": 2, "label": "拆成兩句：同一位", "file": "db/40-split-emoji.json"},
+  {"op": "splitSegment", "key": "en", "seq": 1, "at": 33, "to": null, "label": "Split", "file": "db/41-split-en.json"},
+  {"op": "dumpTables", "file": "db/42-split.json", "tables": ["segments", "speakers", "speaker_undo"]},
   {
    "op": "addTerm",
    "term": "  Valkey  "
@@ -2079,6 +2087,33 @@
   "他发现自己的头发白了，后来去了皇后大道",
   "干净 干部 干燥 饼干 干活",
   "Queue Gate 第一期先做商品级排队，IP 节流先设十秒三十次。",
+  "English only, 123 numbers.",
+  ""
+ ],
+ "uiHansCases": [
+  "請到設定的「錄音與轉錄」換一個預設的麥克風",
+  "匯出檔案到資料夾：%@",
+  "參考文件（%lld 份）、%lld 張投影片",
+  "登入企業伺服器後，錄音檔會上傳",
+  "已拆成兩句。要復原的話，在逐字稿按右鍵選「復原」。",
+  "復原上一版會議紀錄",
+  "琥珀色是辨識信心低的段落",
+  "在終端機執行 claude 登入（結束代碼 %d）",
+  "進階 → 讓 AI 工具讀取會議",
+  "結束拾音",
+  "這支麥克風",
+  "檔案總管、鑰匙圈、認證管理員",
+  "English only, 123 numbers.",
+  ""
+ ],
+ "tw2sCases": [
+  "今天的會議由王小明負責，Redis 的快取時間改成兩分鐘。",
+  "軟體、伺服器、資料庫都要更新，後來發現裡面很複雜。",
+  "頭髮很長，皇后在後面；乾淨、幹部、乾燥、餅乾、幹活。",
+  "臺灣的麵條，一隻貓，幾個人，鐘錶，歷史，著急，為什麼，儘量。",
+  "說話者 1 剛剛說的我同意 😀，期限 10/21。",
+  "一口吃個胖子；喫飯了沒？",
+  "決議、待辦、未決問題、摘要、議題",
   "English only, 123 numbers.",
   ""
  ],

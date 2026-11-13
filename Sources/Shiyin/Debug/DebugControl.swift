@@ -146,6 +146,21 @@ enum DebugControl {
             model.selection = id
             model.reassignSegments(args.dropFirst(3).compactMap { Int64($0) }, to: args[2] == "new" ? nil : Int(args[2]))
         case "undospeaker": model.selection = id; model.undoSpeakerEdit()
+        case "splitmode":   // splitmode <会议 id> <段落 id>：逐字稿进入拆成两句的模式（等于右键「拆成两句…」）
+            model.selection = id
+            model.tab = .transcript
+            model.splitRequest = Int64(args[2])
+        case "splitcaret":   // splitcaret <UTF-16 位置>：拆开模式的文字框把光标放到这里（背景的窗口点不到文字框，design §46.2）
+            func find(_ view: NSView) -> NSTextView? {
+                if let text = view as? NSTextView, text.accessibilityLabel() == String(localized: "要拆开的句子") { return text }
+                return view.subviews.lazy.compactMap(find).first
+            }
+            if let content = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" })?.contentView, let text = find(content) {
+                text.setSelectedRange(NSRange(location: Int(args[1]) ?? 0, length: 0))
+            }
+        case "splitsegment":   // splitsegment <会议 id> <段落 id> <UTF-16 位置> <说话者|new>：拆成两句（design §46.2）
+            model.selection = id
+            model.splitSegment(Int64(args[2]) ?? 0, at: Int(args[3]) ?? 0, to: args[4] == "new" ? nil : Int(args[4]))
         case "speakerhint": model.selection = id; if args.count > 2, args[2] == "dismiss" { model.dismissSpeakerHint() }
         case "minspeakers": model.selection = id; model.setMinSpeakers(args[2] == "auto" ? nil : Int(args[2]))   // 录音中的「人数」菜单（design §26.2）
         case "levelhint": if args.count > 1, args[1] == "dismiss" { model.recorder.dismissLevelHint() }   // 收音提醒按「知道了」
@@ -407,6 +422,8 @@ enum DebugControl {
             model.recorder.simulateStall(channel: args.count > 2 ? Int(args[2]) ?? 0 : 0, seconds: args[1] == "off" ? nil : Double(args[1]) ?? 5)
         case "recordinterrupt":   // recordinterrupt [声道]：等于音源发现设备变了，Recorder 会重新开始这个音源
             model.recorder.simulateInterruption(channel: args.count > 1 ? Int(args[1]) ?? 0 : 0)
+        case "recordflap":   // recordflap <次数> [秒数]：麦克风接下来几次开始收音后都说设备变了，每次重新开始花几秒（design §50.4）
+            model.recorder.simulateFlapping(times: Int(args[1]) ?? 0, seconds: args.count > 2 ? Double(args[2]) ?? 0 : 0)
         case "recordlang":   // recordlang <语言代码>：录音中换会议语言（等于按「改回」；zh、en、ja、yue、ko…）
             if let language = MeetingLanguage(rawValue: args[1]) { model.recorder.switchLanguage(to: language) }
         case "record-sim":
@@ -414,6 +431,7 @@ enum DebugControl {
             model.startSimulatedRecording(file: URL(fileURLWithPath: args[1]), speed: Double(args[2]) ?? 1, both: args.count > 3 && args[3] == "1")
         case "seek": model.player.seek(to: Double(args[1]) ?? 0, play: args.count > 2 && args[2] == "play")
         case "rate": model.player.setRate(Float(args[1]) ?? 1)
+        case "playvolume": model.player.setVolume(Float(args[1]) ?? 1)   // playvolume <0～1>（design §49.3）
         case "toggle": model.player.toggle()
         case "export":
             // export <项目> <格式> <路径> [times 1/0] [speakers 1/0] [会议 id，默认目前选中的]
@@ -780,7 +798,9 @@ enum DebugControl {
             "transcriptionEngine": AppSettings.transcriptionEngine,
             "textSize": TextSize.level,   // 会议内容的文字大小（design §38.5）
             "player": ["loaded": model.player.isLoaded, "playing": model.player.isPlaying,
-                       "time": model.player.currentTime, "duration": model.player.duration, "rate": model.player.rate],
+                       "time": model.player.currentTime, "duration": model.player.duration, "rate": model.player.rate,
+                       "mixing": model.player.isMixing,
+                       "mix": ChannelMix.stats.withLock { ["frames": $0.frames, "sourcePeaks": $0.sourcePeaks, "mixedPeak": $0.mixedPeak] }],
             "recorder": ["recording": model.recorder.isRecording, "paused": model.recorder.isPaused,
                          "meetingId": model.recorder.meetingId ?? -1, "elapsed": model.recorder.elapsed,
                          "micLevel": model.recorder.micLevel, "systemLevel": model.recorder.systemLevel,
@@ -791,6 +811,7 @@ enum DebugControl {
                          "failure": model.recorder.failureMessage ?? "", "language": model.recorder.language.rawValue,
                          "languageSwitch": model.recorder.languageSwitch.map { "\($0.from.rawValue)→\($0.to.rawValue)" } ?? "",
                          "deviceWarning": model.recorder.deviceWarning ?? "",
+                         "restarts": model.recorder.restartInfo,   // 重新连接的节奏（design §50.4）
                          // 麦克风（design §38.7）
                          "micDevice": model.recorder.micDevice.map { ["name": $0.name, "uid": $0.uid, "bluetooth": $0.isBluetooth] } as Any,
                          "micHint": model.recorder.micHint.map { ["text": $0.text, "builtIn": $0.builtIn?.name ?? ""] } as Any],
@@ -798,6 +819,7 @@ enum DebugControl {
                                                                             "builtIn": $0.isBuiltIn] },
                             "default": MicrophoneMonitor.shared.defaultInput?.uid ?? "", "setting": AppSettings.inputDeviceUID],
             "languages": ["defaultMeeting": AppSettings.defaultMeetingLanguage.rawValue, "interface": MeetingLanguage.interface.rawValue,
+                          "interfaceScript": MeetingLanguage.interfaceCode, "chineseScript": "simplified",
                           "preferred": Locale.preferredLanguages.first ?? ""],
             "models": ["breeze": "\(model.models.state)", "japanese": "\(model.models.state(.japanese))",
                        "qwen": "\(model.models.combinedState(.qwen))",

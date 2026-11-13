@@ -215,6 +215,23 @@ enum NotesExporter {
 
 // MARK: - HTML → PDF、docx、剪贴板（design §10）
 
+/// 中文会议用简体时，导出整份转成简体（R71.3、design §47.2）：标题、字段名称、默认的说话者名称也一起转
+enum ExportScript {
+    static func text(_ text: String, _ b: ExportBundle) -> String {
+        AppSettings.script(text, for: b.meeting.meetingLanguage)
+    }
+
+    /// HTML 另外把语言标记、繁体中文的字体换成简体的
+    static func html(_ html: String, _ b: ExportBundle) -> String {
+        guard AppSettings.simplifiedChinese(for: b.meeting.meetingLanguage) else { return html }
+        var out = ChineseScript.toSimplified(html)
+        for (from, to) in [("lang=\"zh-Hant\"", "lang=\"zh-Hans\""), ("PingFang TC", "PingFang SC"), ("Songti TC", "Songti SC")] {   // l10n-skip
+            out = out.replacingOccurrences(of: from, with: to)
+        }
+        return out
+    }
+}
+
 enum HTML {
     static func escape(_ s: String) -> String {
         s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
@@ -362,11 +379,16 @@ enum AudioExporter {
         guard b.meeting.hasAudio else { throw ExportError.noAudio }
         let source = b.meeting.audioURL
         try? FileManager.default.removeItem(at: url)
-        if format == source.pathExtension.lowercased() {
+        // 「麦克风＋电脑声音」的录音（design §49.1、R73.2）：m4a 两个声道混在一起、wav 混成单声道，原档是同一种格式也要重新转
+        let both = b.meeting.channels == "both"
+        let asset = AVURLAsset(url: source)
+        let mix = format == "m4a" && both ? await ChannelMix.audioMix(for: asset) : nil
+        if format == source.pathExtension.lowercased() && !both {
             try FileManager.default.copyItem(at: source, to: url)
         } else if format == "m4a" {
-            guard let session = AVAssetExportSession(asset: AVURLAsset(url: source), presetName: AVAssetExportPresetAppleM4A)
+            guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A)
             else { throw ExportError.failed(String(localized: "无法创建转档")) }
+            session.audioMix = mix
             try await session.export(to: url, as: .m4a)
         } else {
             // wav：解码成 16 kHz 单声道（转录用的格式，音质足够听清楚人声）

@@ -464,10 +464,11 @@ final class AppDatabase: @unchecked Sendable {
 
     /// 语言档里每种语言的默认说话者名称（design §41.1）：「说话者 %lld」→「说话者 \d+」，接成一个样式
     private static let defaultSpeakerPattern: Regex<AnyRegexOutput> = {
-        // 旧数据和导入封包仍可能使用繁体默认名称，不能当作真实人名（design §45.6）。
+        // 兼容旧繁体标签和当前简体默认名称，避免将默认标签当成真实人名。
         let formats = LanguageProfiles.all.map(\.speaker) + ["說話者 %lld"]  // l10n-skip
-        let forms = formats.map { format -> String in
-            let parts = format.components(separatedBy: "%lld")
+        let speakers = formats.flatMap { [$0, ChineseScript.toSimplified($0)] }
+        let forms = Array(Set(speakers)).sorted().map { speaker -> String in
+            let parts = speaker.components(separatedBy: "%lld")
             return parts.map { NSRegularExpression.escapedPattern(for: $0) }.joined(separator: "\\d+")
         }
         return try! Regex("^(?:" + forms.joined(separator: "|") + ")$")
@@ -844,7 +845,7 @@ final class AppDatabase: @unchecked Sendable {
         return metaRowidBase + meetingId * 4 + code
     }
 
-    private static func indexSegment(_ db: Database, meetingId: Int64, id: Int64, text: String) throws {
+    static func indexSegment(_ db: Database, meetingId: Int64, id: Int64, text: String) throws {
         try db.execute(sql: "INSERT INTO search (rowid, meeting_id, kind, ref, text) VALUES (?, ?, 'segment', ?, ?)",
                        arguments: [id, meetingId, id, text])
     }
