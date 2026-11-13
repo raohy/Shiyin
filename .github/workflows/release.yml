@@ -18,7 +18,12 @@ permissions:
   contents: write
 
 jobs:
+  verify:
+    name: 发布前检查
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: verify
     runs-on: macos-26
     timeout-minutes: 45
     steps:

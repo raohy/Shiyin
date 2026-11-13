@@ -161,6 +161,10 @@ Mac 和 Windows 都可以用。说话者的声纹只存在自己的电脑；公�
 
 ## 发布新版
 
+开发、合并、版本和撤回规则见 [AGENTS.md](AGENTS.md)。独立功能在独立分支开发，通过 PR 和 `macOS checks` 后合并；正式发布另开版本 PR，更新版本号、构建号和 `docs/releases/X.Y.Z.md`。已有 Git 历史和发布标签保留，出问题通过新的撤回提交或修复版本处理。
+
+本地自动检查：`bash scripts/ci/check-macos.sh`。它运行 Swift 测试、会中助手纯逻辑回归、本地化检查和发布配置编译，不启动应用或使用真实会议。GUI 集成和真实模型验证按相关设计另外执行并注明结果。
+
 ### 用 GitHub Actions（推荐）
 
 1. 改 `Resources/Info.plist` 的 `CFBundleShortVersionString`，commit 并推上去。
