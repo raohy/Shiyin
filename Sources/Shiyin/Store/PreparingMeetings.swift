@@ -60,7 +60,7 @@ extension AppModel {
             try db.updateMeeting(meeting)
             try db.resetCoachProgress(id)
             try db.pool.write { db in
-                try db.execute(sql: "DELETE FROM segments WHERE meeting_id = ? AND kind = 'live'", arguments: [id])
+                try db.execute(sql: "DELETE FROM segments WHERE meeting_id = ? AND kind IN ('live', 'reviewed')", arguments: [id])
             }
         } else { try db.deleteMeeting(id) }
     }

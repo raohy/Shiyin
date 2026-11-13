@@ -115,10 +115,17 @@ enum DebugControl {
         case "askall": model.loadAllQuestions(); model.askAll(args[2], scope: AskScope(rawValue: args[1]) ?? .all)
         case "questions":
             let list = args[1] == "all" ? ((try? model.db.questions(meetingId: nil)) ?? []) : ((try? model.db.questions(meetingId: Int64(args[1]))) ?? [])
-            write(["asking": model.asking != nil, "questions": list.map { ["question": $0.question, "scope": $0.scope, "provider": $0.provider,
+            let target: AskTarget = args[1] == "all" ? .all : .meeting(Int64(args[1]) ?? 0)
+            let request = model.askRequest.flatMap { $0.target == target ? $0 : nil }
+            write(["asking": model.asking != nil,
+                   "pendingQuestion": request?.question ?? "", "progress": request?.phase.label ?? "",
+                   "phase": request.map { String(describing: $0.phase) } ?? "",
+                   "visibleQuestions": (args[1] == "all" ? model.allQuestions : model.meetingQuestions).map(\.question),
+                   "questions": list.map { ["question": $0.question, "scope": $0.scope, "provider": $0.provider,
                                                                             "answer": (try? JSONSerialization.jsonObject(with: Data($0.answer.utf8))) ?? [:]] }],
                   to: args[2])
         case "cancelask": model.cancelAsk()
+        case "retryask": model.retryAsk()
         // 检测会议（design §21.7）：meetingapp <bundleID> start|stop；meetingprompts <输出.json>；meetingaction <按钮>
         case "meetingapp": model.meetingDetector.simulated[args[1]] = args[2] == "start"
         case "meetingprompts":
@@ -691,7 +698,7 @@ enum DebugControl {
         }
     }
 
-    /// coach prepare <title> <preparation.json> <result.json> | start <id> | append <id> <seconds> <text>
+    /// coach prepare <title> <preparation.json> <result.json> | start <id> | append|review <id> <seconds> <text>
     /// coach analyze|stop|open|show <id> [output.json] | mark <id> <question UUID> <pending|asked|ignored>
     private static func coachCommand(_ args: [String]) {
         let model = AppModel.shared
@@ -715,6 +722,10 @@ enum DebugControl {
                 guard let id else { return }
                 let start = Double(args[2]) ?? 0
                 try model.db.appendLiveSegment(id, start: start, end: start + 5, text: args[3])
+            case "review" where args.count >= 4:
+                guard let id else { return }
+                let start = Double(args[2]) ?? 0
+                try model.db.appendReviewedSegment(id, start: start, end: start + 5, text: args[3])
             case "analyze": if let id { model.coach.analyze(id) }
             case "stop": model.coach.stop()
             case "finish":
@@ -723,7 +734,7 @@ enum DebugControl {
                     meeting.source = "transcript"
                     try model.db.updateMeeting(meeting)
                     try model.db.pool.write { db in
-                        try db.execute(sql: "UPDATE segments SET kind = 'final' WHERE meeting_id = ? AND kind = 'live'", arguments: [id])
+                        try db.execute(sql: "UPDATE segments SET kind = 'final' WHERE meeting_id = ? AND kind = 'reviewed'", arguments: [id])
                     }
                     model.reload()
                 }

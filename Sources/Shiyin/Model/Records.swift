@@ -81,7 +81,7 @@ struct Segment: SnakeCaseRecord, Identifiable, Hashable {
     var text: String
     var lowConfidence: Bool
     var speaker: Int?
-    var kind: String = "final"           // live（实时预览）/ final
+    var kind: String = "final"           // live（实时快稿）/ reviewed（音频复核稿）/ final
     var channel: Int? = nil              // 分声道转录时：0 麦克风、1 电脑声音（design §17.3）
     var speakerManual: Bool = false      // v9：用户改过这句的说话者（design §24.2）
 

@@ -20,7 +20,7 @@ struct qwen_engine {
 static void quiet_log(enum ggml_log_level level, const char *text, void *user) { (void)level; (void)text; (void)user; }
 
 qwen_params qwen_params_default(void) {
-    qwen_params p = { NULL, "Chinese", 1.0f, 64, 0.0f, 0, 512 };
+    qwen_params p = { NULL, "Chinese", 1.0f, 64, 0.0f, 0, 512, NULL };
     return p;
 }
 
@@ -86,10 +86,11 @@ int32_t qwen_transcribe(qwen_engine *e, const float *samples, int32_t n_samples,
     // 提示词：ChatML（GGUF 里的样板）；system = context，user = 音频，assistant 先填语言前缀（Qwen3-ASR 的输出格式）
     const char *marker = mtmd_default_marker();
     const char *context = p.context ? p.context : "";
-    size_t cap = strlen(context) + strlen(marker) + strlen(p.language) + 160;
+    const char *prefix = p.prefix ? p.prefix : "";
+    size_t cap = strlen(context) + strlen(marker) + strlen(p.language) + strlen(prefix) + 160;
     char *prompt = malloc(cap);
-    snprintf(prompt, cap, "<|im_start|>system\n%s<|im_end|>\n<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\nlanguage %s<asr_text>",
-             context, marker, p.language);
+    snprintf(prompt, cap, "<|im_start|>system\n%s<|im_end|>\n<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\nlanguage %s<asr_text>%s",
+             context, marker, p.language, prefix);
 
     int32_t rc = 0;
     mtmd_bitmap *bitmap = mtmd_bitmap_init_from_audio((size_t)n_samples, samples);

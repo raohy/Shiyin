@@ -28,7 +28,7 @@ final class MeetingCoach {
         stop()
         meetingId = id
         lastUpdated = nil
-        message = String(localized: "等待新的定稿文字")
+        message = String(localized: "等待新的复核文字")
         ticker = Task { [weak self] in
             while !Task.isCancelled {
                 var interval = 30.0
@@ -76,11 +76,10 @@ final class MeetingCoach {
                 message = AppSettings.summarizerProblem?.message ?? String(localized: "请先设置整理工具，再使用会中提问助手")
                 return
             }
-            let lines = try db.segments(id, kind: "live").filter { $0.seq >= state.nextSeq }
-                .map { CoachLine(seq: $0.seq, start: $0.start, text: $0.text) }
+            let lines = try db.reviewedCoachLines(id, from: state.nextSeq)
             let batch = CoachBatch(lines: lines, state: state)
             guard !batch.lines.isEmpty else {
-                if !automatic { message = String(localized: "还没有新的定稿文字") }
+                if !automatic { message = String(localized: "还没有新的复核文字，请等待音频复核") }
                 return
             }
             let prompt = try MeetingCoachPrompt.input(state: state, batch: batch)

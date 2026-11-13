@@ -20,6 +20,7 @@ typedef struct {
     float temperature;        ///< 0 = greedy
     uint32_t seed;
     int32_t max_tokens;       ///< 最多生成几个 token
+    const char *prefix;      ///< 已确认的前文；对应同一次输入音频的开头，接在 assistant 前缀后，不计入输出。NULL = 无
 } qwen_params;
 
 qwen_params qwen_params_default(void);

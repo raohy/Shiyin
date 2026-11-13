@@ -474,7 +474,7 @@ final class AppDatabase: @unchecked Sendable {
         return try! Regex("^(?:" + forms.joined(separator: "|") + ")$")
     }()
 
-    /// 写入正式逐字稿：取代旧的正式版，并删掉实时预览（design §5.3）
+    /// 写入正式逐字稿：取代旧的正式版，并删掉实时快稿和音频复核稿（design §5.3、§52）
     /// voices：每位说话者的声纹、说话秒数、收音（design §21.4），写进 speakers
     /// transcribedWith：用哪个引擎转录的（breeze、japanese、system，design §21.17）；导入的逐字稿不写
     func saveTranscript(_ meetingId: Int64, segments: [Segment], duration: Int, speakerCount: Int,
@@ -520,11 +520,21 @@ final class AppDatabase: @unchecked Sendable {
 
     /// 录音中的实时预览段落（kind = live）
     func appendLiveSegment(_ meetingId: Int64, start: Double, end: Double, text: String) throws {
+        try appendRecordingSegment(meetingId, start: start, end: end, text: text, kind: "live")
+    }
+
+    /// 复核稿单独保存，不覆盖快稿；只有这个来源能进入会中助手。
+    func appendReviewedSegment(_ meetingId: Int64, start: Double, end: Double, text: String) throws {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        try appendRecordingSegment(meetingId, start: start, end: end, text: text, kind: "reviewed")
+    }
+
+    private func appendRecordingSegment(_ meetingId: Int64, start: Double, end: Double, text: String, kind: String) throws {
         try pool.write { db in
-            let seq = try Int.fetchOne(db, sql: "SELECT COALESCE(MAX(seq), -1) + 1 FROM segments WHERE meeting_id = ?",
-                                       arguments: [meetingId]) ?? 0
+            let seq = try Int.fetchOne(db, sql: "SELECT COALESCE(MAX(seq), -1) + 1 FROM segments WHERE meeting_id = ? AND kind = ?",
+                                       arguments: [meetingId, kind]) ?? 0
             var segment = Segment(meetingId: meetingId, seq: seq, start: start, end: end, text: text, lowConfidence: false,
-                                  speaker: nil, kind: "live")
+                                  speaker: nil, kind: kind)
             try segment.insert(db)
         }
     }

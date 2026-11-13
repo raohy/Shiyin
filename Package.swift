@@ -38,5 +38,6 @@ let package = Package(
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
         ),
+        .testTarget(name: "ShiyinTests", dependencies: ["Shiyin"], path: "Tests/ShiyinTests"),
     ]
 )

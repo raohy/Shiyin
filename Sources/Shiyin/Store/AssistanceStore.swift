@@ -2,6 +2,11 @@ import Foundation
 import GRDB
 
 extension AppDatabase {
+    func reviewedCoachLines(_ id: Int64, from seq: Int) throws -> [CoachLine] {
+        try segments(id, kind: "reviewed").filter { $0.seq >= seq }
+            .map { CoachLine(seq: $0.seq, start: $0.start, text: $0.text) }
+    }
+
     func assistance(_ meetingId: Int64) throws -> MeetingAssistance? {
         try pool.read { try Self.assistance($0, meetingId) }
     }

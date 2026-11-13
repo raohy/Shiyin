@@ -285,7 +285,14 @@ final class AppModel {
         coach.onChange = { [weak self] id in self?.reloadAssistance(id) }
         runner.onChange = { [weak self] in self?.reload() }
         runner.onFinished = { [weak self] job, error in self?.jobFinished(job, error: error) }
-        recorder.onLiveFinished = { [weak self] id, duration in self?.enqueueDraftNotes(meetingId: id, duration: duration) }
+        runner.canStartTranscription = { [weak self] in
+            guard let self else { return true }
+            return self.recorder.finishingLiveCount == 0 && !self.recorder.isUsingQwenLive
+        }
+        recorder.onLiveFinished = { [weak self] id, duration in
+            self?.enqueueDraftNotes(meetingId: id, duration: duration)
+            self?.runner.wake()
+        }
         runner.onRediarized = { [weak self] id, result in
             guard let self, self.selection == id else { return }
             switch result {
@@ -310,6 +317,9 @@ final class AppModel {
         recorder.onFinished = { [weak self] result in self?.recordingFinished(result) }
         recorder.onLiveFinal = { [weak self] id, start, end, text in
             try? self?.db.appendLiveSegment(id, start: start, end: end, text: text)
+        }
+        recorder.onReviewed = { [weak self] id, start, end, text in
+            try self?.db.appendReviewedSegment(id, start: start, end: end, text: text)
         }
         recorder.onLanguageChange = { [weak self] id, language in
             guard let self else { return }
@@ -1424,6 +1434,7 @@ final class AppModel {
 
     /// 正在问哪里：一场会议或所有会议
     var asking: AskTarget?
+    var askRequest: AskRequest?
     /// 目前会议的问答记录、问所有会议的问答记录
     var meetingQuestions: [QuestionRecord] = []
     var allQuestions: [QuestionRecord] = []

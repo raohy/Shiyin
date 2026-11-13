@@ -2,12 +2,27 @@
 import Foundation
 import Speech
 
+@MainActor
+protocol LiveTranscribing: AnyObject {
+    var onVolatile: ((String) -> Void)? { get set }
+    var onFinal: ((Double, Double, String) -> Void)? { get set }
+    var onFailure: ((Error) -> Void)? { get set }
+    var buffersBeforeStart: Bool { get }
+    var feedHandler: ([Float]) -> Void { get }
+    func start() async throws
+    func finish() async
+    func cancel()
+}
+
 /// 录音中的实时逐字稿（design §5.3）：SpeechAnalyzer，语言依会议语言（§16.4），暂定结果约 0 秒、定稿约 2 秒
 @MainActor
-final class LiveTranscriber {
+final class LiveTranscriber: LiveTranscribing {
     let language: MeetingLanguage
     var onVolatile: ((String) -> Void)?
     var onFinal: ((Double, Double, String) -> Void)?
+    var onFailure: ((Error) -> Void)?
+    let buffersBeforeStart = false
+    private var finished = false
 
     private var analyzer: SpeechAnalyzer?
     private var resultsTask: Task<Void, Never>?
@@ -76,6 +91,7 @@ final class LiveTranscriber {
         let transcriber = SpeechTranscriber(locale: language.speechLocale, transcriptionOptions: [],
                                             reportingOptions: [.volatileResults], attributeOptions: [.audioTimeRange])
         try await Self.ensureAssets(language, for: transcriber)
+        guard !finished else { throw WhisperError.cancelled }
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
             throw CaptureError.unsupportedFormat
@@ -83,6 +99,11 @@ final class LiveTranscriber {
         let (stream, builder) = AsyncStream<AnalyzerInput>.makeStream()
         feeder.configure(builder: builder, format: format)
         try await analyzer.start(inputSequence: stream)
+        guard !finished else {
+            feeder.finish()
+            try? await analyzer.finalizeAndFinishThroughEndOfInput()
+            throw WhisperError.cancelled
+        }
         self.analyzer = analyzer
         resultsTask = Task { [weak self] in
             do {
@@ -98,16 +119,23 @@ final class LiveTranscriber {
                 }
             } catch {
                 log.error("live transcription ended: \(error.localizedDescription, privacy: .public)")
+                if self?.finished == false { self?.onFailure?(error) }
             }
         }
     }
 
     func finish() async {
+        finished = true
         feeder.finish()
         try? await analyzer?.finalizeAndFinishThroughEndOfInput()
         _ = await resultsTask?.value
         analyzer = nil
         resultsTask = nil
+    }
+
+    func cancel() {
+        finished = true
+        feeder.finish()
     }
 
     static func isLocaleInstalled(_ language: MeetingLanguage) async -> Bool {

@@ -14,6 +14,7 @@ enum AppSettings {
     static let splitChannelsKey = "splitChannels"
     static let correctTranscriptKey = "correctTranscript"
     static let liveTranscriptionKey = "liveTranscription"
+    static let liveTranscriptionEngineKey = "liveTranscriptionEngine"   // system（默认）/ qwen
     static let autoDetectLanguageKey = "autoDetectLanguage"
     static let recordSourceKey = "recordSource"          // mic / system / both
     static let inputDeviceKey = "inputDeviceUID"
@@ -83,6 +84,7 @@ enum AppSettings {
     /// 转录完先找出可能听错的字（design §17.4）；评估后默认打开（§17.6）
     static var correctTranscript: Bool { flag(correctTranscriptKey, default: true) }
     static var liveTranscription: Bool { flag(liveTranscriptionKey, default: true) }
+    static var liveTranscriptionEngine: String { d.string(forKey: liveTranscriptionEngineKey) == "qwen" ? "qwen" : "system" }
     /// 录音开始后自动检测主要语言（design §18.8、R16）
     static var autoDetectLanguage: Bool { flag(autoDetectLanguageKey, default: true) }
     static var recordSource: String { d.string(forKey: recordSourceKey) ?? "mic" }
@@ -162,6 +164,8 @@ final class JobRunner {
     @ObservationIgnored private var sleepers: [JobLane: Task<Void, Never>] = [:]
     @ObservationIgnored var onChange: (() -> Void)?
     @ObservationIgnored var onFinished: ((Job, Error?) -> Void)?
+    /// Qwen 实时录音优先使用 GPU；录音停止后，尾句全部写入再开始正式转录。
+    @ObservationIgnored var canStartTranscription: () -> Bool = { true }
     @ObservationIgnored var onAudioReplaced: ((Int64) -> Void)?
     /// 正式版取代了用户改过的草稿（design §21.3）
     @ObservationIgnored var onEditedDraftReplaced: ((Int64) -> Void)?
@@ -230,7 +234,7 @@ final class JobRunner {
                     AppModel.shared.models.autoStartTranscription(for: language)
                 }
             }
-            do { job = try db.claimNext(lane: lane) } catch {
+            do { job = lane == .transcribe && !canStartTranscription() ? nil : try db.claimNext(lane: lane) } catch {
                 log.error("claim failed: \(error.localizedDescription)")
                 job = nil
             }

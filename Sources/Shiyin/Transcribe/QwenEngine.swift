@@ -272,25 +272,76 @@ enum QwenEngine {
     }
 
     private static func decode(_ engine: OpaquePointer, buffer: UnsafeBufferPointer<Float>, range: Range<Int>, context: String, language: String,
-                               params: qwen_params, control: WhisperEngine.Control) throws -> (text: String, truncated: Bool) {
+                               params: qwen_params, control: WhisperEngine.Control, prefix: String = "") throws -> (text: String, truncated: Bool, raw: String) {
         var params = params
         var out = [CChar](repeating: 0, count: 1 << 16)
         var produced: Int32 = 0
         let rc: Int32 = context.withCString { contextPointer in
             language.withCString { languagePointer in
-                params.context = contextPointer
-                params.language = languagePointer
-                let abort: qwen_abort_fn = { user in
-                    guard let user else { return false }
-                    return Unmanaged<WhisperEngine.Control>.fromOpaque(user).takeUnretainedValue().isCancelled
+                prefix.withCString { prefixPointer in
+                    params.context = contextPointer
+                    params.language = languagePointer
+                    params.prefix = prefixPointer
+                    let abort: qwen_abort_fn = { user in
+                        guard let user else { return false }
+                        return Unmanaged<WhisperEngine.Control>.fromOpaque(user).takeUnretainedValue().isCancelled
+                    }
+                    return qwen_transcribe(engine, buffer.baseAddress! + range.lowerBound, Int32(range.count), &params,
+                                           abort, Unmanaged.passUnretained(control).toOpaque(), &out, Int32(out.count), &produced)
                 }
-                return qwen_transcribe(engine, buffer.baseAddress! + range.lowerBound, Int32(range.count), &params,
-                                       abort, Unmanaged.passUnretained(control).toOpaque(), &out, Int32(out.count), &produced)
             }
         }
         if rc == -1 || control.isCancelled { throw WhisperError.cancelled }
         guard rc >= 0 || rc == -5 else { throw WhisperError.failed(rc) }
-        return (clean(String(cString: out)), rc == 1 || rc == -5)
+        let raw = String(cString: out)
+        return (clean(raw), rc == 1 || rc == -5, raw)
+    }
+
+    /// 实时录音期间常驻一个模型；只由一个后台任务使用。前文音频与原始文字成对保留，
+    /// 以 assistant prefix 续写新音频，不能拿清理过或繁简转换后的文字当 prefix。
+    final class LiveSession {
+        private let engine: OpaquePointer
+        private let context: String
+        private let language: String
+        private let control: WhisperEngine.Control
+
+        init(modelPath: String, encoderPath: String, language: MeetingLanguage, glossary: [String], control: WhisperEngine.Control) throws {
+            let threads = Int32(max(2, min(8, ProcessInfo.processInfo.activeProcessorCount - 2)))
+            guard let engine = qwen_load(modelPath, encoderPath, contextTokens, threads, true) else { throw WhisperError.loadFailed }
+            self.engine = engine
+            self.context = QwenEngine.context(glossary: glossary, language: language)
+            self.language = languageName(language)
+            self.control = control
+        }
+
+        deinit { qwen_free(engine) }
+
+        func transcribe(_ samples: [Float], precedingAudio: [Float], precedingText: String) throws -> (raw: String, text: String) {
+            if control.isCancelled { throw WhisperError.cancelled }
+            let audio = precedingAudio + samples
+            var params = qwen_params_default()
+            params.max_tokens = Int32(Double(samples.count) / AudioDecoder.sampleRate * 12) + 64
+            let speechDuration = samples.withUnsafeBufferPointer {
+                speechSeconds($0, range: 0..<$0.count, median: medianFrameEnergy($0))
+            }
+            func bad(_ result: (text: String, truncated: Bool, raw: String)) -> Bool {
+                looksBad(result.text, truncated: result.truncated) || tooLong(result.text, language: language, speechSeconds: speechDuration)
+            }
+            return try audio.withUnsafeBufferPointer { buffer in
+                var result = try decode(engine, buffer: buffer, range: 0..<buffer.count, context: context,
+                                        language: language, params: params, control: control, prefix: precedingText)
+                if bad(result) {
+                    params.repeat_penalty = 1.3
+                    params.repeat_last_n = 128
+                    params.temperature = 0.2
+                    params.seed = 1
+                    result = try decode(engine, buffer: buffer, range: 0..<buffer.count, context: context,
+                                        language: language, params: params, control: control, prefix: precedingText)
+                    guard !bad(result) else { throw QwenLiveError.unstable }
+                }
+                return (result.raw, result.text)
+            }
+        }
     }
 
     /// 去掉 tokenizer 漏出来的私用区字符和前后空白；模型把缩写一个字母一个字母拆开（「A P P」「O T P」），并回去

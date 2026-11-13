@@ -20,7 +20,7 @@ struct MeetingPreparationEditor: View {
                     editor("我的角色和关注点（可选）", text: $preparation.role, limit: 1000)
                     editor("已有问题（可选，每行一个）", text: $preparation.initialQuestions, limit: 4000)
                     Toggle("开启会中提问助手", isOn: $preparation.enabled)
-                    Text("开启后，会前资料和录音中的实时定稿文字会交给当前选择的整理工具处理，约每 30 秒分析一次。可以在录音时随时关闭。")
+                    Text("开启后，Qwen3-ASR 会在本机复核约 18～30 秒的音频，会前资料和复核文字再交给当前整理工具，约每 30 秒分析一次。需要先下载 Qwen 模型；可以在录音时随时关闭助手。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 .padding(2)
@@ -108,12 +108,20 @@ struct MeetingAssistancePanel: View {
                 }
             }
             if recording {
-                Text("会前资料和实时定稿文字会交给当前整理工具处理。")
+                Text("会前资料和音频复核后的文字会交给当前整理工具处理，实时快稿不会用于会中分析。")
                     .font(.caption).foregroundStyle(.secondary)
                 if state.preparation.enabled {
-                    if !AppSettings.liveTranscription || !model.recorder.liveStatus.isEmpty {
-                        Text("需要实时逐字稿的定稿文字才能分析。请确认实时逐字稿已开启并准备就绪。")
+                    if !AppSettings.liveTranscription {
+                        Text("请开启实时逐字稿并下载 Qwen3-ASR 模型，助手需要音频复核后的文字才能分析。")
                             .font(.caption).foregroundStyle(Color.signal)
+                    } else {
+                        if !model.recorder.reviewStatus.isEmpty {
+                            Text(model.recorder.reviewStatus).font(.caption).foregroundStyle(.secondary)
+                        }
+                        if model.recorder.reviewedThrough > 0 {
+                            Text("音频已复核至 \(TimeFormat.string(model.recorder.reviewedThrough))")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                     HStack(spacing: 8) {
                         if model.coach.busy { ProgressView().controlSize(.small) }

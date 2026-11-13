@@ -762,6 +762,7 @@ struct RecordingSettings: View {
     @AppStorage(AppSettings.recordSourceKey) private var source = "mic"
     @AppStorage(AppSettings.inputDeviceKey) private var device = ""
     @AppStorage(AppSettings.liveTranscriptionKey) private var live = true
+    @AppStorage(AppSettings.liveTranscriptionEngineKey) private var liveEngine = "system"
     @AppStorage(AppSettings.autoDetectLanguageKey) private var autoDetect = true
     @AppStorage(AppSettings.diarizeKey) private var diarize = true
     @AppStorage(AppSettings.globalHotKeyKey) private var hotKey = true
@@ -835,6 +836,29 @@ struct RecordingSettings: View {
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Toggle("转录时识别说话者", isOn: $diarize)
                 Toggle("录音中显示实时逐字稿", isOn: $live)
+                Picker("实时转录引擎", selection: $liveEngine) {
+                    Text("macOS 系统识别（低延迟）").tag("system")
+                    Text("Qwen3-ASR（上下文优先）").tag("qwen")
+                }
+                .disabled(!live || model.recorder.isRecording)
+                .onChange(of: liveEngine) { _, value in
+                    if value == "qwen" {
+                        for file in ModelStore.files(of: .qwen) { model.models.autoStart(file) }
+                    }
+                }
+                if liveEngine == "qwen" {
+                    Text("全程本机识别，参考词汇表，保留前一段音频与文字作为上下文。当前句子会持续修订，停顿后定稿；出字可能更慢，占用更多内存和 GPU。更改在下次录音生效。")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    if model.models.combinedState(.qwen) != .installed {
+                        Text("请在下方下载 Qwen3-ASR 模型和音频编码器（约 2.5 GB）。下载完成前无法使用 Qwen 实时逐字稿，录音仍可正常进行。")
+                            .font(.caption).foregroundStyle(Color.signal).fixedSize(horizontal: false, vertical: true)
+                    }
+                } else {
+                    Text("使用 macOS 系统语音识别，出字快、资源占用低；当前不参考词汇表。更改在下次录音生效。")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Text("实时快稿保留原样；Qwen3-ASR 会另行复核约 18～30 秒的音频，供会中助手分析。两种实时引擎都需要已下载的 Qwen 模型才能复核；复核会额外使用本机 GPU，实际延迟取决于电脑速度。")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 // 模型清单（原「模型与保存空间」标签页，R44.5）
                 ModelRows()
             }
@@ -894,7 +918,9 @@ struct ModelRows: View {
         Text("中文、英文会议用，1.66 GB。").font(.caption).foregroundStyle(.secondary)
         ModelRow(title: String(localized: "Qwen3-ASR 1.7B（q8_0，含音频编码器）"), state: model.models.combinedState(.qwen),
                  start: { model.models.startAll(.qwen) }, pause: { model.models.pauseAll(.qwen) },
-                 delete: { model.models.deleteAll(.qwen); model.refreshEnvironment() }, deleteDisabled: transcribing)
+                 delete: { model.models.deleteAll(.qwen); model.refreshEnvironment() }, deleteDisabled: transcribing || model.recorder.isRecording)
+        Text("Qwen 实时模式与正式转录共用这组模型，不需要重复下载。")
+            .font(.caption).foregroundStyle(.secondary)
         Text(MeetingLanguage.uiNames(model: "qwen").isEmpty ? String(localized: "正式转录选「Qwen3-ASR」时用，2.5 GB。")
              : String(localized: "正式转录选「Qwen3-ASR」时用；\(MeetingLanguage.uiNames(model: "qwen"))会议一律用。2.5 GB。"))
             .font(.caption).foregroundStyle(.secondary)

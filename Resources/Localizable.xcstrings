@@ -2509,6 +2509,23 @@
         }
       }
     },
+    "Qwen 实时模式与正式转录共用这组模型，不需要重复下载。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qwen live and post-meeting transcription share these models. No additional download is needed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qwen 实时模式与正式转录共用这组模型，不需要重复下载。"
+          }
+        }
+      }
+    },
     "Qwen3-ASR 1.7B（q8_0）": {
       "extractionState": "manual",
       "localizations": {
@@ -2560,6 +2577,57 @@
         }
       }
     },
+    "Qwen3-ASR 实时模式暂不支持这个会议语言，请改用 macOS 系统识别": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qwen3-ASR live mode does not support this meeting language yet. Use macOS speech recognition instead"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qwen3-ASR 实时模式暂不支持这个会议语言，请改用 macOS 系统识别"
+          }
+        }
+      }
+    },
+    "Qwen3-ASR 识别速度跟不上录音，积压已超过两分钟；请改用 macOS 系统识别": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qwen3-ASR cannot keep up with the recording and is over two minutes behind. Use macOS speech recognition instead"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qwen3-ASR 识别速度跟不上录音，积压已超过两分钟；请改用 macOS 系统识别"
+          }
+        }
+      }
+    },
+    "Qwen3-ASR 连续两次识别结果异常，请使用会后正式转录复核": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qwen3-ASR produced unreliable results twice in a row. Review the recording with post-meeting transcription"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qwen3-ASR 连续两次识别结果异常，请使用会后正式转录复核"
+          }
+        }
+      }
+    },
     "Qwen3-ASR 音频编码器（q8_0）": {
       "extractionState": "manual",
       "localizations": {
@@ -2573,6 +2641,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Qwen3-ASR 音频编码器（q8_0）"
+          }
+        }
+      }
+    },
+    "Qwen3-ASR（上下文优先）": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qwen3-ASR (prioritize context)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qwen3-ASR（上下文优先）"
           }
         }
       }
@@ -2794,6 +2879,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "macOS 没有让拾音读取钥匙串里的 API key。再试一次时，系统询问就输入这台 Mac 的登录密码（不是 API key），按「永远允许」；或到设置 → 整理工具重新粘贴 key。"
+          }
+        }
+      }
+    },
+    "macOS 系统识别（低延迟）": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS speech recognition (low latency)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS 系统识别（低延迟）"
           }
         }
       }
@@ -5034,19 +5136,19 @@
         }
       }
     },
-    "会前资料和实时定稿文字会交给当前整理工具处理。": {
+    "会前资料和音频复核后的文字会交给当前整理工具处理，实时快稿不会用于会中分析。": {
       "extractionState": "manual",
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Preparation and finalized live transcript text are sent to your selected AI provider."
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "会前资料和实时定稿文字会交给当前整理工具处理。"
+            "value": "会前资料和音频复核后的文字会交给当前整理工具处理，实时快稿不会用于会中分析。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparation and text reviewed against the audio are sent to the current notes tool. Quick transcripts are not used for meeting analysis."
           }
         }
       }
@@ -5680,6 +5782,23 @@
         }
       }
     },
+    "使用 %@ · 已用时 %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 %@ · 已用时 %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Using %@ · Elapsed %@"
+          }
+        }
+      }
+    },
     "使用 %@ 附的 codex（这台 Mac 没有另外安装 Codex CLI）": {
       "extractionState": "manual",
       "localizations": {
@@ -5693,6 +5812,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "使用 %@ 附的 codex（这台 Mac 没有另外安装 Codex CLI）"
+          }
+        }
+      }
+    },
+    "使用 macOS 系统语音识别，出字快、资源占用低；当前不参考词汇表。更改在下次录音生效。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uses macOS speech recognition for fast text and low resource use. Does not currently use your glossary. Changes apply to the next recording."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 macOS 系统语音识别，出字快、资源占用低；当前不参考词汇表。更改在下次录音生效。"
           }
         }
       }
@@ -6499,6 +6635,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "全域快捷键 %@：在其他 app 里也能开始或停止录音"
+          }
+        }
+      }
+    },
+    "全程本机识别，参考词汇表，保留前一段音频与文字作为上下文。当前句子会持续修订，停顿后定稿；出字可能更慢，占用更多内存和 GPU。更改在下次录音生效。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runs locally with your glossary and the previous audio and transcript as context. Revises the current sentence until a pause. Text may appear more slowly and use more memory and GPU. Changes apply to the next recording."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全程本机识别，参考词汇表，保留前一段音频与文字作为上下文。当前句子会持续修订，停顿后定稿；出字可能更慢，占用更多内存和 GPU。更改在下次录音生效。"
           }
         }
       }
@@ -10021,6 +10174,23 @@
         }
       }
     },
+    "回答失败：%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "回答失败：%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to answer: %@"
+          }
+        }
+      }
+    },
     "回答待确认、修改": {
       "extractionState": "manual",
       "localizations": {
@@ -11060,6 +11230,23 @@
         }
       }
     },
+    "完成后会在这里显示完整回答和出处。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成后会在这里显示完整回答和出处。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The complete answer and sources will appear here when ready."
+          }
+        }
+      }
+    },
     "完成后可以关掉这个窗口。": {
       "extractionState": "manual",
       "localizations": {
@@ -11077,6 +11264,40 @@
         }
       }
     },
+    "实时快稿保留原样；Qwen3-ASR 会另行复核约 18～30 秒的音频，供会中助手分析。两种实时引擎都需要已下载的 Qwen 模型才能复核；复核会额外使用本机 GPU，实际延迟取决于电脑速度。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实时快稿保留原样；Qwen3-ASR 会另行复核约 18～30 秒的音频，供会中助手分析。两种实时引擎都需要已下载的 Qwen 模型才能复核；复核会额外使用本机 GPU，实际延迟取决于电脑速度。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quick transcripts are preserved. Qwen3-ASR separately reviews roughly 18–30 seconds of audio for the meeting assistant. Both live engines need the downloaded Qwen model for review. Review uses additional local GPU resources; actual latency depends on your computer."
+          }
+        }
+      }
+    },
+    "实时转录引擎": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live transcription engine"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实时转录引擎"
+          }
+        }
+      }
+    },
     "实时逐字稿、正式转录、说话者识别都在本机进行，不需要网络。": {
       "extractionState": "manual",
       "localizations": {
@@ -11090,6 +11311,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "实时逐字稿、正式转录、说话者识别都在本机进行，不需要网络。"
+          }
+        }
+      }
+    },
+    "实时逐字稿已停止（%@），录音照常进行，录完会正式转录": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live transcription stopped (%@). Recording continues and will be transcribed after it ends"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实时逐字稿已停止（%@），录音照常进行，录完会正式转录"
           }
         }
       }
@@ -11959,6 +12197,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "已取消"
+          }
+        }
+      }
+    },
+    "已取消回答，问题已保留": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消回答，问题已保留"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer cancelled. Your question has been kept."
           }
         }
       }
@@ -13194,19 +13449,19 @@
         }
       }
     },
-    "开启后，会前资料和录音中的实时定稿文字会交给当前选择的整理工具处理，约每 30 秒分析一次。可以在录音时随时关闭。": {
+    "开启后，Qwen3-ASR 会在本机复核约 18～30 秒的音频，会前资料和复核文字再交给当前整理工具，约每 30 秒分析一次。需要先下载 Qwen 模型；可以在录音时随时关闭助手。": {
       "extractionState": "manual",
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "When enabled, your preparation and finalized live transcript are sent to your selected AI provider about every 30 seconds. You can turn this off while recording."
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "开启后，会前资料和录音中的实时定稿文字会交给当前选择的整理工具处理，约每 30 秒分析一次。可以在录音时随时关闭。"
+            "value": "开启后，Qwen3-ASR 会在本机复核约 18～30 秒的音频，会前资料和复核文字再交给当前整理工具，约每 30 秒分析一次。需要先下载 Qwen 模型；可以在录音时随时关闭助手。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When enabled, Qwen3-ASR reviews roughly 18–30 seconds of audio locally. Preparation and reviewed text are then sent to the current notes tool for analysis about every 30 seconds. Download the Qwen model first. You can turn off the assistant while recording."
           }
         }
       }
@@ -18771,6 +19026,23 @@
         }
       }
     },
+    "无法保存复核文字：%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法保存复核文字：%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to save reviewed text: %@"
+          }
+        }
+      }
+    },
     "无法准备会中分析：%@": {
       "extractionState": "manual",
       "localizations": {
@@ -21005,6 +21277,23 @@
         }
       }
     },
+    "正在准备会议记录和逐字稿…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备会议记录和逐字稿…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing meeting notes and transcript…"
+          }
+        }
+      }
+    },
     "正在准备安装…": {
       "extractionState": "manual",
       "localizations": {
@@ -21052,6 +21341,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在分析会议内容…"
+          }
+        }
+      }
+    },
+    "正在分析会议内容并生成回答…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在分析会议内容并生成回答…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyzing the meeting and generating an answer…"
           }
         }
       }
@@ -21267,7 +21573,7 @@
         }
       }
     },
-    "正在找相关的会议，再用 %@ 回答…": {
+    "正在找相關的會議，再用 %@ 回答…": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -21284,19 +21590,36 @@
         }
       }
     },
-    "正在找相關的會議，再用 %@ 回答…": {
+    "正在整理回答和出处…": {
       "extractionState": "manual",
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Finding related meetings, then answering with %@…"
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在找相关的会议，再用 %@ 回答…"
+            "value": "正在整理回答和出处…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing the answer and sources…"
+          }
+        }
+      }
+    },
+    "正在查找相关会议和录音片段…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在查找相关会议和录音片段…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finding relevant meetings and recording excerpts…"
           }
         }
       }
@@ -21365,6 +21688,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在准备安装…"
+          }
+        }
+      }
+    },
+    "正在理解问题，提取搜索关键词…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在理解问题，提取搜索关键词…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Understanding the question and identifying search keywords…"
           }
         }
       }
@@ -25130,19 +25470,36 @@
         }
       }
     },
-    "等待新的定稿文字": {
+    "等待新的复核文字": {
       "extractionState": "manual",
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waiting for finalized transcript text"
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "等待新的定稿文字"
+            "value": "等待新的复核文字"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for new reviewed text"
+          }
+        }
+      }
+    },
+    "等待音频复核…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待音频复核…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for audio review…"
           }
         }
       }
@@ -27748,6 +28105,23 @@
         }
       }
     },
+    "请先在「录音与转录」下载 Qwen3-ASR 模型和音频编码器": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download the Qwen3-ASR model and audio encoder in Recording & Transcription first"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先在「录音与转录」下载 Qwen3-ASR 模型和音频编码器"
+          }
+        }
+      }
+    },
     "请先设置整理工具，再使用会中提问助手": {
       "extractionState": "manual",
       "localizations": {
@@ -27782,6 +28156,23 @@
         }
       }
     },
+    "请在下方下载 Qwen3-ASR 模型和音频编码器（约 2.5 GB）。下载完成前无法使用 Qwen 实时逐字稿，录音仍可正常进行。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download the Qwen3-ASR model and audio encoder below (about 2.5 GB). Qwen live transcription requires both downloads; recording remains available."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在下方下载 Qwen3-ASR 模型和音频编码器（约 2.5 GB）。下载完成前无法使用 Qwen 实时逐字稿，录音仍可正常进行。"
+          }
+        }
+      }
+    },
     "请填写会议主要内容或本场目标": {
       "extractionState": "manual",
       "localizations": {
@@ -27795,6 +28186,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "请填写会议主要内容或本场目标"
+          }
+        }
+      }
+    },
+    "请开启实时逐字稿并下载 Qwen3-ASR 模型，助手需要音频复核后的文字才能分析。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请开启实时逐字稿并下载 Qwen3-ASR 模型，助手需要音频复核后的文字才能分析。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable live transcription and download the Qwen3-ASR model. The assistant needs text reviewed against the audio before it can analyze the meeting."
           }
         }
       }
@@ -29171,19 +29579,19 @@
         }
       }
     },
-    "还没有新的定稿文字": {
+    "还没有新的复核文字，请等待音频复核": {
       "extractionState": "manual",
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No new finalized transcript text yet"
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "还没有新的定稿文字"
+            "value": "还没有新的复核文字，请等待音频复核"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No new reviewed text yet. Please wait for audio review."
           }
         }
       }
@@ -33136,23 +33544,6 @@
         }
       }
     },
-    "需要实时逐字稿的定稿文字才能分析。请确认实时逐字稿已开启并准备就绪。": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Analysis needs finalized live transcript text. Make sure live transcription is enabled and ready."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "需要实时逐字稿的定稿文字才能分析。请确认实时逐字稿已开启并准备就绪。"
-          }
-        }
-      }
-    },
     "音量": {
       "extractionState": "manual",
       "localizations": {
@@ -33166,6 +33557,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "音量"
+          }
+        }
+      }
+    },
+    "音频复核已停止（%@），会中助手只分析已复核文字": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频复核已停止（%@），会中助手只分析已复核文字"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio review stopped (%@). The meeting assistant only analyzes text already reviewed."
+          }
+        }
+      }
+    },
+    "音频已复核至 %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频已复核至 %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio reviewed through %@"
           }
         }
       }

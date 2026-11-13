@@ -9,6 +9,9 @@ struct AskTab: View {
     @State private var question = ""
 
     private var asking: Bool { model.asking == .meeting(detail.meeting.id!) }
+    private var request: AskRequest? {
+        model.askRequest?.target == .meeting(detail.meeting.id!) ? model.askRequest : nil
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,6 +25,12 @@ struct AskTab: View {
                         .onChange(of: model.meetingQuestions.count) { _, _ in
                             if let last = model.meetingQuestions.last?.id { withAnimation { proxy.scrollTo(last, anchor: .top) } }
                         }
+                        .onChange(of: request?.id) { _, id in
+                            if let id { withAnimation { proxy.scrollTo(id, anchor: .top) } }
+                        }
+                        .onAppear {
+                            if let id = request?.id { proxy.scrollTo(id, anchor: .top) }
+                        }
                 }
             }
             Divider()
@@ -30,7 +39,7 @@ struct AskTab: View {
                             model.clearQuestions(meetingId: detail.meeting.id)
                         }) {
                 model.askMeeting(question)
-                question = ""
+                if asking { question = "" }
             }
         }
         .onAppear { model.loadMeetingQuestions(detail.meeting.id!) }
@@ -42,7 +51,7 @@ struct AskTab: View {
                 MeetingAssistancePanel(meeting: detail.meeting, recording: false)
                 Divider()
             }
-            if model.meetingQuestions.isEmpty && !asking {
+            if model.meetingQuestions.isEmpty && request == nil {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("问这场会议").font(.songti(18))
                     Text("例如：「谁负责寄信的部分？」「最后决定的上线日期是哪一天？」回答只根据这场会议的会议记录和逐字稿，每一点都附上时间，点了就能听原话。")
@@ -56,13 +65,8 @@ struct AskTab: View {
                 }
                 .id(record.id)
             }
-            if asking {
-                HStack(spacing: 10) {
-                    ProgressView().controlSize(.small)
-                    Text("正在用 \(AppSettings.provider.shortLabel) 回答…").foregroundStyle(.secondary)
-                    Button("取消") { model.cancelAsk() }.buttonStyle(.link)
-                }
-                .id("asking")
+            if let request {
+                AskRequestView(request: request).id(request.id)
             }
         }
         .contentFont()   // 文字大小（design §38.5）
@@ -103,6 +107,7 @@ struct AskInputBar: View {
                     .menuIndicator(.hidden)
                     .fixedSize()
                     .help("更多")
+                    .disabled(busy)
                 }
             }
         }
@@ -113,6 +118,45 @@ struct AskInputBar: View {
     private func submit() {
         guard !busy, model.askUnavailableReason == nil, !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         onSubmit()
+    }
+}
+
+/// 问题先显示在问答列表里，回答完成后由整组问答替换。
+struct AskRequestView: View {
+    @Environment(AppModel.self) private var model
+    let request: AskRequest
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(request.question).fontWeight(.semibold).textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .top, spacing: 10) {
+                if request.phase.isRunning { ProgressView().controlSize(.small) }
+                Text(request.phase.label).foregroundStyle(.secondary)
+                    .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+            }
+            if request.phase.isRunning {
+                TimelineView(.periodic(from: request.startedAt, by: 1)) { context in
+                    Text("使用 \(request.providerLabel) · 已用时 \(TimeFormat.string(max(0, context.date.timeIntervalSince(request.startedAt))))")
+                        .contentFont(.caption).foregroundStyle(.secondary).monospacedDigit()
+                }
+                HStack {
+                    Text("完成后会在这里显示完整回答和出处。")
+                        .contentFont(.caption).foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
+                    Button("取消") { model.cancelAsk() }.buttonStyle(.link)
+                }
+            } else {
+                HStack(spacing: 14) {
+                    Button("重试") { model.retryAsk() }.buttonStyle(.link)
+                    Button("关闭") { model.askRequest = nil }.buttonStyle(.link)
+                }
+                .disabled(model.asking != nil)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -183,6 +227,7 @@ struct AskAllView: View {
     @Environment(AppModel.self) private var model
     @State private var question = ""
     @State private var scope: AskScope = .all
+    private var request: AskRequest? { model.askRequest?.target == .all ? model.askRequest : nil }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -203,7 +248,7 @@ struct AskAllView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        if model.allQuestions.isEmpty && model.asking != .all {
+                        if model.allQuestions.isEmpty && request == nil {
                             Text("例如：「上个月跟客户谈过哪些价格？」「寄信的机制最后怎么决定的？」拾音会先找出相关的会议片段，再请整理工具回答，回答附上是哪一场会议、哪个时间点。")
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -214,12 +259,8 @@ struct AskAllView: View {
                             }, onCitation: { _ in }, onMeetingCitation: { id, time in model.openCitation(meetingId: id, time: time) })
                             .id(record.id)
                         }
-                        if model.asking == .all {
-                            HStack(spacing: 10) {
-                                ProgressView().controlSize(.small)
-                                Text("正在找相关的会议，再用 \(AppSettings.provider.shortLabel) 回答…").foregroundStyle(.secondary)
-                                Button("取消") { model.cancelAsk() }.buttonStyle(.link)
-                            }
+                        if let request {
+                            AskRequestView(request: request).id(request.id)
                         }
                     }
                     .contentFont()   // 文字大小（design §38.5）
@@ -229,12 +270,18 @@ struct AskAllView: View {
                 .onChange(of: model.allQuestions.count) { _, _ in
                     if let last = model.allQuestions.last?.id { withAnimation { proxy.scrollTo(last, anchor: .top) } }
                 }
+                .onChange(of: request?.id) { _, id in
+                    if let id { withAnimation { proxy.scrollTo(id, anchor: .top) } }
+                }
+                .onAppear {
+                    if let id = request?.id { proxy.scrollTo(id, anchor: .top) }
+                }
             }
             Divider()
             AskInputBar(question: $question, placeholder: String(localized: "问所有会议，例如：寄信的机制最后怎么决定的？"),
                         busy: model.asking != nil, onClear: model.allQuestions.isEmpty ? nil : { model.clearQuestions(meetingId: nil) }) {
                 model.askAll(question, scope: scope)
-                question = ""
+                if model.asking == .all { question = "" }
             }
         }
         .frame(minWidth: 560, minHeight: 480)

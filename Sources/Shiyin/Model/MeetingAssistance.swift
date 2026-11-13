@@ -30,7 +30,7 @@ struct CoachQuestion: Codable, Equatable, Identifiable {
 struct MeetingAssistance: Codable, Equatable {
     var preparation = MeetingPreparation()
     var summary = ""
-    /// 下次读取的定稿序号和字符偏移；同一个长段落可以分多批处理。
+    /// 下次读取的音频复核稿序号和字符偏移；同一个长段落可以分多批处理。
     var nextSeq = 0
     var offset = 0
     var questions: [CoachQuestion] = []
