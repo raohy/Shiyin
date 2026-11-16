@@ -26,7 +26,7 @@ struct GeminiAPI: LLMBackend {
         let status = object["status"] as? String ?? String(localized: "未知")
         switch status {
         case "completed": break
-        case "incomplete": throw LLMError.failed(String(localized: "回应不完整（可能超过长度上限）"))
+        case "incomplete": throw LLMError.failed(String(localized: "回应不完整（可能超过长度上限）"), cause: .incomplete)
         default: throw LLMError.failed(String(localized: "Gemini 没有完成整理（status：\(status)）"))
         }
         // steps 里还有思考过程（thought），只取模型的输出

@@ -47,7 +47,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             content.userInfo = ["bundle": app.bundleID]
         case .stop(let app):
             content.title = String(localized: "会议好像结束了")
-            content.body = String(localized: "要停止录音并转录吗？")
+            content.body = AppSettings.autoStopOnMeetingEnd ? String(localized: "\(AppSettings.meetingEndCountdown) 秒后自动停止录音并转录")
+                                                            : String(localized: "要停止录音并转录吗？")
             content.categoryIdentifier = "MEETING_STOP"
             content.userInfo = ["bundle": app.bundleID]
         }
@@ -93,6 +94,32 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         content.userInfo = ["meetingId": NSNumber(value: meetingId)]
         #if DEBUG
         recent = Array(([["title": content.title, "body": content.body, "meetingId": meetingId, "idle": "stopped"]] + recent).prefix(10))
+        #endif
+        post(content)
+    }
+
+    /// 会议结束、倒数完自动停止录音（R95、design §69）
+    func meetingEndStopped(meetingId: Int64, title: String) {
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "会议结束，已自动停止录音")
+        content.body = title
+        content.sound = .default
+        content.userInfo = ["meetingId": NSNumber(value: meetingId)]
+        #if DEBUG
+        recent = Array(([["title": content.title, "body": content.body, "meetingId": meetingId]] + recent).prefix(10))
+        #endif
+        post(content)
+    }
+
+    /// 企业服务器连不上太久，自动改在这台电脑转录（R93、design §67）
+    func serverFallback(meeting: Meeting) {
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "企业服务器连不上，已改在这台电脑转录")
+        content.body = meeting.displayTitle
+        content.sound = .default
+        content.userInfo = ["meetingId": NSNumber(value: meeting.id ?? 0)]
+        #if DEBUG
+        recent = Array(([["title": content.title, "body": content.body, "meetingId": meeting.id ?? 0]] + recent).prefix(10))
         #endif
         post(content)
     }

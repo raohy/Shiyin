@@ -68,6 +68,23 @@ struct MeetingNotes: Codable, Hashable {
         var items: [Item]
     }
 
+    /// 每个人的重点（R92、design §66）：name 是逐字稿里的说话者名称
+    struct Person: Codable, Hashable {
+        var name: String
+        var points: [Item]
+
+        init(name: String, points: [Item]) {
+            self.name = name
+            self.points = points
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            name = (try? c.decode(String.self, forKey: .name)) ?? ""
+            points = (try? c.decode([Item].self, forKey: .points)) ?? []
+        }
+    }
+
     struct ReviewItem: Codable, Hashable {
         var time: String
         var question: String
@@ -106,9 +123,11 @@ struct MeetingNotes: Codable, Hashable {
     var topics: [Topic]
     var custom: [CustomSection]
     var reviewItems: [ReviewItem]
+    var people: [Person]
 
     init(title: String = "", summary: [Item] = [], decisions: [Item] = [], actionItems: [ActionItem] = [],
-         openQuestions: [Item] = [], topics: [Topic] = [], custom: [CustomSection] = [], reviewItems: [ReviewItem] = []) {
+         openQuestions: [Item] = [], topics: [Topic] = [], custom: [CustomSection] = [], reviewItems: [ReviewItem] = [],
+         people: [Person] = []) {
         self.title = title
         self.summary = summary
         self.decisions = decisions
@@ -117,7 +136,10 @@ struct MeetingNotes: Codable, Hashable {
         self.topics = topics
         self.custom = custom
         self.reviewItems = reviewItems
+        self.people = people
     }
+
+    private enum CodingKeys: String, CodingKey { case title, summary, decisions, actionItems, openQuestions, topics, custom, reviewItems, people }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -129,6 +151,21 @@ struct MeetingNotes: Codable, Hashable {
         custom = (try? c.decode([CustomSection].self, forKey: .custom)) ?? []
         reviewItems = (try? c.decode([ReviewItem].self, forKey: .reviewItems)) ?? []
         topics = (try? c.decode([Topic].self, forKey: .topics)) ?? []
+        people = (try? c.decode([Person].self, forKey: .people)) ?? []
+    }
+
+    /// people 是空的时不写（design §66）：以前的会议记录、没有这一段的会议记录存起来跟以前一字不差
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(title, forKey: .title)
+        try c.encode(summary, forKey: .summary)
+        try c.encode(decisions, forKey: .decisions)
+        try c.encode(actionItems, forKey: .actionItems)
+        try c.encode(openQuestions, forKey: .openQuestions)
+        try c.encode(topics, forKey: .topics)
+        try c.encode(custom, forKey: .custom)
+        try c.encode(reviewItems, forKey: .reviewItems)
+        if !people.isEmpty { try c.encode(people, forKey: .people) }
     }
 
     func jsonString() -> String {
@@ -138,7 +175,7 @@ struct MeetingNotes: Codable, Hashable {
     }
 
     var isEmpty: Bool {
-        summary.isEmpty && decisions.isEmpty && actionItems.isEmpty && openQuestions.isEmpty && topics.isEmpty && custom.isEmpty
+        summary.isEmpty && decisions.isEmpty && actionItems.isEmpty && openQuestions.isEmpty && topics.isEmpty && custom.isEmpty && people.isEmpty
     }
 
     /// 全文取代：对每一个字符串值做区分大小写的单纯取代
@@ -176,13 +213,15 @@ struct MeetingNotes: Codable, Hashable {
             openQuestions: openQuestions.map(ri),
             topics: topics.map { Topic(title: r($0.title), start: $0.start, points: $0.points.map(ri)) },
             custom: custom.map { CustomSection(title: r($0.title), items: $0.items.map(ri)) },
-            reviewItems: reviewItems.map { ReviewItem(time: $0.time, question: r($0.question), yesNo: $0.yesNo) })
+            reviewItems: reviewItems.map { ReviewItem(time: $0.time, question: r($0.question), yesNo: $0.yesNo) },
+            people: people.map { Person(name: r($0.name), points: $0.points.map(ri)) })
     }
 
     /// 给搜索索引用的纯文字
     var plainText: String {
         var lines = [title]
         lines += summary.map(\.text) + decisions.map(\.text) + openQuestions.map(\.text)
+        for person in people { lines.append(person.name); lines += person.points.map(\.text) }
         lines += actionItems.map { "\($0.owner) \($0.task) \($0.due)" }
         for topic in topics { lines.append(topic.title); lines += topic.points.map(\.text) }
         for section in custom { lines.append(section.title); lines += section.items.map(\.text) }
@@ -194,7 +233,8 @@ struct MeetingNotes: Codable, Hashable {
     // 不用 $ref／$defs：不是每个服务都支持，条目的定义直接展开
     static let jsonSchema: String = {
         let items = #"{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","time"],"properties":{"text":{"type":"string"},"time":{"type":"string"}}}}"#
-        return #"{"type":"object","additionalProperties":false,"required":["title","summary","decisions","actionItems","openQuestions","topics","custom","reviewItems"],"properties":{"title":{"type":"string"},"summary":"# + items
+        return #"{"type":"object","additionalProperties":false,"required":["title","summary","people","decisions","actionItems","openQuestions","topics","custom","reviewItems"],"properties":{"title":{"type":"string"},"summary":"# + items
+            + #","people":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","points"],"properties":{"name":{"type":"string"},"points":"# + items + #"}}}"#
             + #","decisions":"# + items
             + #","actionItems":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["owner","task","due","time"],"properties":{"owner":{"type":"string"},"task":{"type":"string"},"due":{"type":"string"},"time":{"type":"string"}}}}"#
             + #","openQuestions":"# + items
@@ -211,6 +251,8 @@ enum NoteItemRef: Hashable {
     case topicPoint(Int, Int)
     /// 第几个自订段落的第几条
     case custom(Int, Int)
+    /// 每个人的重点：第几个人的第几条（design §66）
+    case person(Int, Int)
 
     /// 标准答案用的名称和排序（design-windows §4：Windows 的 ReviewLinks 跟这里比对）
     var sectionName: String {
@@ -221,6 +263,7 @@ enum NoteItemRef: Hashable {
         case .openQuestions: return "openQuestions"
         case .topicPoint: return "topicPoint"
         case .custom: return "custom"
+        case .person: return "person"
         }
     }
 
@@ -232,6 +275,7 @@ enum NoteItemRef: Hashable {
         case .openQuestions(let i): return (3, i, 0)
         case .topicPoint(let t, let i): return (4, t, i)
         case .custom(let c, let i): return (5, c, i)
+        case .person(let p, let i): return (6, p, i)
         }
     }
 }
@@ -255,6 +299,7 @@ extension MeetingNotes {
         add(openQuestions) { .openQuestions($0) }
         for (t, topic) in topics.enumerated() { add(topic.points) { .topicPoint(t, $0) } }
         for (c, section) in custom.enumerated() { add(section.items) { .custom(c, $0) } }
+        for (p, person) in people.enumerated() { add(person.points) { .person(p, $0) } }
 
         var links: [NoteItemRef: [Int]] = [:]
         for (index, item) in reviewItems.enumerated() {

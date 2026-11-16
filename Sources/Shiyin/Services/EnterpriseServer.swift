@@ -79,11 +79,21 @@ final class EnterpriseServer {
         }
     }
 
-    var isSignedIn: Bool { account != nil && status == .signedIn }
+    var isSignedIn: Bool {
+        #if DEBUG
+        if Self.debugUnreachable { return true }
+        #endif
+        return account != nil && status == .signedIn
+    }
     /// 有登录过（失效了也算）：设置页显示账号、正式转录的选项照样出现
     var hasAccount: Bool { account != nil }
 
-    var savedURL: URL? { UserDefaults.standard.string(forKey: Self.urlKey).flatMap { Self.normalized($0) } }
+    var savedURL: URL? {
+        #if DEBUG
+        if Self.debugUnreachable { return URL(string: "http://127.0.0.1:9") }
+        #endif
+        return UserDefaults.standard.string(forKey: Self.urlKey).flatMap { Self.normalized($0) }
+    }
     /// 隐私说明用的主机名称（design §36.5）
     var host: String { savedURL.map(Self.displayHost) ?? "" }
 
@@ -356,6 +366,9 @@ final class EnterpriseServer {
 
     /// 还有效的 access token；过期了用 refresh token 换（同时只换一次：refresh token 换过就作废，design §5.2）
     func validAccessToken() async throws -> String {
+        #if DEBUG
+        if Self.debugUnreachable { return "debug" }
+        #endif
         guard account != nil, let base = savedURL else { throw Failure.loginExpired }
         if let accessToken, accessExpires > Date() { return accessToken }
         if let refreshing { return try await refreshing.value }
@@ -509,6 +522,10 @@ final class EnterpriseServer {
 
     /// 测试用：让 access token 立刻过期（下一次调用会换新的）
     func debugExpireAccess() { accessExpires = .distantPast }
+
+    /// 测试 R93：启动参数 -debugEnterpriseUnreachable YES 假装登录了一台连不上的服务器（http://127.0.0.1:9），
+    /// 只在内存，不写共用设置（用户的拾音也用 enterpriseServerURL）
+    static let debugUnreachable = UserDefaults.standard.bool(forKey: "debugEnterpriseUnreachable")
 
     var debugState: [String: Any] {
         var state: [String: Any] = ["url": savedURL?.absoluteString ?? "", "hasAccount": account != nil]

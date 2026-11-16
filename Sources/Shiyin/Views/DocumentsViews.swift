@@ -22,6 +22,7 @@ struct DocumentsMenu: View {
         } label: {
             Label(label(reading: !reading.isEmpty), systemImage: "paperclip")
         }
+        .menuStyle(.borderlessButton)
         .fixedSize()
         .help("会议中一起讨论的文档（演示文稿、规格书、报价单…）。整理会议记录、提问时会一起参考；也可以把文档拖进窗口")
     }

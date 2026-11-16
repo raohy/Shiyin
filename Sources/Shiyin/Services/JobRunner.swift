@@ -11,6 +11,7 @@ enum AppSettings {
     static let autoSummarizeKey = "autoSummarize"
     static let compressAudioKey = "compressAudio"
     static let diarizeKey = "diarize"
+    static let diarizationModelKey = "diarizationModel"
     static let splitChannelsKey = "splitChannels"
     static let correctTranscriptKey = "correctTranscript"
     static let liveTranscriptionKey = "liveTranscription"
@@ -29,6 +30,11 @@ enum AppSettings {
     static let textSizeKey = "contentTextSize"   // 会议内容的文字大小，−1～5，0 是 100%（design §38.5）
     static let notesViewKey = "notesView"   // 记录标签页：list（条列）／mindMap（心智图，design §42.4）
     static let mcpEnabledKey = "mcpEnabled"   // 让 AI 工具读取会议（本地 MCP，design §44.1），默认关
+    static let hideFromScreenSharingKey = "hideFromScreenSharing"   // 分享画面时藏起拾音的窗口，默认关（design §53）
+    static let remindersListKey = "remindersListId"   // 提醒事项里「拾音」列表的 id（design §52.1）
+    static let recordingIslandKey = "recordingIsland"   // 在屏幕上方显示录音岛，默认开（design §57.2）
+    static let autoStopOnMeetingEndKey = "autoStopOnMeetingEnd"   // 会议结束时倒数后自动停止录音，默认开（design §69）
+    static let transcriptViewKey = "transcriptView"   // 逐字稿：original（原文）／clean（精简，design §70）
 
     private static var d: UserDefaults { .standard }
 
@@ -79,6 +85,8 @@ enum AppSettings {
     static var mcpEnabled: Bool { flag(mcpEnabledKey, default: false) }
     static var compressAudio: Bool { flag(compressAudioKey, default: true) }
     static var diarize: Bool { flag(diarizeKey, default: true) }
+    /// 说话者识别的模型（design §61.2、R87）：standard（默认）、nemotron；不认得的值当 standard
+    static var diarizationModel: Diarizer.Model { Diarizer.Model(rawValue: d.string(forKey: diarizationModelKey) ?? "") ?? .standard }
     /// 在线会议的麦克风、电脑声音分开转录（design §17.3）；还在评估，设置里没有开关，测试时用 defaults 打开
     static var splitChannels: Bool { flag(splitChannelsKey, default: false) }
     /// 转录完先找出可能听错的字（design §17.4）；评估后默认打开（§17.6）
@@ -93,6 +101,19 @@ enum AppSettings {
     static var globalHotKey: Bool { flag(globalHotKeyKey, default: true) }
     /// 记住说话者的声音，之后的会议自动带入名字（design §21.4、R19.3）
     static var voiceprints: Bool { flag(voiceprintsKey, default: true) }
+    /// 在屏幕上方显示录音岛（design §57、R81.8）
+    static var recordingIsland: Bool { flag(recordingIslandKey, default: true) }
+    static var autoStopOnMeetingEnd: Bool { flag(autoStopOnMeetingEndKey, default: true) }
+    /// 会议结束后倒数几秒自动停止（R95）；DEBUG 可以用 -meetingEndCountdownSeconds 改短
+    static var meetingEndCountdown: Int {
+        #if DEBUG
+        let seconds = UserDefaults.standard.integer(forKey: "meetingEndCountdownSeconds")
+        if seconds > 0 { return seconds }
+        #endif
+        return 60
+    }
+    /// 分享画面时藏起拾音的窗口（design §53、R77）
+    static var hideFromScreenSharing: Bool { flag(hideFromScreenSharingKey, default: false) }
     /// 录音中按 ⌃⌥⌘B 标记重点（design §21.10、R19.5）
     static var bookmarkHotKey: Bool { flag(bookmarkHotKeyKey, default: true) }
     /// 很久没人说话时提醒，30 分钟后自动停止（design §35、R48.5）
@@ -125,9 +146,27 @@ struct RevisePayload: Codable {
     var answers: [ReviewAnswer]
 }
 
-/// 整理工作的 payload：draft 是用实时逐字稿整理草稿（design §21.3）
+/// 整理工作的 payload：draft 是用实时逐字稿整理草稿（design §21.3）；people 是只补上每个人的重点，其他段落不动（design §66）
 struct SummarizePayload: Codable {
     var draft = false
+    var people = false
+
+    init(draft: Bool = false, people: Bool = false) { (self.draft, self.people) = (draft, people) }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        draft = (try? c.decode(Bool.self, forKey: .draft)) ?? false
+        people = (try? c.decode(Bool.self, forKey: .people)) ?? false
+    }
+
+    /// people 是 false 时不写：草稿的 payload 跟以前一字不差
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(draft, forKey: .draft)
+        if people { try c.encode(true, forKey: .people) }
+    }
+
+    private enum CodingKeys: String, CodingKey { case draft, people }
 }
 
 /// 转录工作的 payload（design §35.3）：until 是只转录到第几秒（没人说话太久而自动停止的录音）；
@@ -262,12 +301,13 @@ final class JobRunner {
             case .transcribe: try await transcribe(job, lane: lane)
             case .summarize:
                 let payload = (try? JSONDecoder().decode(SummarizePayload.self, from: Data((job.payload ?? "{}").utf8))) ?? SummarizePayload()
-                notify = try await summarize(job, lane: lane, answers: nil, draft: payload.draft)
+                notify = try await summarize(job, lane: lane, answers: nil, draft: payload.draft, peopleOnly: payload.people)
             case .revise:
                 let payload = try JSONDecoder().decode(RevisePayload.self, from: Data((job.payload ?? "{}").utf8))
                 notify = try await summarize(job, lane: lane, answers: payload.answers)
             case .compress: try await compress(job)
             case .correct: await correct(job, lane: lane)
+            case .clean: try await clean(job, lane: lane)
             case .nameSpeakers: await nameSpeakers(job, lane: lane)
             case .rediarize: try await rediarize(job, lane: lane)
             }
@@ -375,9 +415,11 @@ final class JobRunner {
         do {
             guard let value = try await pipeline.run(trimmed ?? meeting.audioURL) else { return }
             result = value
-        } catch is ServerTranscriber.SwitchToLocal {
-            // 改在这台 Mac 转（R50.5）：用本机的引擎，模型还没下载好就先下载、先用 macOS 内置（同 D35）
+        } catch let switched as ServerTranscriber.SwitchToLocal {
+            // 改在这台 Mac 转（R50.5）：用本机的引擎，模型还没下载好就先下载、先用 macOS 内置（同 D35）；
+            // 连不上太久自动改的（R93）发通知
             running[lane]?.server = nil
+            if switched.automatic { AppModel.shared.notifier.serverFallback(meeting: meeting) }
             pipeline = try makePipeline(local: true)
             if !AppSettings.useSystemTranscriber { AppModel.shared.models.autoStartTranscription(for: meeting.meetingLanguage) }
             guard let value = try await pipeline.run(trimmed ?? meeting.audioURL) else { return }
@@ -616,6 +658,35 @@ final class JobRunner {
         }
     }
 
+    // MARK: 精简逐字稿（R96、design §70）
+
+    /// 每一句都存：整理工具改过的用改过的，没改的存原文（有没有产生过看有没有这份）；中文会议用简体时转成简体
+    private func clean(_ job: Job, lane: JobLane) async throws {
+        guard let meeting = try db.meeting(job.meetingId) else { return }
+        let provider = AppSettings.provider
+        guard provider != .none else { throw LLMError.notConfigured(String(localized: "还没设置整理工具，请到设置选择 Claude、Codex 或 API")) }
+        let segments = try db.segments(job.meetingId)
+        guard !segments.isEmpty else { return }
+        running[lane]?.provider = provider
+        running[lane]?.stage = String(localized: "产生精简版")
+        let language = meeting.meetingLanguage
+        let names = Dictionary(uniqueKeysWithValues: try db.speakers(job.meetingId).map { ($0.idx, $0.name) })
+        let context = TranscriptCleanup.Context(language: language, segments: segments.map { segment in
+            (segment.text, segment.speaker.map { names[$0] ?? language.defaultSpeaker($0) })
+        })
+        let changed = try await callLLM(lane) { onStart in
+            try await TranscriptCleanup.clean(context, provider: provider, model: AppSettings.model, onStart: onStart,
+                                              onProgress: { [weak self] value in self?.running[lane]?.progress = value })
+        }
+        guard isStillRunning(job) else { return }
+        var lines: [Int64: String] = [:]
+        for (index, segment) in segments.enumerated() {
+            guard let id = segment.id else { continue }
+            lines[id] = changed[index].map { AppSettings.script($0, for: language) } ?? segment.text
+        }
+        try db.saveCleanLines(job.meetingId, lines)
+    }
+
     // MARK: 压缩（design §6.4）
 
     private func compress(_ job: Job) async throws {
@@ -634,7 +705,7 @@ final class JobRunner {
     // MARK: 整理（design §8）
 
     /// 回传要不要发通知：草稿没做（正式逐字稿已经好了）、正式版取代了草稿时不发
-    private func summarize(_ job: Job, lane: JobLane, answers: [ReviewAnswer]?, draft: Bool = false) async throws -> Bool {
+    private func summarize(_ job: Job, lane: JobLane, answers: [ReviewAnswer]?, draft: Bool = false, peopleOnly: Bool = false) async throws -> Bool {
         guard let meeting = try db.meeting(job.meetingId) else { return false }
         // 草稿（design §21.3）：正式逐字稿已经好了就不做（短的会议转录比较快）
         if try draft && !db.segments(job.meetingId).isEmpty { return false }
@@ -650,11 +721,17 @@ final class JobRunner {
         guard !segments.isEmpty || !meeting.userNotes.isEmpty else { throw LLMError.failed(String(localized: "还没有逐字稿，请先完成转录")) }
         let templates = try db.templates()
         let template = templates.first { $0.id == meeting.templateId } ?? templates.first { $0.id == "general" }
+        var definition = template?.definition(for: meeting.meetingLanguage) ?? TemplateDefinition.decode("{}")
+        // 只补上每个人的重点（design §66）：模板只要 people，整理完只换掉 people，其他段落不动
+        if peopleOnly {
+            guard meeting.decodedNotes != nil else { return false }
+            definition = TemplateDefinition(description: definition.description, sections: ["people"], custom: [], instruction: definition.instruction)
+        }
         let context = NotesContext(
             meeting: meeting, segments: segments,
             speakers: Dictionary(uniqueKeysWithValues: try db.speakers(job.meetingId).map { ($0.idx, $0.name) }),
             bookmarks: try db.bookmarks(job.meetingId), glossary: try glossaryTerms(),
-            template: template?.definition(for: meeting.meetingLanguage) ?? TemplateDefinition.decode("{}"),
+            template: definition,
             documents: try db.documents(job.meetingId).map(DocumentText.init),
             assistance: try db.assistance(job.meetingId)?.notesReference ?? "")
         let prompt: String
@@ -672,6 +749,13 @@ final class JobRunner {
         guard isStillRunning(job) else { return false }
         // 中文会议用简体时，整理完才转（提示词照旧，design §47.2、D154）
         if AppSettings.simplifiedChinese(for: meeting.meetingLanguage) { notes = notes.simplified() }
+        if peopleOnly {
+            // 整理的期间记录可能被改过：用现在的记录，只换掉 people
+            guard var current = try db.meeting(job.meetingId)?.decodedNotes else { return false }
+            current.people = notes.people
+            try db.saveNotes(job.meetingId, notes: current, by: nil, reason: String(localized: "补上每个人的重点"), source: .edit)
+            return false
+        }
         if draft {
             // 整理草稿的期间正式逐字稿好了、或已经有会议记录：丢掉草稿
             guard try db.segments(job.meetingId).isEmpty, try db.meeting(job.meetingId)?.notes == nil else { return false }

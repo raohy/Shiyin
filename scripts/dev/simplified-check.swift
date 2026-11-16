@@ -48,7 +48,8 @@ enum SimplifiedCheck {
             openQuestions: [.init(text: "還有問題", time: "00:20")],
             topics: [.init(title: "網路", start: "00:25", points: [.init(text: "記憶體", time: "00:30")])],
             custom: [.init(title: "回饋", items: [.init(text: "投影片", time: "00:35")])],
-            reviewItems: [.init(time: "00:40", question: "確認時程？", yesNo: true)])
+            reviewItems: [.init(time: "00:40", question: "確認時程？", yesNo: true)],
+            people: [.init(name: "陳經理", points: [.init(text: "確認軟體交付", time: "00:45")])])
         let expected = MeetingNotes(
             title: "会议记录", summary: [.init(text: "软件开发", time: "00:05")],
             decisions: [.init(text: "默认启用", time: "00:10")],
@@ -56,7 +57,8 @@ enum SimplifiedCheck {
             openQuestions: [.init(text: "还有问题", time: "00:20")],
             topics: [.init(title: "网络", start: "00:25", points: [.init(text: "内存", time: "00:30")])],
             custom: [.init(title: "反馈", items: [.init(text: "幻灯片", time: "00:35")])],
-            reviewItems: [.init(time: "00:40", question: "确认时程？", yesNo: true)])
+            reviewItems: [.init(time: "00:40", question: "确认时程？", yesNo: true)],
+            people: [.init(name: "陈经理", points: [.init(text: "确认软件交付", time: "00:45")])])
         equal(notes.outputScript(.zh), expected, "记录字段和元数据")
         equal(notes.outputScript(yue), expected, "粤语记录")
         for language in [MeetingLanguage.ja, .en, MeetingLanguage(rawValue: "ko")!] {

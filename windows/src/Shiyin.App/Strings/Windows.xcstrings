@@ -1,6 +1,40 @@
 {
   "sourceLanguage": "zh-Hant",
   "strings": {
+    "%1$@ 的聲音從「%2$@」播出，拾音錄的是預設的「%3$@」，所以錄不到。請把 Windows 的預設輸出裝置改成「%2$@」（設定 → 系統 → 音效 → 輸出），或在 %1$@ 裡把喇叭改成預設的裝置。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ is playing through “%2$@”, but Shiyin records the default device “%3$@”, so it can't hear it. Set Windows' default output device to “%2$@” (Settings → System → Sound → Output), or switch the speaker in %1$@ to the default device."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 的声音从“%2$@”播出，拾音录的是默认的“%3$@”，所以录不到。请把 Windows 的默认输出装置改成“%2$@”（设置 → 系统 → 音效 → 输出），或在 %1$@ 里把扬声器改成默认的装置。"
+          }
+        }
+      }
+    },
+    "%@ 正在播放聲音，但拾音錄不到電腦的聲音。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is playing audio, but Shiyin can't record the computer's audio."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 正在播放声音，但拾音录不到电脑的声音。"
+          }
+        }
+      }
+    },
     "%@失敗（錯誤代碼 %@）": {
       "extractionState": "manual",
       "localizations": {
@@ -528,6 +562,40 @@
         }
       }
     },
+    "「設定 → 進階 → 顯示」的「分享畫面時藏起拾音的視窗」：打開後，用 Zoom、Teams、Google Meet 分享整個螢幕時別人看不到拾音，截圖、螢幕錄影也拍不到。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings → Advanced → Display, “Hide Shiyin's windows when sharing the screen”: when on, people can't see Shiyin when you share your whole screen in Zoom, Teams, or Google Meet, and screenshots and screen recordings won't show it either."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“设置 → 高级 → 显示”的“分享画面时藏起拾音的窗口”：打开后，用 Zoom、Teams、Google Meet 分享整个屏幕时别人看不到拾音，截图、屏幕录像也拍不到。"
+          }
+        }
+      }
+    },
+    "「進階 → 顯示」的「分享畫面時藏起拾音的視窗」：打開後，用 Zoom、Teams、Google Meet 分享整個螢幕時別人看不到拾音，截圖、螢幕錄影也拍不到。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Advanced → Display, “Hide Shiyin's windows when sharing the screen”: when on, people can't see Shiyin when you share your whole screen in Zoom, Teams, or Google Meet, and screenshots and screen recordings won't show it either."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“高级 → 显示”的“分享画面时藏起拾音的窗口”：打开后，用 Zoom、Teams、Google Meet 分享整个屏幕时别人看不到拾音，截图、屏幕录像也拍不到。"
+          }
+        }
+      }
+    },
     "・匯入：把錄音檔拖進視窗，或按「匯入」（Ctrl+O）": {
       "extractionState": "manual",
       "localizations": {
@@ -766,6 +834,23 @@
         }
       }
     },
+    "也可以在側欄的「人物」管理": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can also manage them under People in the sidebar."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "也可以在侧边栏的“人物”管理"
+          }
+        }
+      }
+    },
     "也可以用 Ctrl＋＋、Ctrl＋－ 調整": {
       "extractionState": "manual",
       "localizations": {
@@ -902,6 +987,23 @@
         }
       }
     },
+    "側欄上方切到「人物」，可以看拾音認識的每個人：一起開過的會議（每場他說了多久）、所有會議紀錄裡他負責的待辦，點了打開那場會議、從那個時間點播放。同一個人被記成兩個名字時按「合併到…」，也可以在這裡「改名」「刪除聲音特徵…」。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch the top of the sidebar to People to see everyone Shiyin knows: the meetings you've had together (and how long they spoke in each) and their action items from all meeting notes. Click one to open that meeting and play from that point. If the same person was saved under two names, use Merge Into…; you can also Rename or Delete Voice Profile… here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "侧边栏上方切到“人物”，可以看拾音认识的每个人：一起开过的会议（每场他说了多久）、所有会议记录里他负责的待办，点了打开那场会议、从那个时间点播放。同一个人被记成两个名字时按“合并到…”，也可以在这里“改名”“删除声音特征…”。"
+          }
+        }
+      }
+    },
     "全域快捷鍵 Ctrl+Alt+Shift+R：在其他 app 裡也能開始或停止錄音": {
       "extractionState": "manual",
       "localizations": {
@@ -983,6 +1085,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "切换记录、逐字稿、提问"
+          }
+        }
+      }
+    },
+    "到「設定 → 說話者與詞彙 → 我的聲音」錄一段自己的聲音（照著畫面上的文字唸約 20 秒），第一場會議就認得你：聲音像你的說話者會直接帶入你的名字，沒把握時在待確認問你。錄音只用來算聲音特徵，算完就刪掉。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record your own voice in Settings → Speakers & Glossary → My voice (read the passage on screen for about 20 seconds), and Shiyin recognizes you from your first meeting: a speaker who sounds like you gets your name, or Shiyin asks you in the questions to confirm when it isn't sure. The recording is used only to work out your voice profile and is deleted right after."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "到“设置 → 说话者与词汇 → 我的声音”录一段自己的声音（照着画面上的文字念约 20 秒），第一场会议就认得你：声音像你的说话者会直接带入你的名字，没把握时在待确认问你。录音只用来算声音特征，算完就删掉。"
           }
         }
       }
@@ -1238,6 +1357,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "已登录企业服务器"
+          }
+        }
+      }
+    },
+    "待辦可以加到 macOS 的「提醒事項」：在紀錄的「待辦」右邊按「加到提醒事項」，會加進「拾音」列表；期限是日期的會設成到期日，點提醒裡的連結就回到這場會議的那個時間點。加過的不會重複加，在提醒事項裡完成的，紀錄裡那一條會打勾。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To-dos can go into the macOS Reminders app: click “Add to Reminders” next to To-dos in the notes, and they're added to the “Shiyin” list. Deadlines that are dates become due dates, and the link in each reminder takes you back to that moment in the meeting. To-dos already added aren't added again, and ones you complete in Reminders get a check mark in the notes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "待办可以加到 macOS 的“提醒事项”：在记录的“待办”右边按“加到提醒事项”，会加进“拾音”列表；期限是日期的会设成到期日，点提醒里的链接就回到这场会议的那个时间点。加过的不会重复加，在提醒事项里完成的，记录里那一条会打勾。"
           }
         }
       }
@@ -1509,6 +1645,23 @@
         }
       }
     },
+    "拾音會在這台電腦上把會議錄下來，轉成逐字稿，再整理成會議紀錄。我現在唸這一段，是要讓拾音記住我的聲音。之後開會的時候，拾音聽到這個聲音，就會在逐字稿上標出我的名字。聲音特徵只存在這台電腦裡，不會上傳。下午三點，我們要討論下一季的計畫，請大家先看一下上週的數字。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shiyin records meetings on this computer, turns them into transcripts, and writes up meeting notes. I'm reading this so Shiyin can learn my voice. In future meetings, when Shiyin hears this voice, it will put my name next to what I said. The voice profile stays on this computer and is never uploaded. At three this afternoon we'll talk about next quarter's plan, so please take a look at last week's numbers first."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拾音会在这台电脑上把会议录下来，转成逐字稿，再整理成会议记录。我现在念这一段，是要让拾音记住我的声音。之后开会的时候，拾音听到这个声音，就会在逐字稿上标出我的名字。声音特征只存在这台电脑里，不会上传。下午三点，我们要讨论下一季的计划，请大家先看一下上周的数字。"
+          }
+        }
+      }
+    },
     "拾音會常駐在工作列右下角的系統匣，關掉視窗也會繼續錄音和整理。": {
       "extractionState": "manual",
       "localizations": {
@@ -1522,6 +1675,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "拾音会常驻在工作列右下角的系统托盘，关掉窗口也会继续录音和整理。"
+          }
+        }
+      }
+    },
+    "拾音會忘記「%@」的聲音，之後的會議不會再自動帶入這個名字。已經帶入的名字會留著。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shiyin will forget %@'s voice, and later meetings won't fill in this name automatically. Names already filled in stay as they are."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拾音会忘记“%@”的声音，之后的会议不会再自动带入这个名字。已经带入的名字会留着。"
           }
         }
       }
@@ -1556,6 +1726,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "拾音没有麦克风的使用权限"
+          }
+        }
+      }
+    },
+    "拾音錄音島": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shiyin recording island"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拾音录音岛"
           }
         }
       }
@@ -1675,6 +1862,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "按“开始使用”后就可以录音或导入了。"
+          }
+        }
+      }
+    },
+    "按住 Ctrl 點選可以加入或取消，按住 Shift 點選一次選一段。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ctrl-click to add or remove a meeting. Shift-click to select a range."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按住 Ctrl 点击可以加入或取消，按住 Shift 点击一次选一段。"
           }
         }
       }
@@ -2304,6 +2508,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "没办法把 key 存进凭据管理器（错误代码 %lld）"
+          }
+        }
+      }
+    },
+    "沒辦法算出聲音特徵：%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't work out the voice profile: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没办法算出声音特征：%@"
           }
         }
       }
@@ -3430,6 +3651,23 @@
         }
       }
     },
+    "錄音中在螢幕上方正中間顯示錄音的時間和提醒，全螢幕開會、分享畫面時也看得到，分享畫面拍不到它。偵測到線上會議時的「要開始錄音嗎？」也在這裡。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "While recording, the elapsed time and alerts appear at the top center of the screen. You can see it in full-screen meetings and while sharing your screen, and screen sharing doesn't capture it. “Start recording?” for online meetings shows up here too."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录音中在屏幕上方正中间显示录音的时间和提醒，全屏开会、分享画面时也看得到，分享画面拍不到它。检测到线上会议时的“要开始录音吗？”也在这里。"
+          }
+        }
+      }
+    },
     "錄音中按 Ctrl+Alt+Shift+B 標記重點（在其他 app 裡也能用）": {
       "extractionState": "manual",
       "localizations": {
@@ -3477,6 +3715,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "录音中画面左边是实时逐字稿，讲完几秒内就会出现；右边“我的笔记”每换一行会自动记下当时的录音时间（录完在逐字稿标签页顶部的“我的笔记”还能改）。重要的地方按“标记重点”（Ctrl+B），在其他 app 里也可以按 Ctrl+Alt+Shift+B。需要中断时按“暂停”（Ctrl+Shift+P），暂停的时间不会录进去。"
+          }
+        }
+      }
+    },
+    "錄音中螢幕上方正中間會有一個小小的錄音島，顯示錄音的時間；收音有問題（麥克風沒收到聲音、用的是藍牙耳機的麥克風、好像沒人在說話）時會往下展開那一句提醒和按鈕。滑鼠移上去可以看音量和最新一句逐字稿，直接按「暫停」「標記重點」「打開拾音」「停止並轉錄」，不用切回拾音。全螢幕開會、分享畫面時也看得到，分享畫面拍不到它；偵測到線上會議時的「要開始錄音嗎？」也在這裡。不想要的話，到「設定 → 錄音與轉錄 → 提醒與快捷鍵」關掉「在螢幕上方顯示錄音島」。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "While you record, a small recording island at the top center of the screen shows the elapsed time. When something is wrong with the audio (the microphone hears nothing, you're using a Bluetooth headset's microphone, or nobody seems to be talking), it expands to show the alert and its buttons. Hover over it to see the levels and the latest line of the transcript, and use Pause, Bookmark, Open Shiyin, or Stop & Transcribe without switching back to Shiyin. You can see it in full-screen meetings and while sharing your screen, and screen sharing doesn't capture it. “Start recording?” for online meetings shows up here too. If you don't want it, turn off “Show the recording island at the top of the screen” in Settings → Recording & Transcription → Alerts & Shortcuts."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录音中屏幕上方正中间会有一个小小的录音岛，显示录音的时间；收音有问题（麦克风没收到声音、用的是蓝牙耳机的麦克风、好像没人在说话）时会往下展开那一句提醒和按钮。鼠标移上去可以看音量和最新一句逐字稿，直接按“暂停”“标记重点”“打开拾音”“停止并转录”，不用切回拾音。全屏开会、分享画面时也看得到，分享画面拍不到它；检测到线上会议时的“要开始录音吗？”也在这里。不想要的话，到“设置 → 录音与转录 → 提醒与快捷键”关掉“在屏幕上方显示录音岛”。"
           }
         }
       }

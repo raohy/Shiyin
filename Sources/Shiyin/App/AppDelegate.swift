@@ -13,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppModel.shared.start()
         installSpaceKey()
+        WindowSharing.install()
+        RecordingIsland.shared.install(AppModel.shared)
         #if DEBUG
         DebugControl.install()
         #endif
@@ -21,6 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 回到前景时更新 claude、codex 的登录状态（用户可能刚在终端登录，design §34.1）
     func applicationDidBecomeActive(_ notification: Notification) {
         Task { await CLILogin.refreshIfStale() }
+        // 用户可能刚在提醒事项里完成了待办（design §52.2）
+        AppModel.shared.refreshReminderStatus()
     }
 
     /// 拖到 Dock 图标、Finder 的「打开方式」（R1.3）；企业服务器的加入链接 shiyin://join（R49.7）；

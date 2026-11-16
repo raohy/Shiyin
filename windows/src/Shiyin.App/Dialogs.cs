@@ -31,10 +31,13 @@ public static class Dialogs
         await Show(dialog);
     }
 
-    public static async Task<bool> Confirm(MainWindow window, string title, string message, string action)
+    /// <summary>destructive：刪除這類動作，預設按鈕（Enter）是「取消」，不小心按 Enter 不會刪掉</summary>
+    public static async Task<bool> Confirm(MainWindow window, string title, string message, string action, bool destructive = false)
     {
         if (window.XamlRoot is null) return false;
-        return await Show(Dialog(window, title, Ui.Text(message), action)) == ContentDialogResult.Primary;
+        var dialog = Dialog(window, title, Ui.Text(message), action);
+        if (destructive) dialog.DefaultButton = ContentDialogButton.Close;
+        return await Show(dialog) == ContentDialogResult.Primary;
     }
 
     /// <summary>同時只能開一個 ContentDialog：前一個還開著時等它關掉</summary>
@@ -275,12 +278,15 @@ public static class Dialogs
 
     // MARK: 資料夾（R9.2）
 
-    public static async Task NewFolder(MainWindow window, long meetingId)
+    /// <summary>新資料夾：選的會議（多選時是全部，R88）移進去</summary>
+    public static async Task NewFolder(MainWindow window, IReadOnlyList<long> meetingIds)
     {
+        if (meetingIds.Count == 0) return;
         var name = new TextBox { PlaceholderText = L.T("資料夾名稱") };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(name, L.T("資料夾名稱"));
         var form = Ui.Column(10, Ui.Text(L.T("例如專案名稱或客戶名稱。這場會議會移進新資料夾。"), color: Ui.Secondary), name);
         if (await Show(Dialog(window, L.T("新資料夾"), form, L.T("建立並移入"))) != ContentDialogResult.Primary) return;
-        if (name.Text.Trim().Length > 0) AppHost.Current.Controller.MoveToFolder(meetingId, name.Text);
+        if (name.Text.Trim().Length > 0) AppHost.Current.Controller.MoveToFolder(meetingIds, name.Text);
     }
 
     public static async Task RenameFolder(MainWindow window, string old)

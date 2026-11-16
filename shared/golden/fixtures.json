@@ -151,6 +151,38 @@
       "time": ""
      }
     ],
+    "people": [
+     {
+      "name": "王小明",
+      "points": [
+       {
+        "text": "回報 Redis 快取下週三完成",
+        "time": "00:04"
+       },
+       {
+        "text": "負責確認 <admin> 權限 | 部署",
+        "time": "1:02:05"
+       }
+      ]
+     },
+     {
+      "name": "說話者 2",
+      "points": [
+       {
+        "text": "建議部署腳本路徑維持 /deploy/k8s",
+        "time": "00:15"
+       },
+       {
+        "text": "想先確認 Kubernetes 版本",
+        "time": ""
+       }
+      ]
+     },
+     {
+      "name": "說話者 3",
+      "points": []
+     }
+    ],
     "decisions": [
      {
       "text": "部署腳本路徑維持 /deploy/k8s",
@@ -1026,6 +1058,8 @@
   "speaker 3",
   "王小明"
  ],
+ "avatarNames": ["王小明", "  王小明 ", "Bob", "bob", "Amy Chen", "amy-chen", "mary_jane.watson", "alice  bob   carol", "O'Brien", "Élodie Durand", "說話者 3", "說話者 123", "說話者 一", "Speaker 12", "話者 1", "화자 2", "이서연", "たなか", "タナカ", "陳 美玲", "😀 Smile", "a", "", "   ", "Speaker", "說話者1"],
+ "avatarSpeakers": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17],
  "speakerRenames": [
   {
    "old": "說話者 1",
@@ -2008,6 +2042,15 @@
     "jobs"
    ]
   },
+  {"op": "enrollVoiceprint", "name": "陳美玲", "embedding": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2], "comment": "人物頁（design §60.1）：錄過「我的聲音」的人排第一，還沒有一起開過會議"},
+  {"op": "peopleOverview", "file": "db/43-people.json"},
+  {"op": "personMeetings", "file": "db/44-person-meetings.json"},
+  {"op": "personActionItems", "names": ["王小明", "小明", "bob", "  Bob ", "李大華", "陳美玲", "王小明的同事", ""], "file": "db/45-person-items.json"},
+  {"op": "setTrashed", "key": "zh", "trashed": true, "comment": "垃圾桶裡的會議不算（還原後才接著下面的步驟）"},
+  {"op": "peopleOverview", "file": "db/46-people-trash.json"},
+  {"op": "personMeetings", "file": "db/47-person-meetings-trash.json"},
+  {"op": "personActionItems", "names": ["王小明", "Bob"], "file": "db/48-person-items-trash.json"},
+  {"op": "setTrashed", "key": "zh", "trashed": false},
   {
    "op": "setTrashed",
    "key": "en",
@@ -2401,6 +2444,26 @@
      {
       "text": "摘要不畫，因為有議題",
       "time": "00:00"
+     }
+    ],
+    "people": [
+     {
+      "name": "Alice",
+      "points": [
+       {
+        "text": "Proposed moving the launch to the first week of next quarter so QA has two more sprints",
+        "time": "03:10"
+       }
+      ]
+     },
+     {
+      "name": "Bob",
+      "points": [
+       {
+        "text": "Will draft the migration plan",
+        "time": "12:40"
+       }
+      ]
      }
     ],
     "decisions": [

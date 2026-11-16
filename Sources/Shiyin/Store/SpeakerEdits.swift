@@ -17,12 +17,15 @@ extension AppDatabase {
         /// 拆句（design §46.1）：前半句、后半句的 id，中间去掉的空白
         struct SplitState: Codable { var id: Int64; var newId: Int64; var gap: String }
         var split: SplitState?
+        /// 删除一句（design §63）：那一句的整笔资料、它的校正建议
+        struct DeletedState: Codable { var segment: Segment; var corrections: [Correction] }
+        var deleted: DeletedState?
     }
 
     /// 改之前先存一份，只留最近一次
     private static func saveSpeakerUndo(_ db: Database, meetingId: Int64, label: String,
                                         notesBefore: String? = nil, notesAfter: String? = nil,
-                                        split: SpeakerSnapshot.SplitState? = nil) throws {
+                                        split: SpeakerSnapshot.SplitState? = nil, deleted: SpeakerSnapshot.DeletedState? = nil) throws {
         let segments = try Row.fetchAll(db, sql: "SELECT id, speaker, speaker_manual FROM segments WHERE meeting_id = ? AND kind = 'final'",
                                         arguments: [meetingId])
             .map { SpeakerSnapshot.SegmentState(id: $0["id"], speaker: $0["speaker"], manual: $0["speaker_manual"]) }
@@ -30,7 +33,8 @@ extension AppDatabase {
             SpeakerSnapshot.SpeakerState(idx: $0.idx, name: $0.name, nameSource: $0.nameSource, personId: $0.personId,
                                          embedding: $0.embedding, speechSeconds: $0.speechSeconds, audioSource: $0.audioSource)
         }
-        let snapshot = SpeakerSnapshot(segments: segments, speakers: speakers, notesBefore: notesBefore, notesAfter: notesAfter, split: split)
+        let snapshot = SpeakerSnapshot(segments: segments, speakers: speakers, notesBefore: notesBefore, notesAfter: notesAfter,
+                                       split: split, deleted: deleted)
         let json = String(decoding: try JSONEncoder().encode(snapshot), as: UTF8.self)
         try db.execute(sql: "INSERT OR REPLACE INTO speaker_undo (meeting_id, snapshot, label, created_at) VALUES (?, ?, ?, ?)",
                        arguments: [meetingId, json, label, Clock.now()])
@@ -54,6 +58,7 @@ extension AppDatabase {
                 try Self.undoNotes(db, meetingId)
             }
             if let split = snapshot.split { try Self.joinSplit(db, meetingId: meetingId, split) }
+            if let deleted = snapshot.deleted { try Self.restoreDeleted(db, meetingId: meetingId, deleted) }
             for s in snapshot.segments {
                 try db.execute(sql: "UPDATE segments SET speaker = ?, speaker_manual = ? WHERE id = ?", arguments: [s.speaker, s.manual, s.id])
             }
@@ -198,6 +203,31 @@ extension AppDatabase {
         try db.execute(sql: "UPDATE segments SET seq = seq - 1 WHERE meeting_id = ? AND seq > ?", arguments: [meetingId, second.seq])
     }
 
+    /// 删除一句（R89、design §63）：校正建议跟着删（ON DELETE CASCADE），只剩这句的说话者拿掉；都记在复原里
+    @discardableResult
+    func deleteSegment(_ meetingId: Int64, id: Int64, label: String) throws -> Bool {
+        try pool.write { db in
+            guard let segment = try Segment.fetchOne(db, key: id), segment.meetingId == meetingId else { return false }
+            let corrections = try Correction.filter(Column("segment_id") == id).fetchAll(db)
+            try Self.saveSpeakerUndo(db, meetingId: meetingId, label: label, deleted: .init(segment: segment, corrections: corrections))
+            try db.execute(sql: "DELETE FROM search WHERE rowid = ?", arguments: [id])
+            try db.execute(sql: "DELETE FROM segments WHERE id = ?", arguments: [id])
+            try db.execute(sql: "UPDATE segments SET seq = seq - 1 WHERE meeting_id = ? AND seq > ?", arguments: [meetingId, segment.seq])
+            try Self.removeEmptySpeakers(db, meetingId: meetingId)
+            return true
+        }
+    }
+
+    /// 复原删掉的一句：用原本的 id 放回去，后面的 seq 往后移，索引和校正建议加回来
+    private static func restoreDeleted(_ db: Database, meetingId: Int64, _ deleted: SpeakerSnapshot.DeletedState) throws {
+        guard try Segment.fetchOne(db, key: deleted.segment.id) == nil else { return }
+        try db.execute(sql: "UPDATE segments SET seq = seq + 1 WHERE meeting_id = ? AND seq >= ?", arguments: [meetingId, deleted.segment.seq])
+        var segment = deleted.segment
+        try segment.insert(db)
+        if let id = segment.id, segment.kind == "final" { try indexSegment(db, meetingId: meetingId, id: id, text: segment.text) }
+        for var correction in deleted.corrections { try correction.insert(db) }
+    }
+
     /// 添加一位说话者（默认名称），回传编号
     private static func addSpeaker(_ db: Database, meetingId: Int64) throws -> Int {
         let target = (try Int.fetchOne(db, sql: "SELECT MAX(idx) FROM speakers WHERE meeting_id = ?", arguments: [meetingId]) ?? 0) + 1
@@ -210,7 +240,7 @@ extension AppDatabase {
     }
 
     /// 没有段落的说话者拿掉
-    private static func removeEmptySpeakers(_ db: Database, meetingId: Int64) throws {
+    static func removeEmptySpeakers(_ db: Database, meetingId: Int64) throws {
         let empty = try Int.fetchAll(db, sql: """
             SELECT idx FROM speakers s WHERE meeting_id = ?
               AND NOT EXISTS (SELECT 1 FROM segments g WHERE g.meeting_id = s.meeting_id AND g.speaker = s.idx)

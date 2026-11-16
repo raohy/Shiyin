@@ -100,12 +100,17 @@ struct MenuBarContent: View {
                 if let hint = recorder.levelHint {
                     // 收音提醒（R42.2）：跟录音画面同一句，「知道了」这场不再提示
                     VStack(alignment: .leading, spacing: 6) {
-                        Label(recorder.text(for: hint), systemImage: hint == .noisy ? "waveform.badge.exclamationmark" : "mic.badge.xmark")
+                        Label(recorder.text(for: hint), systemImage: hint.symbol)
                             .font(.caption)
                             .foregroundStyle(Color.signal)
                             .fixedSize(horizontal: false, vertical: true)
-                        Button("知道了") { recorder.dismissLevelHint() }
-                            .font(.caption)
+                        HStack {
+                            if hint == .systemDenied {
+                                Button("打开系统设置") { Recorder.openPrivacySettings("Privacy_AudioCapture") }
+                            }
+                            Button("知道了") { recorder.dismissLevelHint() }
+                        }
+                        .font(.caption)
                     }
                 }
                 if !recorder.volatileText.isEmpty || !recorder.liveLines.isEmpty {

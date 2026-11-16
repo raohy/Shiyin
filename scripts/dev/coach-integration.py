@@ -88,7 +88,7 @@ def launch(target_home=home, fake_cli=False):
                     '-hasCompletedOnboarding', 'YES', '-hasSeenGuide', 'YES', '-llmProvider', 'none',
                     '-autoSummarize', 'NO', '-correctTranscript', 'NO', '-diarize', 'NO',
                     '-liveTranscription', 'NO', '-compressAudio', 'NO', '-autoDetectLanguage', 'NO',
-                    '-meetingDetection', 'NO', '-globalHotKey', 'NO', '-mcpEnabled', 'NO',
+                    '-meetingDetection', 'NO', '-recordingIsland', 'NO', '-globalHotKey', 'NO', '-mcpEnabled', 'NO',
                     '-debugNoCLI', 'NO' if fake_cli else 'YES', '-debugToolDirectory', str(base / 'tools'),
                     '-debugCoachInterval', '0.5', '-debugCoachTimeout', '2'], check=True)
     path = base / 'ready.json'
@@ -268,12 +268,37 @@ try:
     upgrade_home.mkdir()
     with sqlite3.connect(home / 'shiyin.sqlite') as source, sqlite3.connect(upgrade_home / 'shiyin.sqlite') as target:
         source.backup(target)
+        target.execute('DROP TRIGGER clean_lines_text')
+        target.execute('DROP TABLE clean_lines')
+        target.execute("DELETE FROM grdb_migrations WHERE identifier='v12'")
         target.execute('DROP TABLE meeting_assistance')
         target.execute("DELETE FROM grdb_migrations WHERE identifier='v11'")
         target.execute("UPDATE meetings SET source='transcript'")
     launch(upgrade_home)
     check(bool(query("SELECT identifier FROM grdb_migrations WHERE identifier='v11'", target_home=upgrade_home))
           and bool(list((upgrade_home / 'backups').glob('*.sqlite'))), '旧数据库升级到 v11 前自动备份')
+    quit_app()
+    v11_home = base / 'v11-home'
+    v11_home.mkdir()
+    original_preparation = query(
+        'SELECT state FROM meeting_assistance WHERE meeting_id=?', (failure_id,))[0][0]
+    with sqlite3.connect(home / 'shiyin.sqlite') as source, sqlite3.connect(v11_home / 'shiyin.sqlite') as target:
+        source.backup(target)
+        target.execute('DROP TRIGGER clean_lines_text')
+        target.execute('DROP TABLE clean_lines')
+        target.execute("DELETE FROM grdb_migrations WHERE identifier='v12'")
+    launch(v11_home)
+    check(query('SELECT state FROM meeting_assistance WHERE meeting_id=?', (failure_id,), target_home=v11_home)[0][0]
+          == original_preparation, 'v11 升级保留已有助手准备和问题状态')
+    check(bool(query("SELECT identifier FROM grdb_migrations WHERE identifier='v12'", target_home=v11_home))
+          and bool(query("SELECT name FROM sqlite_master WHERE name='clean_lines'", target_home=v11_home)),
+          'v12 正确创建精简逐字稿表')
+    backups = list((v11_home / 'backups').glob('*before-v12.sqlite'))
+    check(bool(backups), 'v12 升级前创建独立数据库备份')
+    with sqlite3.connect(f'file:{backups[0]}?mode=ro', uri=True) as backup:
+        check(backup.execute('SELECT state FROM meeting_assistance WHERE meeting_id=?', (failure_id,)).fetchone()[0]
+              == original_preparation and not backup.execute("SELECT identifier FROM grdb_migrations WHERE identifier='v12'").fetchall(),
+              '备份保留原 v11 助手数据及迁移版本')
     quit_app()
     tools = base / 'tools'
     tools.mkdir()

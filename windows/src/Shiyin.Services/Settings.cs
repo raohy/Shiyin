@@ -50,6 +50,10 @@ public sealed class AppSettings
     public const string NotesViewKey = "notesView";
     /// <summary>讓 AI 工具讀取會議（本地 MCP，M§44.1），預設關</summary>
     public const string McpEnabledKey = "mcpEnabled";
+    /// <summary>分享畫面時藏起拾音的視窗（R77、design-windows §11.19），預設關</summary>
+    public const string HideFromScreenSharingKey = "hideFromScreenSharing";
+    /// <summary>在螢幕上方顯示錄音島，預設開（M§57.2、R81.8、design-windows §11.21）</summary>
+    public const string RecordingIslandKey = "recordingIsland";
     /// <summary>中文的字：traditional／simplified（沒有值 = traditional，M§47.2）</summary>
     public const string ChineseScriptKey = "chineseScript";
     /// <summary>Windows 才有：介面語言（空的是跟著 Windows 的顯示語言，zh、en）</summary>
@@ -296,6 +300,7 @@ public sealed class AppSettings
     public bool SummarizerReady => SummarizerProblem is null;
     public bool AutoSummarize => Flag(AutoSummarizeKey, true);
     public bool McpEnabled => Flag(McpEnabledKey, false);
+    public bool HideFromScreenSharing => Flag(HideFromScreenSharingKey, false);
     public bool CompressAudio => Flag(CompressAudioKey, true);
     public bool Diarize => Flag(DiarizeKey, true);
     /// <summary>線上會議的麥克風、電腦聲音分開轉錄（M§17.3）；還在評估，設定裡沒有開關</summary>
@@ -318,6 +323,8 @@ public sealed class AppSettings
     public bool GlobalHotKey => Flag(GlobalHotKeyKey, true);
     public bool Voiceprints => Flag(VoiceprintsKey, true);
     public bool MeetingDetection => Flag(MeetingDetectionKey, true);
+    /// <summary>在螢幕上方顯示錄音島（M§57、R81.8）</summary>
+    public bool RecordingIsland => Flag(RecordingIslandKey, true);
     public bool BookmarkHotKey => Flag(BookmarkHotKeyKey, true);
     public bool IdleStop => Flag(IdleStopKey, true);
     /// <summary>正式轉錄用快速辨識（Mac 的「macOS 內建」，D45）：設定值同 Mac 是 system</summary>

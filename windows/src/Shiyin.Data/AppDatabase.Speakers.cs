@@ -8,7 +8,8 @@ using Shiyin.Transcribe;
 namespace Shiyin.Data;
 
 /// <summary>設定頁的認識的人：幾份聲紋、最近出現在哪場會議</summary>
-public sealed record PersonSummary(long Id, string Name, int VoiceprintCount, string? LastMeetingTitle, string? LastMeetingDate);
+/// <summary>EnrolledAt：錄過「我的聲音」的人（M§56.1）錄的時間</summary>
+public sealed record PersonSummary(long Id, string Name, int VoiceprintCount, string? LastMeetingTitle, string? LastMeetingDate, string? EnrolledAt = null);
 
 /// <summary>一組問答（M§21.8）：meeting_id 是 NULL 時是問所有會議</summary>
 public sealed class QuestionRecord
@@ -150,11 +151,44 @@ public sealed partial class AppDatabase
         if (existing.Any(e => Voiceprint.Similarity(vector, e) > 0.95)) return;
         db.Execute("INSERT INTO voiceprints (person_id, embedding, audio_source, meeting_id, speaker_idx, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             personId, embedding, speaker.AudioSource, meetingId, idx, Clock.Now());
+        // 錄的「我的聲音」不算在上限裡、不刪（M§56.1）
         db.Execute("""
-            DELETE FROM voiceprints WHERE person_id = ? AND id NOT IN
-              (SELECT id FROM voiceprints WHERE person_id = ? ORDER BY id DESC LIMIT ?)
+            DELETE FROM voiceprints WHERE person_id = ? AND audio_source <> 'enroll' AND id NOT IN
+              (SELECT id FROM voiceprints WHERE person_id = ? AND audio_source <> 'enroll' ORDER BY id DESC LIMIT ?)
             """, personId, personId, VoiceprintsPerPerson);
     });
+
+    /// <summary>錄好的聲紋存成「我」的一份 enroll 聲紋（M§56.1、R80）：先刪掉現有的那份（整個資料庫最多一份），照名字找人、沒有就建立。
+    /// 之前的「我」換了名字、又沒有其他聲紋和會議用到時刪掉。回傳「我」的 id</summary>
+    public long EnrollVoiceprint(string name, float[] embedding) => Write(db =>
+    {
+        var trimmed = name.Trim();
+        db.Execute("DELETE FROM voiceprints WHERE audio_source = 'enroll'");
+        var personId = db.Scalar("SELECT id FROM people WHERE name = ? COLLATE NOCASE", trimmed) as long?;
+        if (personId is null)
+        {
+            db.Execute("INSERT INTO people (name, created_at) VALUES (?, ?)", trimmed, Clock.Now());
+            personId = db.LastInsertRowId;
+        }
+        db.Execute("INSERT INTO voiceprints (person_id, embedding, audio_source, meeting_id, speaker_idx, created_at) VALUES (?, ?, 'enroll', NULL, NULL, ?)",
+            personId, Voiceprint.Data(embedding), Clock.Now());
+        DeleteOrphanPeople(db);
+        return personId.Value;
+    });
+
+    /// <summary>刪掉「我的聲音」那份聲紋（R80.4）</summary>
+    public void DeleteEnrollment() => Write(db =>
+    {
+        db.Execute("DELETE FROM voiceprints WHERE audio_source = 'enroll'");
+        DeleteOrphanPeople(db);
+    });
+
+    /// <summary>「我」：有 enroll 聲紋的那個人</summary>
+    public (long PersonId, string Name, string CreatedAt)? Enrollment() => Read(db =>
+        db.QueryOne("""
+            SELECT p.id, p.name, v.created_at FROM voiceprints v JOIN people p ON p.id = v.person_id
+            WHERE v.audio_source = 'enroll' LIMIT 1
+            """) is { } r ? (r.Long("id"), r.Str("name"), r.Str("created_at")) : ((long, string, string)?)null);
 
     /// <summary>這場會議說話者辨識至少分出幾個人（M§23.2），null 自動判斷</summary>
     public void SetMinSpeakers(long meetingId, int? minSpeakers) =>
@@ -232,13 +266,14 @@ public sealed partial class AppDatabase
     public List<PersonSummary> PeopleSummaries() => Read(db => db.Query("""
         SELECT p.id, p.name,
           (SELECT count(*) FROM voiceprints v WHERE v.person_id = p.id) AS prints,
+          (SELECT v.created_at FROM voiceprints v WHERE v.person_id = p.id AND v.audio_source = 'enroll' LIMIT 1) AS enrolled,
           (SELECT m.id FROM speakers s JOIN meetings m ON m.id = s.meeting_id
              WHERE s.person_id = p.id AND m.deleted_at IS NULL ORDER BY m.meeting_date DESC LIMIT 1) AS last_id
         FROM people p ORDER BY p.name COLLATE NOCASE
         """).Select(r =>
     {
         var last = r.LongOrNull("last_id") is long id ? FetchMeeting(db, id) : null;
-        return new PersonSummary(r.Long("id"), r.Str("name"), r.Int("prints"), last?.DisplayTitle, last?.MeetingDate);
+        return new PersonSummary(r.Long("id"), r.Str("name"), r.Int("prints"), last?.DisplayTitle, last?.MeetingDate, r.StrOrNull("enrolled"));
     }).ToList());
 
     /// <summary>改名：認識的人和所有連到他的說話者一起改；新名字已經有人用了就合併過去</summary>
@@ -274,7 +309,7 @@ public sealed partial class AppDatabase
 
     /// <summary>改之前先存一份，只留最近一次</summary>
     static void SaveSpeakerUndo(Db db, long meetingId, string label, string? notesBefore = null, string? notesAfter = null,
-                                (long Id, long NewId, string Gap)? split = null)
+                                (long Id, long NewId, string Gap)? split = null, (Segment Segment, List<Correction> Corrections)? deleted = null)
     {
         var segments = new JNode.Arr(db.Query("SELECT id, speaker, speaker_manual FROM segments WHERE meeting_id = ? AND kind = 'final'", meetingId)
             .Select(r =>
@@ -295,10 +330,29 @@ public sealed partial class AppDatabase
         if (notesAfter is not null) snapshot.Add("notesAfter", notesAfter);
         // 拆句（M§46.1）：前半句、後半句的 id，中間去掉的空白
         if (split is { } sp) snapshot.Add("split", new JNode.Obj().Add("id", new JNode.Int(sp.Id)).Add("newId", new JNode.Int(sp.NewId)).Add("gap", sp.Gap));
+        // 刪除一句（M§63）：那一句的整筆資料、它的校正建議，鍵照 Mac 的 Segment、Correction（Codable，沒有值的選填欄位不寫）
+        if (deleted is { } d)
+            snapshot.Add("deleted", new JNode.Obj().Add("segment", SegmentJson(d.Segment))
+                .Add("corrections", new JNode.Arr(d.Corrections.Select(CorrectionJson))));
         // Mac 用沒有排序的 JSONEncoder 寫（Data 是 base64、斜線會跳脫）；讀的時候兩邊都只看內容
         var json = SwiftJsonWriter.Write(snapshot, sortKeys: false, escapeSlashes: true);
         db.Execute("INSERT OR REPLACE INTO speaker_undo (meeting_id, snapshot, label, created_at) VALUES (?, ?, ?, ?)", meetingId, json, label, Clock.Now());
     }
+
+    /// <summary>Mac 的 Segment 用 JSONEncoder 寫出來的樣子（宣告的順序；speaker、channel 是 nil 時沒有這個鍵）</summary>
+    static JNode SegmentJson(Segment s)
+    {
+        var o = new JNode.Obj().Add("id", new JNode.Int(s.Id ?? 0)).Add("meetingId", new JNode.Int(s.MeetingId)).Add("seq", new JNode.Int(s.Seq))
+            .Add("start", JNode.Of(s.Start)).Add("end", JNode.Of(s.End)).Add("text", s.Text).Add("lowConfidence", JNode.Of(s.LowConfidence));
+        if (s.Speaker is int speaker) o.Add("speaker", new JNode.Int(speaker));
+        o.Add("kind", s.Kind);
+        if (s.Channel is int channel) o.Add("channel", new JNode.Int(channel));
+        return o.Add("speakerManual", JNode.Of(s.SpeakerManual));
+    }
+
+    static JNode CorrectionJson(Correction c) => new JNode.Obj().Add("id", new JNode.Int(c.Id ?? 0)).Add("meetingId", new JNode.Int(c.MeetingId))
+        .Add("segmentId", new JNode.Int(c.SegmentId)).Add("original", c.Original).Add("suggestion", c.Suggestion).Add("reason", c.Reason)
+        .Add("status", c.Status).Add("createdAt", c.CreatedAt);
 
     /// <summary>可以復原的調整（顯示用的說明），沒有就是 null</summary>
     public string? SpeakerUndoLabel(long meetingId) => Read(db => db.Scalar("SELECT label FROM speaker_undo WHERE meeting_id = ?", meetingId) as string);
@@ -314,6 +368,7 @@ public sealed partial class AppDatabase
             UndoNotes(db, meetingId);
         if (snapshot.TryGetProperty("split", out var split) && split.ValueKind == JsonValueKind.Object)
             JoinSplit(db, meetingId, split.Long("id") ?? 0, split.Long("newId") ?? 0, split.Str("gap") ?? "");
+        if (snapshot.Get("deleted") is { ValueKind: JsonValueKind.Object } deleted) RestoreDeleted(db, meetingId, deleted);
         foreach (var s in snapshot.GetProperty("segments").EnumerateArray())
             db.Execute("UPDATE segments SET speaker = ?, speaker_manual = ? WHERE id = ?", s.Long("speaker"), s.Bool("manual") ?? false, s.Long("id"));
         var people = db.Query("SELECT id FROM people").Select(r => r.Long("id")).ToHashSet();
@@ -476,6 +531,47 @@ public sealed partial class AppDatabase
         db.Execute("DELETE FROM search WHERE rowid = ?", newId);
         db.Execute("DELETE FROM segments WHERE id = ?", newId);
         db.Execute("UPDATE segments SET seq = seq - 1 WHERE meeting_id = ? AND seq > ?", meetingId, second.Seq);
+    }
+
+    /// <summary>刪除一句（R89、M§63）：校正建議跟著刪（ON DELETE CASCADE），後面的 seq 往前補，只剩這句的說話者拿掉；
+    /// 都記在說話者的復原裡（D171）。不是這場的段落回傳 false</summary>
+    public bool DeleteSegment(long meetingId, long id, string label) => Write(db =>
+    {
+        if (db.QueryOne("SELECT * FROM segments WHERE id = ?", id) is not { } row) return false;
+        var segment = ToSegment(row);
+        if (segment.MeetingId != meetingId) return false;
+        var corrections = db.Query("SELECT * FROM corrections WHERE segment_id = ? ORDER BY id", id).Select(ToCorrection).ToList();
+        SaveSpeakerUndo(db, meetingId, label, deleted: (segment, corrections));
+        db.Execute("DELETE FROM search WHERE rowid = ?", id);
+        db.Execute("DELETE FROM segments WHERE id = ?", id);
+        db.Execute("UPDATE segments SET seq = seq - 1 WHERE meeting_id = ? AND seq > ?", meetingId, segment.Seq);
+        RemoveEmptySpeakers(db, meetingId);
+        return true;
+    });
+
+    /// <summary>復原刪掉的一句（M§63）：用原本的 id 放回去，後面的 seq 往後移，索引和校正建議加回來。
+    /// Mac 存的快照也讀得懂（數字可能寫成 12 或 12.5）</summary>
+    static void RestoreDeleted(Db db, long meetingId, JsonElement deleted)
+    {
+        if (deleted.Get("segment") is not { ValueKind: JsonValueKind.Object } s || s.Long("id") is not long id
+            || db.QueryOne("SELECT id FROM segments WHERE id = ?", id) is not null) return;
+        var seq = s.Long("seq") ?? 0;
+        var kind = s.Str("kind") ?? "final";
+        var text = s.Str("text") ?? "";
+        db.Execute("UPDATE segments SET seq = seq + 1 WHERE meeting_id = ? AND seq >= ?", meetingId, seq);
+        db.Execute("INSERT INTO segments (id, meeting_id, seq, start, end, text, low_confidence, speaker, kind, channel, speaker_manual) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            id, meetingId, seq, s.Double("start") ?? 0, s.Double("end") ?? 0, text, s.Bool("lowConfidence") ?? false, s.Long("speaker"), kind,
+            s.Long("channel"), s.Bool("speakerManual") ?? false);
+        if (kind == "final") IndexSegment(db, meetingId, id, text);
+        if (deleted.Get("corrections") is not { ValueKind: JsonValueKind.Array } corrections) return;
+        foreach (var c in corrections.EnumerateArray())
+        {
+            // 原本的 id 被用掉了（AUTOINCREMENT，正常不會）就給新的，不要讓整個復原失敗
+            var cid = c.Long("id") is long given && db.QueryOne("SELECT id FROM corrections WHERE id = ?", given) is null ? given : (long?)null;
+            db.Execute("INSERT INTO corrections (id, meeting_id, segment_id, original, suggestion, reason, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                cid, meetingId, id, c.Str("original") ?? "", c.Str("suggestion") ?? "", c.Str("reason") ?? "", c.Str("status") ?? "pending",
+                c.Str("createdAt") ?? Clock.Now());
+        }
     }
 
     /// <summary>說話者辨識完記下自我檢查的分數（M§24.5），之前按過的「不用了」重設</summary>

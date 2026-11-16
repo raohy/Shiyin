@@ -119,6 +119,9 @@ final class ModelStore: NSObject {
 
     private(set) var states: [Model: State] = [:]
     private(set) var diarizerState: State = .missing
+    /// Nemotron-3 说话者识别（design §61.2、R87）：FluidAudio 下载，只有进度的比例
+    private(set) var nemotronState: State = .missing
+    private var nemotronTask: Task<Void, Never>?
     @ObservationIgnored private var session: URLSession!
     @ObservationIgnored private var tasks: [Model: URLSessionDownloadTask] = [:]
 
@@ -185,6 +188,10 @@ final class ModelStore: NSObject {
             }
         }
         if !diarizerState.isBusy { diarizerState = Diarizer.isInstalled ? .installed : .missing }
+        // 下载失败的消息留着，用户按「继续下载」才重来
+        if !nemotronState.isBusy {
+            if Diarizer.isNemotronInstalled { nemotronState = .installed } else if nemotronState == .installed { nemotronState = .missing }
+        }
     }
 
     // MARK: 下载
@@ -246,6 +253,43 @@ final class ModelStore: NSObject {
                 diarizerState = .failed(error.localizedDescription)
             }
         }
+    }
+
+    /// 大约的大小（FluidAudio 只给比例，进度条用这个换成字节）
+    nonisolated static let nemotronSize: Int64 = 190_000_000
+
+    /// 下载 Nemotron-3（选了这个模型时；下载不了就照旧用标准的，R87.2）
+    func prepareNemotron() {
+        guard !nemotronState.isBusy, !Diarizer.isNemotronInstalled else {
+            if Diarizer.isNemotronInstalled { nemotronState = .installed }
+            return
+        }
+        nemotronState = .downloading(received: 0, total: Self.nemotronSize)
+        log.info("model download started: nemotron")
+        nemotronTask = Task {
+            do {
+                try await Diarizer.prepareNemotron { fraction in
+                    Task { @MainActor [weak self] in
+                        guard let self, case .downloading = self.nemotronState else { return }
+                        self.nemotronState = .downloading(received: Int64(Double(Self.nemotronSize) * min(max(fraction, 0), 1)), total: Self.nemotronSize)
+                    }
+                }
+                nemotronState = Diarizer.isNemotronInstalled ? .installed : .failed(String(localized: "下载不完整，请再试一次"))
+            } catch is CancellationError {
+                nemotronState = .missing
+            } catch {
+                log.error("nemotron download failed: \(error.localizedDescription, privacy: .public)")
+                nemotronState = .failed(error.localizedDescription)
+            }
+            nemotronTask = nil
+        }
+    }
+
+    func deleteNemotron() {
+        nemotronTask?.cancel()
+        nemotronTask = nil
+        Diarizer.deleteNemotron()
+        nemotronState = .missing
     }
 
     private func finish(_ model: Model, downloadedFile: URL) {

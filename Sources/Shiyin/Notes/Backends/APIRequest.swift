@@ -75,7 +75,7 @@ enum APIRequest {
         switch response.status {
         case 401, 403: return LLMError.rejected(message)
         case 429: return LLMError.limited(message)
-        default: return LLMError.failed(message)
+        default: return LLMError.failed(message, cause: .http(response.status))
         }
     }
 
@@ -92,6 +92,6 @@ enum APIRequest {
         // 设置问题和用量上限分开（design §34.4）：key 错误或没权限要改设置，429 等一下或加值
         if keyProblem || status == 403 { return LLMError.rejected(message) }
         if status == 429 { return LLMError.limited(message) }
-        return LLMError.failed(message)
+        return LLMError.failed(message, cause: .http(status))
     }
 }

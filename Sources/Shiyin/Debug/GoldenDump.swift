@@ -1,7 +1,9 @@
 #if DEBUG
+import AppKit
 import FluidAudio
 import Foundation
 import GRDB
+import SwiftUI
 
 /// 产生 Windows 版用来比对的标准答案（design-windows §4）：读 shared/golden/fixtures.json，用 Mac 的程序算出提示词、模板、
 /// 导出、转录流程的规则、数据库的结果，写进输出文件夹。只在 DEBUG 建置，不改任何正式的行为（R26.5）。
@@ -216,6 +218,10 @@ enum GoldenDump {
             if let r = f["correctionRange"] as? [Int], r.count == 2, r[1] <= fx.segments.count {
                 w.text(dir + "correction-prompt-range.txt", TranscriptCorrection.prompt(correction, range: r[0]..<r[1]))
             }
+            // 精简逐字稿（R96、design §70）：跟 JobRunner.clean 一样组 Context
+            let cleanup = TranscriptCleanup.Context(language: l, segments: fx.segments.map { ($0.text, speakerName($0.speaker)) })
+            w.text(dir + "clean-system.txt", TranscriptCleanup.system(l))
+            w.text(dir + "clean-prompt.txt", TranscriptCleanup.prompt(cleanup, range: 0..<fx.segments.count))
 
             // 猜说话者：跟 JobRunner.nameSpeakers 一样
             let unnamed = names.keys.sorted().filter { AppDatabase.isDefaultSpeakerName(names[$0]!) }
@@ -269,9 +275,10 @@ enum GoldenDump {
         w.text("schemas/keywords.json", AskPrompt.keywordsSchema)
         w.text("schemas/naming.json", SpeakerNaming.jsonSchema)
         w.text("schemas/correction.json", TranscriptCorrection.jsonSchema)
+        w.text("schemas/clean.json", TranscriptCleanup.jsonSchema)
         let formats: [(String, LLMClient.OutputFormat)] = [
             ("notes", .meetingNotes), ("askMeeting", AskPrompt.meetingFormat), ("askAll", AskPrompt.allFormat),
-            ("keywords", AskPrompt.keywordsFormat), ("naming", SpeakerNaming.format), ("correction", TranscriptCorrection.format),
+            ("keywords", AskPrompt.keywordsFormat), ("naming", SpeakerNaming.format), ("correction", TranscriptCorrection.format), ("clean", TranscriptCleanup.format),
         ]
         w.json("schemas/formats.json", Dictionary(uniqueKeysWithValues: formats.map {
             ($0.0, ["toolName": $0.1.toolName, "toolDescription": $0.1.toolDescription, "schema": $0.1.schema])
@@ -304,6 +311,27 @@ enum GoldenDump {
         let ratios = ["短", "this is a normal sentence without much repetition at all",  // l10n-skip
                       String(repeating: "重复", count: 40), String(repeating: "ha ", count: 30), "一二三四五六七八九十一二三四五六七八九十"]  // l10n-skip
         w.json("whisper/compression.json", ratios.map { ["text": $0, "ratio": WhisperEngine.compressionRatio($0)] })
+        // 没人讲话时的输出（design §6.2）：只是标记或标点、词汇表被照抄
+        let marks = ["[BLANK_AUDIO]", "[silence]", "(marker tapping)", "<|5.55|>", "-", "。", "（笑）", "【音乐】", "[音乐] 大家好",  // l10n-skip
+                     "(1) 第一点", "好", "Hello (world)", "[a][b]", "<|0.00|>大家好", "()", "[ ]"]  // l10n-skip
+        w.json("whisper/nonspeech.json", marks.map { ["text": $0, "nonSpeech": WhisperEngine.isNonSpeech($0)] })
+        // 一次粘贴好几个词汇（R94.1）
+        let pasted = ["Redis", "Redis、Kubernetes、拾音", "Redis, kubernetes\nKubernetes；SendGrid;  \n\n  拾音 ", "  ", "A，B，a",  // l10n-skip
+                      "Claude Code\r\nCodex", "第一行\n第二行、第三行"]  // l10n-skip
+        w.json("util/glossary-split.json", pasted.map { ["input": $0, "terms": GlossaryInput.split($0)] as Object })
+        let abc = ["甲", "乙", "丙"], redis = glossaries.count > 1 ? glossaries[1] : [], claude = ["Claude", "Claude Code"]  // l10n-skip
+        let echoes: [(String, [String], MeetingLanguage)] = [
+            ("甲、乙、丙。", abc, .zh), ("词汇：甲、乙、丙。", abc, .zh), ("甲。", abc, .zh), ("乙、丙", abc, .zh), ("丙、甲", abc, .zh),  // l10n-skip
+            ("甲乙丙我们开始开会", abc, .zh), ("甲、乙、丙。", abc, .en), ("词汇：", abc, .zh), ("", abc, .zh),  // l10n-skip
+            ("Claude Code", claude, .en), ("Glossary: Claude, Claude Code.", claude, .en), ("claude claude code", claude, .en),
+            ("Redis、Kubernetes、拾音", redis, .zh), ("我们用 Redis 和 Kubernetes", redis, .zh), ("拾音", redis, .zh),  // l10n-skip
+            ("以下是繁体中文的工作会议录音", [], .zh), ("用语：甲、乙", abc, .ja), ("용어: 甲, 乙", abc, MeetingLanguage(rawValue: "ko")!), ("词汇：甲、乙", abc, MeetingLanguage(rawValue: "yue")!),  // l10n-skip
+        ]
+        w.json("whisper/echoes.json", echoes.map { text, glossary, language in
+            let prompt = WhisperEngine.prompt(glossary: glossary, language: language)
+            return ["text": text, "glossary": glossary, "language": language.rawValue, "prompt": prompt,
+                    "echo": WhisperEngine.echoesGlossary(text, prompt: prompt, glossary: glossary)] as Object
+        })
     }
 
     /// 没有 sortedKeys 的 JSONEncoder 每次启动键的顺序都不同（模板的定义、说话者的复原资料）：重新排序后再写，Windows 比对解析后的内容
@@ -575,6 +603,13 @@ enum GoldenDump {
         w.json("util/default-speaker-names.json", (f["defaultSpeakerNames"] as? [String] ?? []).map {
             ["name": $0, "isDefault": AppDatabase.isDefaultSpeakerName($0)] as Object
         })
+        // 头像的字和釉色（design §58）：人物照名字算的颜色、说话者照编号的颜色，写浅色、深色的 sRGB
+        w.json("util/avatars.json", [
+            "people": (f["avatarNames"] as? [String] ?? []).map {
+                ["name": $0, "initials": PersonAvatar.initials($0), "color": hexes(Color.person($0))] as Object
+            },
+            "speakers": (f["avatarSpeakers"] as? [Int] ?? []).map { ["idx": $0, "color": hexes(Color.speaker($0))] as Object },
+        ] as Object)
         w.json("util/transcript-import.json", (f["transcriptImports"] as? [Object] ?? []).map { item -> Object in
             let parsed = TranscriptImporter.parse(item["text"] as? String ?? "", ext: item["ext"] as? String ?? "")
             return ["ext": item["ext"] ?? "", "segments": parsed.segments.map { ["start": $0.start, "end": $0.end, "text": $0.text] }]
@@ -634,6 +669,15 @@ enum GoldenDump {
             CorrectionSuggestion(segment: $0["segment"] as? Int ?? 0, original: $0["original"] as? String ?? "",
                                  suggestion: $0["suggestion"] as? String ?? "", reason: $0["reason"] as? String ?? "")
         }
+        // 精简逐字稿的验证（R96）：编号不在这一批、重复、跟原文一样、比原文长太多的丢掉；空字符串留着（整句都是赘字）
+        let cleanContext = TranscriptCleanup.Context(language: .zh, segments: zh.segments.map { ($0.text, nil) })
+        let cleanRaw = [TranscriptCleanup.Line(segment: 0, text: "  " + String(zh.segments[0].text.dropLast()) + " "),
+                        TranscriptCleanup.Line(segment: 0, text: "重复的第二个"), TranscriptCleanup.Line(segment: 1, text: zh.segments[1].text),  // l10n-skip
+                        TranscriptCleanup.Line(segment: 2, text: ""), TranscriptCleanup.Line(segment: 3, text: zh.segments[3].text + String(repeating: "补", count: 40)),  // l10n-skip
+                        TranscriptCleanup.Line(segment: 9, text: "范围外")]  // l10n-skip
+        w.json("util/validate-clean.json", TranscriptCleanup.validate(cleanRaw, context: cleanContext, range: 0..<4).map {
+            ["segment": $0.segment, "text": $0.text] as Object
+        })
         let valid = TranscriptCorrection.validate(raw, context: correctionContext, range: 0..<4)
         w.json("util/validate-corrections.json", valid.map { s -> Object in
             let text = zh.segments[s.segment].text
@@ -994,9 +1038,46 @@ enum GoldenDump {
                 if let file { w.json(file, ["deleted": deleted.map { $0.name as Any } ?? NSNull()]) }
             case "deleteMeeting":
                 try db.deleteMeeting(id(op))
+            case "enrollVoiceprint":   // 我的声音（design §56.1）：人物页的「我」（§60.1）
+                _ = try db.enrollVoiceprint(name: op["name"] as? String ?? "", embedding: (op["embedding"] as? [Double] ?? []).map { Float($0) })
+            case "peopleOverview":   // 人物页（design §60.1）：侧栏的人物列表
+                w.json(file!, try db.peopleOverview().map {
+                    ["id": $0.id, "name": $0.name, "meetings": $0.meetingCount, "last": $0.lastMeetingDate ?? NSNull(), "me": $0.isMe] as Object
+                })
+            case "personMeetings":   // 每个人出现过的会议、说了多久
+                var result: Object = [:]
+                for person in try db.peopleOverview() {
+                    result[person.name] = try db.personMeetings(person.id).map {
+                        ["meetingId": $0.id, "date": $0.meeting.meetingDate, "title": $0.meeting.displayTitle, "seconds": $0.seconds] as Object
+                    }
+                }
+                w.json(file!, result)
+            case "personActionItems":   // 负责人是这个名字的待办（R85.3）
+                var result: Object = [:]
+                for name in op["names"] as? [String] ?? [] {
+                    result[name] = try db.personActionItems(name).map {
+                        ["meetingId": $0.meeting.id ?? 0, "date": $0.meeting.meetingDate, "title": $0.meeting.displayTitle, "index": $0.index,
+                         "owner": $0.item.owner, "task": $0.item.task, "due": $0.item.due, "time": $0.item.time] as Object
+                    }
+                }
+                w.json(file!, result)
             default:
                 throw LLMError.badOutput("unknown op \(op["op"] ?? "")")
             }
+        }
+    }
+
+    /// 颜色在浅色、深色模式下的 sRGB（"3F5BA9"）：头像的釉色（design §58.1）
+    private static func hexes(_ color: Color) -> [String] {
+        let ns = NSColor(color)
+        return [NSAppearance.Name.aqua, .darkAqua].map { name in
+            var hex = ""
+            NSAppearance(named: name)?.performAsCurrentDrawingAppearance {
+                guard let c = ns.usingColorSpace(.sRGB) else { return }
+                hex = String(format: "%02X%02X%02X", Int((c.redComponent * 255).rounded()), Int((c.greenComponent * 255).rounded()),
+                             Int((c.blueComponent * 255).rounded()))
+            }
+            return hex
         }
     }
 

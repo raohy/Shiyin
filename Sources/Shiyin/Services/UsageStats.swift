@@ -14,6 +14,8 @@ final class UsageStats: @unchecked Sendable {
         var engines = ["breeze": 0, "builtin": 0, "whisperJa": 0, "qwen": 0, "server": 0]
         var meetingLanguages = ["zh": 0, "en": 0, "ja": 0]
         var diarizationRuns = 0
+        /// 其中用 Nemotron-3 分的（R87.4）
+        var diarizationNemotron = 0
         var summarizer = ["claudeCode": 0, "codex": 0, "api": 0, "local": 0, "enterprise": 0]
         var questionsAsked = 0
         /// 待确认送出的题数（R41.7、§31.3）：回答（打字或「不是」）、确认（「是」）、略过
@@ -23,6 +25,8 @@ final class UsageStats: @unchecked Sendable {
         var summarizeErrors = Counters.summarizeErrorKinds.reduce(into: [String: Int]()) { $0[$1] = 0 }
         var summarizeErrorProviders = ["claudeCode": 0, "codex": 0, "api": 0, "local": 0, "enterprise": 0]
         var summarizeDraftErrors = 0
+        /// 「其他」是哪一种（R86、§61.1）：FailureCause 的键 → 次数
+        var summarizeOther: [String: Int] = [:]
 
         static let summarizeErrorKinds = ["notInstalled", "notLoggedIn", "missingKey", "notConfigured", "keyRejected",
                                           "limited", "timeout", "unreachable", "badOutput", "other"]
@@ -42,6 +46,7 @@ final class UsageStats: @unchecked Sendable {
             engines = try c.decodeIfPresent([String: Int].self, forKey: .engines) ?? base.engines
             meetingLanguages = try c.decodeIfPresent([String: Int].self, forKey: .meetingLanguages) ?? base.meetingLanguages
             diarizationRuns = try c.decodeIfPresent(Int.self, forKey: .diarizationRuns) ?? 0
+            diarizationNemotron = try c.decodeIfPresent(Int.self, forKey: .diarizationNemotron) ?? 0
             summarizer = try c.decodeIfPresent([String: Int].self, forKey: .summarizer) ?? base.summarizer
             questionsAsked = try c.decodeIfPresent(Int.self, forKey: .questionsAsked) ?? 0
             review = try c.decodeIfPresent([String: Int].self, forKey: .review) ?? base.review
@@ -49,6 +54,7 @@ final class UsageStats: @unchecked Sendable {
             summarizeErrors = try c.decodeIfPresent([String: Int].self, forKey: .summarizeErrors) ?? base.summarizeErrors
             summarizeErrorProviders = try c.decodeIfPresent([String: Int].self, forKey: .summarizeErrorProviders) ?? base.summarizeErrorProviders
             summarizeDraftErrors = try c.decodeIfPresent(Int.self, forKey: .summarizeDraftErrors) ?? 0
+            summarizeOther = try c.decodeIfPresent([String: Int].self, forKey: .summarizeOther) ?? [:]
         }
     }
 
@@ -133,6 +139,11 @@ final class UsageStats: @unchecked Sendable {
         add { $0.diarizationRuns += 1 }
     }
 
+    /// 说话者识别用了 Nemotron-3（R87.4）：转录、重新识别各算一次，跟 diarizationRuns 一起看
+    func diarizedWithNemotron() {
+        add { $0.diarizationNemotron += 1 }
+    }
+
     /// 整理（含草稿、修正）成功。只记整理工具的种类，不记网址、模型
     @MainActor
     func summarized(with provider: LLMProvider) {
@@ -150,6 +161,7 @@ final class UsageStats: @unchecked Sendable {
             $0.summarizeErrors[kind, default: 0] += 1
             if let providerKey { $0.summarizeErrorProviders[providerKey, default: 0] += 1 }
             if draft { $0.summarizeDraftErrors += 1 }
+            if kind == "other", let cause = Self.otherCause(error) { $0.summarizeOther[cause, default: 0] += 1 }
         }
     }
 
@@ -186,6 +198,12 @@ final class UsageStats: @unchecked Sendable {
         if case SubprocessError.timeout = error { return "timeout" }
         if (error as? URLError)?.code == .timedOut { return "timeout" }
         return "other"
+    }
+
+    /// 「其他」的种类（R86）；不是 LLMError.failed 或种类不明时是 nil
+    static func otherCause(_ error: Error) -> String? {
+        guard case .failed(_, let cause)? = error as? LLMError, cause != .unknown else { return nil }
+        return cause.rawValue
     }
 
     func asked() {
@@ -335,6 +353,8 @@ final class UsageStats: @unchecked Sendable {
         var summarize: [String: Int]
         var summarizeProvider: [String: Int]
         var summarizeDraft: Int
+        /// 「其他」是哪一种（R86）：只有大于 0 的
+        var summarizeOther: [String: Int]
     }
 
     struct Usage: Encodable {
@@ -344,6 +364,8 @@ final class UsageStats: @unchecked Sendable {
         var engines: [String: Int]
         var meetingLanguages: [String: Int]
         var diarizationRuns: Int
+        /// 2026-11-15 加（R87.4）：旧后台没有这一栏就忽略
+        var diarizationNemotron: Int
         var summarizer: [String: Int]
         var questionsAsked: Int
         var review: [String: Int]
@@ -358,10 +380,11 @@ final class UsageStats: @unchecked Sendable {
                          meetingsImported: c.meetingsImported, importedSeconds: c.importedSeconds,
                          transcribedSeconds: c.transcribedSeconds, transcribeWallSeconds: c.transcribeWallSeconds,
                          engines: c.engines, meetingLanguages: c.meetingLanguages, diarizationRuns: c.diarizationRuns,
+                         diarizationNemotron: c.diarizationNemotron,
                          summarizer: c.summarizer, questionsAsked: c.questionsAsked, review: c.review),
             errors: c.errors,
             errorDetail: ErrorDetail(summarize: c.summarizeErrors, summarizeProvider: c.summarizeErrorProviders,
-                                     summarizeDraft: c.summarizeDraftErrors))
+                                     summarizeDraft: c.summarizeDraftErrors, summarizeOther: c.summarizeOther.filter { $0.value > 0 }))
     }
 
     static func encode(_ payload: Payload, pretty: Bool) -> Data {

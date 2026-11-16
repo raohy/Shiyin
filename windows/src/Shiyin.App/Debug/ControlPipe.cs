@@ -70,10 +70,14 @@ public static class ControlPipe
             case "tools" when args.Length > 1 && args[1] == "refresh": host.Locator.ClearCache(); return Ok;
             case "select" when args.Length > 1 && long.TryParse(args[1], out var id): main?.Reveal(id); return Ok;
             // tab <summary|transcript|ask>；舊名稱當別名：topics → 紀錄、review → 紀錄並展開待確認、notes → 逐字稿並展開我的筆記（R44.1）
-            // notesview list|mindmap：紀錄分頁切換成條列或心智圖（M§42.5；寫進測試家目錄的 settings.json）
+            // notesview list|mindmap|people：紀錄分頁切換成條列、心智圖或人物（M§42.5、M§66；寫進測試家目錄的 settings.json）
             case "notesview" when args.Length > 1:
-                host.Settings.Set(AppSettings.NotesViewKey, args[1].Equals("mindmap", StringComparison.OrdinalIgnoreCase) ? "mindMap" : "list");
+                host.Settings.Set(AppSettings.NotesViewKey, args[1].ToLowerInvariant() switch { "mindmap" => "mindMap", "people" => "people", _ => "list" });
                 main?.Refresh();
+                return Ok;
+            // peoplenotes <會議 id>：等於按「人物」的「產生每個人的重點」（M§66、design-windows §11.25）
+            case "peoplenotes" when args.Length > 1 && long.TryParse(args[1], out var peopleMeeting):
+                host.Controller.GeneratePeopleNotes(peopleMeeting);
                 return Ok;
             // seek <秒> [play]、toggle：播放（同 Mac）
             case "seek" when args.Length > 1 && double.TryParse(args[1], System.Globalization.CultureInfo.InvariantCulture, out var seekTo):
@@ -82,6 +86,13 @@ public static class ControlPipe
             case "toggle": host.Player.Toggle(); return Ok;
             case "tab" when args.Length > 1 && DetailTabs.Resolve(args[1]) is { } resolved:
                 main?.State.OpenTab(resolved.Tab, resolved.ExpandReview, resolved.ExpandNotes);
+                return Ok;
+            // 人物頁（M§60.2、design-windows §11.22）：sidebar people|meetings（側欄的「會議｜人物」）；person <人的 id>（切到人物、選這個人）
+            case "sidebar" when args.Length > 1 && main is not null:
+                main.State.SetSidebar(args[1] == "people" ? SidebarMode.People : SidebarMode.Meetings);
+                return Ok;
+            case "person" when args.Length > 1 && long.TryParse(args[1], out var personId) && main is not null:
+                main.State.SelectPerson(personId);
                 return Ok;
             case "closewindow" when args.Length > 1:
                 if (args[1] == "main") main?.AppWindow.Hide();
@@ -100,7 +111,7 @@ public static class ControlPipe
             case "quit": _ = app.Quit(confirmed: true); return Ok;
             // openlink <shiyin:…>：等於點了這個網址（AI 工具給的會議連結 shiyin://open?meeting=…&t=…，M§44.5）
             case "openlink" when args.Length > 1: { var link = args[1]; host.Post(() => App.Current.OpenLink(link)); } return Ok;
-            // 待確認就地回答（R41，M§31.2）：reviewexpand <summary|decisions|actionItems|openQuestions|topic|custom> <位置> [第二個位置]（- 收合）；
+            // 待確認就地回答（R41，M§31.2）：reviewexpand <summary|decisions|actionItems|openQuestions|topic|custom|person> <位置> [第二個位置]（- 收合）；
             // reviewsubmit（送目前的草稿）；reviewskipall（全部略過）；review <答案 JSON：{"0":"答案"}> <略過的題號，逗號分隔>（直接送 SubmitReview）
             case "reviewexpand" when args.Length > 1 && main is not null:
             {
@@ -109,7 +120,8 @@ public static class ControlPipe
                 main.ReviewDraft.Expanded = args[1] switch
                 {
                     "summary" => NoteItemRef.Summary(a), "decisions" => NoteItemRef.Decisions(a), "actionItems" => NoteItemRef.ActionItems(a),
-                    "openQuestions" => NoteItemRef.OpenQuestions(a), "topic" => NoteItemRef.TopicPoint(a, b), "custom" => NoteItemRef.Custom(a, b), _ => null,
+                    "openQuestions" => NoteItemRef.OpenQuestions(a), "topic" => NoteItemRef.TopicPoint(a, b), "custom" => NoteItemRef.Custom(a, b),
+                    "person" => NoteItemRef.Person(a, b), _ => null,
                 };
                 main.Refresh();
                 return Ok;
@@ -124,12 +136,21 @@ public static class ControlPipe
                     NoteItemRef? r = args[1] switch
                     {
                         "summary" => NoteItemRef.Summary(a), "decisions" => NoteItemRef.Decisions(a), "actionItems" => NoteItemRef.ActionItems(a),
-                        "openQuestions" => NoteItemRef.OpenQuestions(a), "topic" => NoteItemRef.TopicPoint(a, b), "custom" => NoteItemRef.Custom(a, b), _ => null,
+                        "openQuestions" => NoteItemRef.OpenQuestions(a), "topic" => NoteItemRef.TopicPoint(a, b), "custom" => NoteItemRef.Custom(a, b),
+                        "person" => NoteItemRef.Person(a, b), _ => null,
                     };
                     only = r is { } rr && submitDetail.ReviewLinks.TryGetValue(rr, out var list) ? list.ToHashSet() : new HashSet<int>();
                 }
                 main.ReviewDraft.Submit(only);
                 main.Refresh();
+                return Ok;
+            }
+            // editnotes <會議 id> <會議紀錄 JSON 或 JSON 檔的路徑>：存成新的一版，同按「完成」（同 Mac 的 editnotes；design-windows §11.25）
+            case "editnotes" when args.Length > 2 && long.TryParse(args[1], out var notesId):
+            {
+                var json = File.Exists(args[2]) ? File.ReadAllText(args[2]) : args[2];
+                if (MeetingNotes.Decode(json) is not { } edited) return new JsonObject { ["error"] = "not notes JSON" };
+                host.Controller.SaveEditedNotes(edited, notesId);
                 return Ok;
             }
             case "reviewskipall" when main?.State.Detail is { } skipDetail:
@@ -146,8 +167,9 @@ public static class ControlPipe
             }
             case "record-sim" when args.Length > 1:
                 var speed = args.Length > 2 && double.TryParse(args[2], out var s) ? s : 1;
-                var both = args.Length > 3 && args[3] == "1";
-                return new JsonObject { ["meetingId"] = host.Controller.StartSimulatedRecording(args[1], speed, both, main?.State.CurrentFolder ?? "") };
+                // 第三個參數：1 是雙聲道，2 是雙聲道、電腦聲音全是 0（design-windows §11.18）
+                var both = args.Length > 3 && args[3] is "1" or "2";
+                return new JsonObject { ["meetingId"] = host.Controller.StartSimulatedRecording(args[1], speed, both, main?.State.CurrentFolder ?? "", args.Length > 3 && args[3] == "2") };
             case "recordstop": host.Recorder.Stop(); return Ok;
             case "recordpause": if (host.Recorder.IsPaused) host.Recorder.Resume(); else host.Recorder.Pause(); return Ok;
             case "recordstall" when args.Length > 1 && int.TryParse(args[1], out var channel):
@@ -157,6 +179,19 @@ public static class ControlPipe
             case "recordlang" when args.Length > 1 && MeetingLanguages.Parse(args[1]) is { } language: host.Recorder.SwitchLanguage(language); return Ok;
             // 麥克風（R58、M§38.7）：fakemic <名稱> <bluetooth 0|1> [內建的名稱]：假的麥克風（只在記憶體，第一支當成系統預設）；fakemic off 清掉。
             // 模擬錄音（record-sim）的 micDevice 照設定從這裡找，測得到選單、提示列、通知、換了之後錄音不中斷
+            // enrollvoice <音檔> <名字>：用音檔代替麥克風錄「我的聲音」（design-windows §11.20），回傳錯誤訊息（成功是空的）
+            case "enrollvoice" when args.Length > 2:
+            {
+                var samples = host.Decoder.Decode(args[1]);
+                var error = host.Controller.EnrollVoice(args[2], samples).GetAwaiter().GetResult();
+                return new JsonObject { ["error"] = error ?? "" };
+            }
+            case "enrolldelete": host.Controller.DeleteEnrollment(); return Ok;
+            // playingapp <名稱> <meeting|browser|other> <裝置> <1=在預設裝置上> <預設裝置的名稱>｜playingapp off：假的正在出聲的 app（design-windows §11.18）
+            case "playingapp" when args.Length > 1:
+                host.FakePlayingApps = args[1] == "off" ? null
+                    : args.Length > 5 ? [new Services.Capture.Recorder.PlayingApp(args[1], args[2], args[3], args[4] == "1", args[5])] : [];
+                return Ok;
             case "fakemic" when args.Length > 1:
                 if (args[1] == "off") host.FakeMicrophones = [];
                 else
@@ -224,6 +259,33 @@ public static class ControlPipe
                 return Ok;
             case "splitcaret" when args.Length > 1 && int.TryParse(args[1], out var caret): Dialogs.SplitBox?.Select(caret, 0); return Ok;
             case "undospeaker" when main?.State.Selection is long undoMeeting: host.Controller.UndoSpeakerEdit(undoMeeting); return Ok;
+            // 多選（R88、M§62、design-windows §11.23）：selectmany <id,id,…>（等於 Ctrl 點選）；trashmany、restoremany、purgemany <id,id,…>（不經過確認）；
+            // showtrash 0|1；confirmemptytrash（打開確認對話框）；emptytrash（不經過確認）
+            case "selectmany" when args.Length > 1 && main is not null: main.State.SetListSelection(Ids(args[1])); return Ok;
+            case "trashmany" when args.Length > 1: host.Controller.MoveToTrash(Ids(args[1])); return Ok;
+            case "restoremany" when args.Length > 1: host.Controller.Restore(Ids(args[1])); return Ok;
+            case "purgemany" when args.Length > 1: host.Controller.DeletePermanently(Ids(args[1])); return Ok;
+            case "showtrash" when main is not null: main.State.ShowTrashList(args.Length > 1 && args[1] == "1"); return Ok;
+            case "confirmemptytrash" when main is not null: _ = main.ConfirmEmptyTrash(); return Ok;
+            case "emptytrash": host.Controller.EmptyTrash(); return Ok;
+            // 刪除一句（R89、M§63）：deletesegment <會議 id> <段落 id>；分割會議（R90、M§64）：splitmeeting <會議 id> <段落 id>（不經過確認），
+            // splitconfirm <會議 id> <段落 id>（打開確認對話框，等於右鍵「從這裡分成兩場…」）
+            case "deletesegment" when args.Length > 2 && long.TryParse(args[1], out var deleteMeeting) && long.TryParse(args[2], out var deleteId):
+                main?.State.Reveal(deleteMeeting);
+                host.Controller.DeleteSegment(deleteMeeting, deleteId);
+                return Ok;
+            case "splitmeeting" when args.Length > 2 && long.TryParse(args[1], out var splitWhole) && long.TryParse(args[2], out var splitAt):
+                main?.State.Reveal(splitWhole);
+                _ = host.Controller.SplitMeeting(splitWhole, splitAt);
+                return Ok;
+            case "splitconfirm" when args.Length > 2 && main is not null && long.TryParse(args[1], out var confirmMeeting) && long.TryParse(args[2], out var confirmAt):
+            {
+                main.State.Reveal(confirmMeeting);
+                main.State.SetTab(DetailTab.Transcript);
+                if (main.State.Detail?.Segments.FirstOrDefault(s => s.Id == confirmAt) is not { } confirmSegment) return new JsonObject { ["error"] = "no such segment" };
+                _ = main.ConfirmSplitMeeting(confirmMeeting, confirmSegment);
+                return Ok;
+            }
             case "purge" when args.Length > 1 && long.TryParse(args[1], out var purge): host.Controller.DeletePermanently(purge); return Ok;
             // export <notes|transcript|audio|package> <格式> <路徑> [times 1/0] [speakers 1/0] [會議 id，預設目前選取的]：同 Mac 的 shiyinctl export。
             // 在 UI 執行緒上跑（PDF 要建 WebView2），所以不等它：失敗時寫 <路徑>.error（同 Mac）
@@ -315,6 +377,9 @@ public static class ControlPipe
             case "meetingapp" when args.Length > 2:
                 host.Detector.Simulated[args[1]] = args[2] == "on";
                 return Ok;
+            // 錄音島（design-windows §11.21、M§57.3）：island hover on|off（等於滑鼠移上去、移開）；meetingaction <later|mute|start|continue|stop>（按島上偵測會議的按鈕）
+            case "island" when args.Length > 2 && args[1] == "hover": app.Island?.SetHover(args[2] == "on"); return Ok;
+            case "meetingaction" when args.Length > 1: app.Island?.Perform(args[1]); return Ok;
             case "rediarize" when args.Length > 2 && long.TryParse(args[1], out var meeting):
                 host.Controller.Rediarize(meeting, int.TryParse(args[2], out var n) ? n : null);
                 return Ok;
@@ -334,6 +399,10 @@ public static class ControlPipe
     }
 
     static string? enterpriseError;
+
+    /// <summary>「1,3,4」這種逗號分隔的會議 id</summary>
+    static List<long> Ids(string text) =>
+        text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(s => long.TryParse(s, out var v) ? v : -1).Where(v => v >= 0).ToList();
 
     /// <summary>state 的 tools：執行檔、桌面版的名稱和啟動用的 id、子程序的 PATH</summary>
     static JsonObject? ToolState(ToolCommand? tool) => tool is null ? null : new JsonObject
@@ -360,9 +429,29 @@ public static class ControlPipe
             ["version"] = host.Version,
             ["home"] = host.Paths.Home,
             ["selection"] = main?.State.Selection,
+            // 多選、清空垃圾桶、分割會議（M§62、§64）：對話框開著時是要處理的那幾場、那一句
+            ["multiSelected"] = new JsonArray([.. (main?.State.MultiSelected ?? []).Select(x => (JsonNode)x)]),
+            ["showTrash"] = main?.State.ShowTrash,
+            ["trashCount"] = main?.State.Trash.Count,
+            ["confirmDelete"] = main?.DeleteTargets.Count > 0,
+            ["deleteTargets"] = new JsonArray([.. (main?.DeleteTargets ?? []).Select(x => (JsonNode)x)]),
+            ["confirmPurge"] = new JsonArray([.. (main?.PurgeTargets ?? []).Select(x => (JsonNode)x)]),
+            ["confirmEmptyTrash"] = main?.ConfirmingEmptyTrash,
+            ["splitMeetingRequest"] = main?.SplitMeetingRequest ?? -1,
+            ["splittingMeeting"] = host.Controller.SplittingMeeting ?? -1,
             ["tab"] = main?.State.Tab.ToString().ToLowerInvariant(),
             ["reviewExpanded"] = main?.State.ReviewExpanded,
             ["notesView"] = host.Settings.NotesView,
+            // 「人物」（M§66、design-windows §11.25）：選取中的會議每一張的名字、對到的說話者、說了幾秒和百分比、重點幾條、負責的待辦（原本的位置）
+            ["peopleCards"] = new JsonArray([.. (main?.State.Detail is { Notes: { } peopleNotes } peopleDetail ? peopleDetail.PeopleCards(peopleNotes) : [])
+                .Select(c => (JsonNode)new JsonObject
+                {
+                    ["index"] = c.Index, ["name"] = c.Person.Name, ["speaker"] = c.Speaker, ["seconds"] = c.Seconds, ["percent"] = c.Percent,
+                    ["points"] = c.Person.Points.Count, ["owned"] = new JsonArray([.. c.Owned.Select(o => (JsonNode)o.Index)]),
+                })]),
+            // 心智圖的縮放（R91、design-windows §11.24）：使用者選的倍數（null 是預設）、畫面上用的倍數（不含文字大小）
+            ["mindMapZoom"] = main?.MindMapZoom.Value,
+            ["mindMapScale"] = main?.MindMapZoom.Scale,
             // 播放（同 Mac 的 player）、播放條上的議題帶（M§43.3）：選取中的會議，長度同播放條
             ["player"] = new JsonObject
             {
@@ -405,11 +494,29 @@ public static class ControlPipe
                 ["expired"] = host.Enterprise.ExpiredMessage, ["error"] = enterpriseError,
                 ["glossary"] = new JsonArray([.. host.Enterprise.Glossary.Terms.Select(t => (JsonNode)t)]),
             },
+            // 錄音島（M§57.3）：mode 是 hidden／collapsed／hint／prompt／hover，frame 是實際像素
+            ["island"] = App.Current.Island is { } island ? new JsonObject
+            {
+                ["enabled"] = island.Enabled, ["visible"] = island.AppWindow.IsVisible, ["mode"] = island.Mode,
+                ["frame"] = new JsonArray(island.Frame.X, island.Frame.Y, island.Frame.W, island.Frame.H),
+                ["hintKey"] = island.HintKey ?? "", ["prompt"] = island.Prompt?.Message ?? "",
+                ["actions"] = new JsonArray([.. (island.Prompt?.Actions ?? []).Select(a => (JsonNode)a.Id)]),
+            } : null,
+            // 人物頁（M§60.2）
+            ["sidebarMode"] = main?.State.Sidebar == SidebarMode.People ? "people" : "meetings",
+            ["selectedPerson"] = main?.State.SelectedPerson ?? -1,
+            ["peopleOverview"] = new JsonArray([.. (main?.State.People ?? []).Select(p => (JsonNode)new JsonObject
+            {
+                ["id"] = p.Id, ["name"] = p.Name, ["meetings"] = p.MeetingCount, ["last"] = p.LastMeetingDate ?? "", ["me"] = p.IsMe,
+            })]),
+            // 我的聲音（design-windows §11.20）
+            ["selfPerson"] = host.Db.Enrollment() is { } me ? new JsonObject { ["id"] = me.PersonId, ["name"] = me.Name, ["createdAt"] = me.CreatedAt } : null,
             ["recorder"] = new JsonObject
             {
                 ["isRecording"] = r.IsRecording, ["isPaused"] = r.IsPaused, ["meetingId"] = r.MeetingId, ["elapsed"] = r.Elapsed, ["source"] = r.Source,
                 ["language"] = r.Language.Code(), ["liveLines"] = r.LiveLines.Count, ["volatile"] = r.VolatileText, ["liveStatus"] = r.LiveStatus,
                 ["deviceWarning"] = r.DeviceWarning, ["hint"] = r.Hint?.ToString(), ["systemSilent"] = r.SystemSilent,
+                ["hintText"] = r.Hint is { } shown ? r.HintText(shown) : null, ["systemCulprit"] = r.SystemCulprit?.Name,
                 // 正在收音的麥克風、藍牙耳機的提醒（R58、M§38.7）
                 ["micDevice"] = r.MicDevice is { } mic
                     ? new JsonObject { ["name"] = mic.Name, ["id"] = mic.Id, ["bluetooth"] = mic.IsBluetooth, ["builtIn"] = mic.IsBuiltIn } : null,

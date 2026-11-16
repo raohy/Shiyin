@@ -26,6 +26,9 @@ struct TranscriptTab: View {
     @State private var splitOffset: Int?
     @State private var splitTarget: Int?
     @FocusState private var searchFocused: Bool
+    /// 原文／精简（R96、design §70）
+    @AppStorage(AppSettings.transcriptViewKey) private var transcriptView = "original"
+    private var cleanMode: Bool { transcriptView == "clean" }
 
     init(detail: MeetingDetail, speakerFilter: Int? = nil) {
         self.detail = detail
@@ -33,8 +36,11 @@ struct TranscriptTab: View {
     }
 
     private var visibleSegments: [Segment] {
-        guard let speakerFilter else { return detail.segments }
-        return detail.segments.filter { $0.speaker == speakerFilter }
+        // 精简：整句都是赘字的那句不显示（R96.1）
+        let segments = cleanMode && !detail.cleanLines.isEmpty
+            ? detail.segments.filter { segment in segment.id.map { detail.cleanLines[$0] != "" } ?? true } : detail.segments
+        guard let speakerFilter else { return segments }
+        return segments.filter { $0.speaker == speakerFilter }
     }
 
     private var matches: [Int64] {
@@ -76,6 +82,9 @@ struct TranscriptTab: View {
                     .foregroundStyle(.secondary)
                     .padding(32)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                Spacer()
+            } else if cleanMode && detail.cleanLines.isEmpty {
+                cleanPlaceholder
                 Spacer()
             } else if snapshotMode {
                 VStack(alignment: .leading, spacing: 2) {
@@ -198,6 +207,16 @@ struct TranscriptTab: View {
                 .frame(width: 150)
                 .help("只看某一位说话者的内容")
             }
+            // 原文／精简（R96）
+            Picker("逐字稿", selection: $transcriptView) {
+                Text("原文").tag("original")
+                Text("精简").tag("clean")
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .disabled(detail.segments.isEmpty)
+            .help("精简：用整理工具去掉赘字、重复和改口的版本；播放、搜索、导出照旧用原文")
             Spacer()
             if detail.segments.contains(where: \.lowConfidence) {
                 Label("琥珀色是识别信心低的段落", systemImage: "circle.fill")
@@ -212,6 +231,32 @@ struct TranscriptTab: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
+    }
+
+    /// 还没有精简版（R96.2）：说明和「产生精简版」；产生中显示进度；上次失败写原因
+    @ViewBuilder private var cleanPlaceholder: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let progress = model.cleaningProgress(detail.meeting.id!) {
+                HStack(spacing: 10) {
+                    ProgressView().controlSize(.small)
+                    Text(progress.map { String(localized: "正在产生精简版 \(Int($0 * 100))%") } ?? String(localized: "正在产生精简版…"))
+                }
+            } else {
+                Text("精简版用整理工具去掉「嗯、呃、那个」这类赘字、重复的字词和说到一半改口的部分，不改意思、不摘要。每一句的时间和说话者不变。")
+                    .foregroundStyle(.secondary)
+                if let failure = detail.cleanFailure {
+                    Text(failure.isEmpty ? String(localized: "上次产生精简版失败。") : String(localized: "上次产生精简版失败：\(failure)"))
+                        .foregroundStyle(Color.signal)
+                }
+                Button(detail.cleanFailure == nil ? "产生精简版" : "再试一次", systemImage: "text.badge.minus") { model.generateCleanTranscript() }
+                    .disabled(model.detailStatus?.isActive == true)
+                    .help("会用整理工具的额度；长的会议要几分钟")
+            }
+        }
+        .contentFont()
+        .padding(32)
+        .frame(maxWidth: 760 * scale, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// 重新转录会用的模型（design §41.3）
@@ -353,14 +398,21 @@ struct TranscriptTab: View {
             TimeButton(time: TimeFormat.string(segment.start), seek: segment.start)
                 .frame(width: 58 * scale, alignment: .trailing)
             if let idx = segment.speaker {
-                Button(detail.speakerName(idx) ?? "") {
+                Button {
                     renameText = detail.speakerName(idx) ?? ""
                     if let id = segment.id { renaming = (idx, id) }
+                } label: {
+                    // 头像加名字（design §58.2、R83.2）
+                    HStack(spacing: 6) {
+                        PersonAvatar(name: detail.speakerName(idx) ?? "", color: Color.speaker(idx), isMe: idx == detail.selfIdx)
+                            .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 * scale }
+                        Text(detail.speakerName(idx) ?? "")
+                    }
                 }
                 .buttonStyle(.plain)
                 .contentFont(.callout, weight: .medium)
                 .foregroundStyle(Color.speaker(idx))
-                .frame(width: 72 * scale, alignment: .leading)
+                .frame(width: 96 * scale, alignment: .leading)
                 .lineLimit(1)
                 .help("点一下帮这位说话者改名")
                 .popover(isPresented: Binding(get: { renaming?.segment == segment.id && segment.id != nil },
@@ -396,9 +448,11 @@ struct TranscriptTab: View {
                 }
             } else {
                 // 每一段的校正建议（design §17.4）：待确认的标在文字上并列出，已接受的可以还原，已拒绝的不显示
-                let corrections = segment.id.flatMap { detail.correctionsBySegment[$0] } ?? []
+                // 精简（R96）：显示精简版的文字，不标校正建议（校正对的是原文）；改过的句子没有精简版，照原文
+                let clean = cleanMode ? segment.id.flatMap { detail.cleanLines[$0] } : nil
+                let corrections = clean == nil ? (segment.id.flatMap { detail.correctionsBySegment[$0] } ?? []) : []
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(highlighted(segment.text, corrections: corrections)).meetingText()
+                    Text(clean.map { AttributedString($0) } ?? highlighted(segment.text, corrections: corrections)).meetingText()
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -423,16 +477,23 @@ struct TranscriptTab: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(segment.text, forType: .string)
             }
-            // 改这句的说话者（design §24.3、R23.2）
-            if let id = segment.id, segment.kind == "final", !detail.speakers.isEmpty {
+            if let id = segment.id, segment.kind == "final" {
                 Divider()
-                Button("拆成两句…") { startSplit(id) }   // R70
-                Menu("这句是谁说的") { speakerChoices(for: [id], current: segment.speaker) }
-                let run = detail.speakerRun(around: id)
-                if run.count > 1 {
-                    Menu("这段连续的话是谁说的（\(run.count) 句）") { speakerChoices(for: run, current: segment.speaker) }
+                // 改这句的说话者（design §24.3、R23.2）
+                if !detail.speakers.isEmpty {
+                    Button("拆成两句…") { startSplit(id) }   // R70
+                    Menu("这句是谁说的") { speakerChoices(for: [id], current: segment.speaker) }
+                    let run = detail.speakerRun(around: id)
+                    if run.count > 1 {
+                        Menu("这段连续的话是谁说的（\(run.count) 句）") { speakerChoices(for: run, current: segment.speaker) }
+                    }
                 }
-                // 复原最近一次说话者的调整（R44.4，原本在「更多」）：有东西可复原才出现
+                // 分割会议（R90、design §64）：第一句之前没有东西，不能从第一句分
+                if detail.segments.first(where: { $0.kind == "final" })?.id != id {
+                    Button("从这里分成两场…") { model.splitMeetingRequest = id }
+                }
+                Button("删除这句", role: .destructive) { model.deleteSegment(id) }   // R89
+                // 复原最近一次说话者的调整、删除（R44.4、R89）：有东西可复原才出现
                 if let label = detail.speakerUndoLabel {
                     Button("复原：\(label)") { model.undoSpeakerEdit() }
                 }

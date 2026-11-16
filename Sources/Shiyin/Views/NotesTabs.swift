@@ -26,13 +26,35 @@ struct ReadingColumn<Content: View>: View {
     }
 }
 
-struct NotesSection<Content: View>: View {
+struct NotesSection<Content: View, Accessory: View>: View {
     let title: String
-    @ViewBuilder var content: Content
+    /// 标题右边的按钮（「待办」的「加到提醒事项」，design §52.2）
+    var accessory: Accessory
+    var content: Content
+
+    init(title: String, @ViewBuilder content: () -> Content) where Accessory == EmptyView {
+        self.title = title
+        self.accessory = EmptyView()
+        self.content = content()
+    }
+
+    init(title: String, @ViewBuilder accessory: () -> Accessory, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.accessory = accessory()
+        self.content = content()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title).contentTitleFont(18)
+            if Accessory.self == EmptyView.self {
+                Text(title).contentTitleFont(18)
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title).contentTitleFont(18)
+                    Spacer()
+                    accessory
+                }
+            }
             content
         }
     }
@@ -188,6 +210,8 @@ struct NotesPage: View {
     let detail: MeetingDetail
     @State private var editing: MeetingNotes?
     @State private var base: MeetingNotes?
+    /// 心智图的缩放（design §65）：换会议时这个 view 跟着换，回到默认；切回条列时清掉
+    @State private var mindMapZoom: Double?
 
     var body: some View {
         if let current = editing {
@@ -195,6 +219,12 @@ struct NotesPage: View {
                 .onDisappear { finish(true, automatically: true) }   // 切到别的标签页、别场会议：自动存，不丢掉打的字
         } else if let notes = detail.notes, !notes.isEmpty, notesView == "mindMap" {
             mindMapPage(notes)
+        } else if let notes = detail.notes, !notes.isEmpty, notesView == "people" {
+            // 人物（R92、design §66）：条列、心智图不变，依人整理的另外一页
+            ReadingColumn {
+                header(notes)
+                PeopleNotes(detail: detail, notes: notes)
+            }
         } else if let notes = detail.notes, !notes.isEmpty {
             ReadingColumn {
                 header(notes)
@@ -205,7 +235,18 @@ struct NotesPage: View {
                     NotesSection(title: String(localized: "决议")) { ItemList(items: notes.decisions, detail: detail) { .decisions($0) } }
                 }
                 if !notes.actionItems.isEmpty {
-                    NotesSection(title: String(localized: "待办")) { ActionItemsTable(items: notes.actionItems, detail: detail) { .actionItems($0) } }
+                    NotesSection(title: String(localized: "待办")) {
+                        // 加到提醒事项（design §52.2、R76.1）：垃圾桶里的会议不显示
+                        if detail.meeting.deletedAt == nil {
+                            Button("加到提醒事项", systemImage: "checklist") { model.addActionItemsToReminders() }
+                                .buttonStyle(.borderless)
+                                .font(.callout)
+                                .disabled(model.addingReminders)
+                                .help("把这场会议的待办加到「提醒事项」app 的「\(Reminders.listTitle)」列表，加过的不会重复加")
+                        }
+                    } content: {
+                        ActionItemsTable(items: notes.actionItems, detail: detail) { .actionItems($0) }
+                    }
                 }
                 if !notes.openQuestions.isEmpty {
                     NotesSection(title: String(localized: "未决问题")) { ItemList(items: notes.openQuestions, detail: detail) { .openQuestions($0) } }
@@ -270,7 +311,7 @@ struct NotesPage: View {
                     .padding(.bottom, 26)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 MindMapView(layout: layout, language: detail.meeting.meetingLanguage, availableWidth: width,
-                            onSeek: model.player.isLoaded ? { model.player.seek(to: $0) } : nil)
+                            onSeek: model.player.isLoaded ? { model.player.seek(to: $0) } : nil, zoom: $mindMapZoom)
             }
         }
         return Group {
@@ -282,6 +323,7 @@ struct NotesPage: View {
                 }
             }
         }
+        .onDisappear { mindMapZoom = nil }   // 切回条列、编辑、换标签页时回到默认（R91.3）
     }
 
     private func finish(_ save: Bool, automatically: Bool = false) {
@@ -331,8 +373,93 @@ struct ReviewBanner: View {
 }
 
 /// 右上角的「编辑」按钮；有上一版时旁边多一颗「复原上一版」（R44.4，原本在「更多」）；左边是「条列｜心智图」（R67）
+/// 人物（R92、design §66）：每个人一张：头像、名字、说了多久，重点（时间点、待确认的标记）、负责的待办。
+/// 这场的记录还没有每个人的重点时说明原因；有两位以上说话者时可以只补上这一段（其他段落不动）
+struct PeopleNotes: View {
+    @Environment(AppModel.self) private var model
+    let detail: MeetingDetail
+    let notes: MeetingNotes
+
+    var body: some View {
+        if notes.people.contains(where: { !$0.points.isEmpty }) {
+            let spoken = spokenSeconds
+            let total = spoken.values.reduce(0, +)
+            VStack(alignment: .leading, spacing: 30) {
+                ForEach(Array(notes.people.enumerated()), id: \.offset) { p, person in
+                    if !person.points.isEmpty { card(p, person, spoken: spoken, total: total) }
+                }
+            }
+            .padding(.top, 10)
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                if detail.speakers.count < 2 {
+                    Text("这场会议只有一位说话者（或没有识别说话者），没有依人物整理的重点。").foregroundStyle(.secondary)
+                } else {
+                    Text("这场的会议记录还没有每个人的重点。").foregroundStyle(.secondary)
+                    Button("产生每个人的重点", systemImage: "person.2") { model.generatePeopleNotes() }
+                        .disabled(model.detailStatus?.isActive == true)
+                        .help("用整理工具依说话者整理每个人的重点；摘要、决议、待办这些段落不会变")
+                }
+            }
+            .contentFont()
+            .padding(.top, 10)
+        }
+    }
+
+    private func card(_ p: Int, _ person: MeetingNotes.Person, spoken: [Int: Double], total: Double) -> some View {
+        let idx = speakerIdx(person.name)
+        let owned = notes.actionItems.enumerated().filter { owns($0.element.owner, person.name) }
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                PersonAvatar(name: person.name, color: idx.map(Color.speaker) ?? Color.person(person.name),
+                             size: 30, isMe: idx != nil && idx == detail.selfIdx)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(person.name).contentTitleFont(18)
+                    if let idx, let seconds = spoken[idx], total > 0 {
+                        Text("说了 \(TimeFormat.duration(Int(seconds.rounded())))（\(Int((seconds / total * 100).rounded()))%）")
+                            .contentFont(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            ItemList(items: person.points, detail: detail) { .person(p, $0) }
+            if !owned.isEmpty {
+                Text("负责的待办").contentFont(.callout).foregroundStyle(.secondary).padding(.top, 4)
+                ItemList(items: owned.map { MeetingNotes.Item(text: dueText($0.element), time: $0.element.time) }, detail: detail) {
+                    .actionItems(owned[$0].offset)
+                }
+            }
+        }
+    }
+
+    /// 每位说话者在正式逐字稿里说了几秒
+    private var spokenSeconds: [Int: Double] {
+        var seconds: [Int: Double] = [:]
+        for s in detail.segments where s.kind == "final" {
+            if let idx = s.speaker { seconds[idx, default: 0] += max(0, s.end - s.start) }
+        }
+        return seconds
+    }
+
+    /// 名字对到哪一位说话者（不分大小写、去头尾空白）；对不到是 nil，头像照名字算颜色（同人物页）
+    private func speakerIdx(_ name: String) -> Int? {
+        let target = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return detail.speakers.first { $0.value.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(target) == .orderedSame }?.key
+    }
+
+    /// 负责人跟名字一样或包含名字（不分大小写，同人物页的待办，R85.3）
+    private func owns(_ owner: String, _ name: String) -> Bool {
+        let target = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !target.isEmpty && owner.range(of: target, options: .caseInsensitive) != nil
+    }
+
+    private func dueText(_ item: MeetingNotes.ActionItem) -> String {
+        item.due.isEmpty ? item.task : String(localized: "\(item.task)（期限 \(item.due)）")
+    }
+}
+
 struct EditBar: View {
-    /// list／mindMap；nil 不显示切换
+    /// list／mindMap／people；nil 不显示切换
     var viewMode: Binding<String>? = nil
     /// 转录或整理中不能编辑：工作完成时会整份写回，手动改的会被盖掉
     var disabled = false
@@ -346,11 +473,12 @@ struct EditBar: View {
                 Picker("显示方式", selection: viewMode) {
                     Text("条列").tag("list")
                     Text("心智图").tag("mindMap")
+                    Text("人物").tag("people")
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .fixedSize()
-                .help("把会议记录切换成条列或心智图")
+                .help("把会议记录切换成条列、心智图或依人物整理")
             }
             Spacer()
             if let onUndo {
@@ -373,6 +501,7 @@ struct EditBar: View {
 
 struct ActionItemsTable: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.textScale) private var scale
     let items: [MeetingNotes.ActionItem]
     var detail: MeetingDetail? = nil
     var ref: (Int) -> NoteItemRef? = { _ in nil }
@@ -390,14 +519,28 @@ struct ActionItemsTable: View {
             ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                 let ref = ref(index)
                 GridRow {
-                    Text(item.owner.isEmpty ? String(localized: "未指定") : item.owner).meetingText()
-                        .foregroundStyle(item.owner.isEmpty ? Color.signal : Color.primary)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        // 负责人是这场的说话者时放他的头像（design §58.2、R83.2）
+                        if let idx = detail?.speakerIdx(named: item.owner) {
+                            PersonAvatar(name: item.owner, color: Color.speaker(idx), isMe: idx == detail?.selfIdx)
+                                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 * scale }
+                        }
+                        Text(item.owner.isEmpty ? String(localized: "未指定") : item.owner).meetingText()
+                            .foregroundStyle(item.owner.isEmpty ? Color.signal : Color.primary)
+                    }
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(item.task).meetingText()
                             .textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
                         if !item.time.isEmpty { TimeButton(time: item.time).font(.caption.monospacedDigit()) }
                         if let ref, let detail { ReviewMarker(ref: ref, count: detail.reviewCount(ref)) }
+                        // 已经加到提醒事项的（design §52.2、R76.4）：完成了打勾
+                        if detail != nil, let done = model.reminderStatus[Reminders.key(item.task)] {
+                            Image(systemName: done ? "checkmark.circle.fill" : "checklist")
+                                .foregroundStyle(done ? Color.celadon : Color.secondary)
+                                .contentFont(.caption)
+                                .help(done ? "已在提醒事项里完成" : "已加到提醒事项")
+                        }
                     }
                     .gridColumnAlignment(.leading)
                     Text(item.due.isEmpty ? "—" : item.due)
@@ -430,6 +573,14 @@ struct NotesEditor: View {
     @Environment(\.textScale) private var scale
     @Binding var notes: MeetingNotes
     let onFinish: (Bool) -> Void
+    /// 打开时有每个人的重点才显示那一段（删光了也留着，可以再添加）
+    @State private var showsPeople: Bool
+
+    init(notes: Binding<MeetingNotes>, onFinish: @escaping (Bool) -> Void) {
+        _notes = notes
+        self.onFinish = onFinish
+        _showsPeople = State(initialValue: !notes.wrappedValue.people.isEmpty)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -475,6 +626,27 @@ struct NotesEditor: View {
                     ForEach(notes.custom.indices, id: \.self) { i in
                         let section = $notes.custom.safe(i, fallback: .init(title: "", items: []))
                         EditorSection(title: section.wrappedValue.title) { ItemsEditor(items: section.items) }
+                    }
+                    // 每个人的重点（R92，「人物」显示的那一段）：有这一段时才出现，原本的编辑器不变；同议题，名字栏＋重点
+                    if showsPeople {
+                        EditorSection(title: String(localized: "每个人的重点")) {
+                            ForEach(notes.people.indices, id: \.self) { i in
+                                let person = $notes.people.safe(i, fallback: .init(name: "", points: []))
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        TextField("名字", text: person.name).contentTitleFont(16)
+                                        Button { if notes.people.indices.contains(i) { notes.people.remove(at: i) } } label: { Image(systemName: "trash") }
+                                            .buttonStyle(.borderless).help("删除这个人的重点")
+                                    }
+                                    ItemsEditor(items: person.points)
+                                }
+                            }
+                            Button("添加一个人", systemImage: "plus") {
+                                notes.people.append(.init(name: "", points: []))
+                            }
+                            .buttonStyle(.borderless)
+                            .contentFont(.callout)
+                        }
                     }
                     if !notes.reviewItems.isEmpty {
                         EditorSection(title: String(localized: "待确认")) {

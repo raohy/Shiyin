@@ -33,8 +33,8 @@ enum NotesPrompt {
         if documents { text += "\n" + DocumentPrompt.notesRules(language) }
         if let note = language.profile.transcriptNote?.notes { text += "\n\n" + note }
         if language.profile.tier == .general, let name = language.profile.outputName {
-            text += "\n\nOutput language: \(name). Every text value in the JSON (title, summary, decisions, action items, open questions, "
-                + "topics, custom sections, review questions) must be in \(name); keep the JSON keys and the time format as they are."
+            text += "\n\nOutput language: \(name). Every text value in the JSON (title, summary, key points by person, decisions, action items, "
+                + "open questions, topics, custom sections, review questions) must be in \(name); keep the JSON keys and the time format as they are."
         }
         return text
     }
@@ -45,7 +45,7 @@ enum NotesPrompt {
     规则：
     1. 只根据逐字稿与用户笔记撰写，不要补充没有提到的信息。
     2. 逐字稿来自语音识别，英文术语、人名、缩写常被听错（同一个词可能出现好几种写法）。请依上下文和词汇表推断正确写法，但凡是推断出来的专有名词、人名，一定要列进 reviewItems 让用户确认。
-    3. 每一条记录（summary、decisions、actionItems、openQuestions、topics 的 points、custom 的 items）都要填 time：该内容在逐字稿中出现的时间点，写成 mm:ss（例如 03:15，超过一小时写 1:03:15），不要加括号。综合多处的内容，填最主要的那一处。
+    3. 每一条记录（summary、people 的 points、decisions、actionItems、openQuestions、topics 的 points、custom 的 items）都要填 time：该内容在逐字稿中出现的时间点，写成 mm:ss（例如 03:15，超过一小时写 1:03:15），不要加括号。综合多处的内容，填最主要的那一处。
     4. 逐字稿每行标有说话者。actionItems 的 owner 只填明确提到的负责人，优先使用说话者的名字；不明确就留空字符串并列进 reviewItems。
     5. actionItems 的 due 依提示中的「会议日期」换算成 yyyy-MM-dd（例如「下周三」要依会议日期和星期几推算，星期几要算对）；没提到期限就留空字符串，提到但不明确就留空并列进 reviewItems。
     6. reviewItems 最多 8 题，相近的问题要合并；只问会影响记录正确性的地方：专有名词、人名、负责人、期限、方案内容。每题的 time 填相关段落的时间点。能用「是」或「不是」回答的题目（例如「负责人是小田切吗？」）写成是非题，yesNo 填 true；要用户说出答案的（例如「这个系统的正确名称是什么？」）yesNo 填 false。
@@ -54,6 +54,7 @@ enum NotesPrompt {
     9. topics 依议题分段，start 填该议题开始的时间点。
     10. title：提示中有「现有标题」就原样回传；没有就依内容取一个 20 字以内的标题。
     11. 时间点格式一律是 mm:ss，超过一小时用 h:mm:ss，与逐字稿相同。没有时间信息时填空字符串。
+    12. 模板要产生 people 时，依说话者整理每个人在会议中的主要意见、提议、报告和答应要做的事，每人 1～4 条；name 用逐字稿里的说话者名称，同一个人只列一次；只有一位说话者或逐字稿没有标说话者时给空数组。
     """
 
     static let systemEnglish = """
@@ -62,7 +63,7 @@ enum NotesPrompt {
     Rules:
     1. Write only from the transcript and the user's notes. Do not add information that was not mentioned.
     2. The transcript comes from speech recognition, so technical terms, names and abbreviations are often misheard (the same word may appear spelled several ways). Infer the correct spelling from context and the glossary, but every proper noun or name you inferred must be listed in reviewItems for the user to confirm.
-    3. Every item (summary, decisions, actionItems, openQuestions, the points in topics, the items in custom) must have a time: when that content appears in the transcript, written as mm:ss (for example 03:15; over an hour, 1:03:15), without brackets. If it combines several places, use the main one.
+    3. Every item (summary, the points in people, decisions, actionItems, openQuestions, the points in topics, the items in custom) must have a time: when that content appears in the transcript, written as mm:ss (for example 03:15; over an hour, 1:03:15), without brackets. If it combines several places, use the main one.
     4. Each transcript line is labeled with a speaker. For actionItems, owner is only someone explicitly named as responsible, preferring the speaker's name; if it is unclear, leave an empty string and add it to reviewItems.
     5. For actionItems, convert due to yyyy-MM-dd based on the "Meeting date" in the prompt (for example, "next Wednesday" must be worked out from the meeting date and its weekday, and the weekday must be right). If no deadline is mentioned, leave an empty string; if one is mentioned but unclear, leave it empty and add it to reviewItems.
     6. At most 8 reviewItems; merge similar questions. Only ask about things that affect accuracy: proper nouns, names, owners, deadlines, details of a proposal. Each item's time is the related part of the transcript. If a question can be answered with yes or no (for example, "Is Odagiri the owner?"), write it as a yes/no question and set yesNo to true; if the user has to supply the answer (for example, "What is the correct name of this system?"), set yesNo to false.
@@ -71,6 +72,7 @@ enum NotesPrompt {
     9. Split topics by subject; start is the time the topic begins.
     10. title: if the prompt gives an "Existing title", return it unchanged; otherwise write a title of at most 10 words.
     11. Times are always mm:ss, or h:mm:ss over an hour, the same as the transcript. Use an empty string when there is no time information.
+    12. When the template asks for people, group key points by speaker: each person's main views, proposals, updates and commitments in the meeting, 1 to 4 points each. name is the speaker's name as written in the transcript, and each person appears once. If there is only one speaker or the transcript has no speaker labels, give an empty array.
     """
 
     static let systemJapanese = """
@@ -79,7 +81,7 @@ enum NotesPrompt {
     ルール：
     1. 文字起こしとユーザーのメモだけをもとに書き、言及されていない情報を補わないこと。
     2. 文字起こしは音声認識によるもので、専門用語、人名、略語がよく聞き間違えられている（同じ語が何通りもの表記で出てくることがある）。文脈と用語集から正しい表記を推測すること。ただし、推測した固有名詞や人名は必ず reviewItems に入れ、ユーザーに確認してもらうこと。
-    3. すべての項目（summary、decisions、actionItems、openQuestions、topics の points、custom の items）に time を入れること。その内容が文字起こしに出てくる時刻を mm:ss（例：03:15。1 時間を超える場合は 1:03:15）で書き、括弧は付けない。複数の箇所をまとめた内容は、主な箇所の時刻にする。
+    3. すべての項目（summary、people の points、decisions、actionItems、openQuestions、topics の points、custom の items）に time を入れること。その内容が文字起こしに出てくる時刻を mm:ss（例：03:15。1 時間を超える場合は 1:03:15）で書き、括弧は付けない。複数の箇所をまとめた内容は、主な箇所の時刻にする。
     4. 文字起こしの各行には話者が付いている。actionItems の owner は担当者として明示された人だけを入れ、話者の名前を優先する。はっきりしない場合は空文字列にして reviewItems に入れる。
     5. actionItems の due は、プロンプトの「会議日」をもとに yyyy-MM-dd に換算する（例：「来週の水曜」は会議日とその曜日から計算し、曜日を正しく数えること）。期限の言及がなければ空文字列、言及があっても曖昧なら空文字列にして reviewItems に入れる。
     6. reviewItems は最大 8 問。似た質問はまとめる。記録の正確さに関わる点（固有名詞、人名、担当者、期限、案の内容）だけを質問する。各問の time は関連する箇所の時刻。「はい」か「いいえ」で答えられる質問（例：「担当者は小田切さんですか？」）はその形で書いて yesNo を true にする。答えを書いてもらう必要がある質問（例：「このシステムの正しい名前は？」）は yesNo を false にする。
@@ -89,6 +91,7 @@ enum NotesPrompt {
     10. title：プロンプトに「既存のタイトル」があればそのまま返す。なければ内容から 30 文字以内のタイトルを付ける。
     11. 時刻の形式は常に mm:ss、1 時間を超える場合は h:mm:ss で、文字起こしと同じにする。時刻の情報がない場合は空文字列にする。
     12. 文体は簡潔な常体（である調）か体言止めにする。
+    13. テンプレートで people が指定されている場合、話者ごとに、その人の主な意見、提案、報告、引き受けたことを 1～4 項目にまとめる。name は文字起こしの話者名をそのまま使い、同じ人は 1 回だけにする。話者が 1 人だけ、または文字起こしに話者が付いていない場合は空配列にする。
     """
 
     /// 提示词里的字段名称
@@ -107,7 +110,7 @@ enum NotesPrompt {
             reviseInstructions: """
 
             请依用户的回答修正会议记录后，回传完整的会议记录：
-            - 依回答修正所有相关内容（摘要、决议、待办、未决问题、议题、自订段落、标题都要一并检查），时间点维持不变。
+            - 依回答修正所有相关内容（摘要、每个人的重点、决议、待办、未决问题、议题、自订段落、标题都要一并检查），时间点维持不变。
             - 已回答的题目从 reviewItems 移除；目前会议记录里没被回答的题目原样保留。
             - 除非回答本身带出新的疑点，否则不要添加题目。
             """,
@@ -124,7 +127,7 @@ enum NotesPrompt {
             reviseInstructions: """
 
             Revise the meeting notes according to the user's answers and return the complete notes:
-            - Fix everything related to each answer (check the summary, decisions, action items, open questions, topics, custom sections and title), keeping the times unchanged.
+            - Fix everything related to each answer (check the summary, key points by person, decisions, action items, open questions, topics, custom sections and title), keeping the times unchanged.
             - Remove answered questions from reviewItems; keep unanswered questions from the current notes as they are.
             - Do not add new questions unless an answer raises a new doubt.
             """,
@@ -141,7 +144,7 @@ enum NotesPrompt {
             reviseInstructions: """
 
             ユーザーの回答にもとづいて議事録を修正し、議事録全体を返してください：
-            - 回答に関係する内容をすべて修正する（要約、決定事項、ToDo、未決事項、議題、カスタムセクション、タイトルをすべて確認する）。時刻は変えない。
+            - 回答に関係する内容をすべて修正する（要約、参加者ごとの要点、決定事項、ToDo、未決事項、議題、カスタムセクション、タイトルをすべて確認する）。時刻は変えない。
             - 回答済みの質問は reviewItems から削除し、現在の議事録にある未回答の質問はそのまま残す。
             - 回答そのものが新しい疑問を生まない限り、質問を追加しない。
             """,

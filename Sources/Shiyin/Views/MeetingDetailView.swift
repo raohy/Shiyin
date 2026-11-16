@@ -115,13 +115,22 @@ struct MeetingHeader: View {
                     .help("录音中很久没人说话，拾音自动停止了录音。要转录全部的话，用「更多 → 重新处理 → 重新转录」。")
             }
             if !detail.speakers.isEmpty {
-                HStack(spacing: 6) {
-                    ForEach(detail.speakers.keys.sorted(), id: \.self) { idx in
-                        if detail.speakerSources[idx] == "voiceprint" {
-                            AutoSpeakerName(idx: idx, name: detail.speakers[idx] ?? "", others: detail.speakerCandidates[idx] ?? [])
-                        } else {
-                            Text(detail.speakers[idx] ?? "").foregroundStyle(Color.speaker(idx))
+                // 与会者：头像加名字，最多 4 位，其他收成「+N」（design §59、R84.1）
+                let ids = detail.speakers.keys.sorted()
+                HStack(spacing: 10) {
+                    ForEach(ids.prefix(Self.visibleSpeakers), id: \.self) { idx in speakerChip(idx) }
+                    if ids.count > Self.visibleSpeakers {
+                        Menu {
+                            ForEach(ids.dropFirst(Self.visibleSpeakers), id: \.self) { idx in
+                                Button(detail.speakers[idx] ?? "") { model.tab = .transcript }
+                            }
+                        } label: {
+                            Text("+\(ids.count - Self.visibleSpeakers)")
                         }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                        .help("其他与会者")
                     }
                 }
             } else if !meeting.participantList.isEmpty {
@@ -133,61 +142,81 @@ struct MeetingHeader: View {
         .foregroundStyle(.secondary)
     }
 
+    /// 会议页上方最多显示几位与会者（design §59）
+    private static let visibleSpeakers = 4
+
+    /// 一位与会者：头像加名字。菜单按钮只画得出文字，头像放在菜单外面（CLAUDE.md）
+    @ViewBuilder
+    private func speakerChip(_ idx: Int) -> some View {
+        let name = detail.speakers[idx] ?? ""
+        HStack(spacing: 5) {
+            PersonAvatar(name: name, color: Color.speaker(idx), size: 20, isMe: idx == detail.selfIdx, scales: false)
+            if detail.speakerSources[idx] == "voiceprint" {
+                AutoSpeakerName(idx: idx, name: name, others: detail.speakerCandidates[idx] ?? [])
+            } else {
+                Text(name).foregroundStyle(Color.speaker(idx))
+            }
+        }
+    }
+
+    /// 「会议设置」：模板、会议语言、大约几个人放在一起（design §59、R84.2）；文件菜单照旧
     @ViewBuilder
     private func menus(_ meeting: Meeting) -> some View {
+        let template = model.templates.first { $0.id == meeting.templateId }?.displayName ?? String(localized: "一般会议")
+        let recordingThis = model.recorder.isRecording && model.recorder.meetingId == meeting.id
         Menu {
-            ForEach(model.templates) { template in
-                Button {
-                    model.setTemplate(template.id)
-                } label: {
-                    if template.id == meeting.templateId { Label(template.displayName, systemImage: "checkmark") }
-                    else { Text(template.displayName) }
-                }
-            }
-        } label: {
-            Label(model.templates.first { $0.id == meeting.templateId }?.displayName ?? String(localized: "一般会议"), systemImage: "doc.text")
-        }
-        .fixedSize()
-        .help("会议记录的模板。换了模板之后，从「更多 → 重新处理」选「刷新会议记录」就会照新模板整理")
-        // 会议语言（design §16.3）
-        Menu {
-            ForEach(MeetingLanguage.allCases) { language in
-                Button {
-                    model.setMeetingLanguage(language)
-                } label: {
-                    if language == meeting.meetingLanguage { Label(language.name, systemImage: "checkmark") }
-                    else { Text(language.name) }
-                }
-            }
-        } label: {
-            Label(meeting.meetingLanguage.name, systemImage: "globe")
-        }
-        .fixedSize()
-        .help("会议语言：决定转录和会议记录用的语言。改了之后，从「更多 → 重新处理」重新转录或刷新会议记录")
-        // 会议的参考文档（design §39.4）：垃圾桶里的会议不放
-        if meeting.deletedAt == nil { DocumentsMenu(detail: detail) }
-        // 录音中先填人数（design §26.2）：录完转录时用
-        if model.recorder.isRecording && model.recorder.meetingId == meeting.id {
-            Menu {
-                Button {
-                    model.setMinSpeakers(nil)
-                } label: {
-                    if meeting.minSpeakers == nil { Label("自动判断", systemImage: "checkmark") } else { Text("自动判断") }
-                }
-                ForEach(2...12, id: \.self) { n in
+            Section("模板") {
+                ForEach(model.templates) { item in
                     Button {
-                        model.setMinSpeakers(n)
+                        model.setTemplate(item.id)
                     } label: {
-                        if meeting.minSpeakers == n { Label("\(n) 人", systemImage: "checkmark") } else { Text("\(n) 人") }
+                        if item.id == meeting.templateId { Label(item.displayName, systemImage: "checkmark") }
+                        else { Text(item.displayName) }
                     }
                 }
-            } label: {
-                Label(meeting.minSpeakers.map { String(localized: "大约 \($0) 人") } ?? String(localized: "人数：自动判断"),
-                      systemImage: "person.2")
             }
-            .fixedSize()
-            .help("大约几个人：人多、吵杂或手机放在桌上录音时，先告诉拾音大约几个人，说话者会分得比较准")
+            // 会议语言（design §16.3）
+            Section("会议语言") {
+                ForEach(MeetingLanguage.allCases) { language in
+                    Button {
+                        model.setMeetingLanguage(language)
+                    } label: {
+                        if language == meeting.meetingLanguage { Label(language.name, systemImage: "checkmark") }
+                        else { Text(language.name) }
+                    }
+                }
+            }
+            // 录音中先填人数（design §26.2）：录完转录时用
+            if recordingThis {
+                Section("大约几个人") {
+                    Button {
+                        model.setMinSpeakers(nil)
+                    } label: {
+                        if meeting.minSpeakers == nil { Label("自动判断", systemImage: "checkmark") } else { Text("自动判断") }
+                    }
+                    ForEach(2...12, id: \.self) { n in
+                        Button {
+                            model.setMinSpeakers(n)
+                        } label: {
+                            if meeting.minSpeakers == n { Label("\(n) 人", systemImage: "checkmark") } else { Text("\(n) 人") }
+                        }
+                    }
+                }
+            }
+        } label: {
+            Label(recordingThis && meeting.minSpeakers != nil
+                  ? String(localized: "\(template)・\(meeting.meetingLanguage.name)・大約 \(meeting.minSpeakers ?? 0) 人")
+                  : String(localized: "\(template)・\(meeting.meetingLanguage.name)"),
+                  systemImage: "slider.horizontal.3")
         }
+        // 没有框：跟信息列同一层，不比标题抢眼（design §59）
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help(recordingThis
+              ? String(localized: "模板、会议语言、大约几个人。人多、吵杂或手机放在桌上录音时，先告诉拾音大约几个人，说话者会分得比较准")
+              : String(localized: "模板和会议语言。换了之后，从「更多 → 重新处理」重新转录或刷新会议记录"))
+        // 会议的参考文件（design §39.4）：垃圾桶里的会议不放
+        if meeting.deletedAt == nil { DocumentsMenu(detail: detail) }
     }
 }
 
@@ -390,24 +419,32 @@ struct StatusBanner: View {
 }
 
 /// 右上角的「导出」（R60、design §38.6）：按下打开导出对话框，箭头直接复制会议记录。
-/// 工具列的菜单创建一次就不更新，动作在按下时才看目前选中的会议（同「更多」）
+/// 按钮和箭头分成两个控制项，各自有辅助功能的名字（A11Y1：分割菜单的箭头在 VoiceOver 没有名字）。
+/// 工具列的菜单建立一次就不更新，动作在按下时才看目前选中的会议（同「更多」）
 struct ExportMenu: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Menu {
-            Button("复制会议记录：保留格式（贴到 Word、Notion、邮件）") { model.copyNotes(.rich) }
-            Button("复制会议记录：Markdown") { model.copyNotes(.markdown) }
-            Button("复制会议记录：纯文字（贴到 Slack、消息）") { model.copyNotes(.plain) }
-            Divider()
-            Button("复制心智图（图片）") { model.copyMindMap() }
-        } label: {
-            Label("导出", systemImage: "square.and.arrow.up")
-        } primaryAction: {
-            model.openExportSheet()
+        ControlGroup {
+            Button { model.openExportSheet() } label: {
+                Label("导出", systemImage: "square.and.arrow.up")
+            }
+            .labelStyle(.titleAndIcon)
+            .help("导出会议记录、逐字稿或录音（⌘E）；箭头可以直接复制会议记录")
+            Menu {
+                Button("复制会议记录：保留格式（贴到 Word、Notion、邮件）") { model.copyNotes(.rich) }
+                Button("复制会议记录：Markdown") { model.copyNotes(.markdown) }
+                Button("复制会议记录：纯文字（贴到 Slack、消息）") { model.copyNotes(.plain) }
+                Divider()
+                Button("复制心智图（图片）") { model.copyMindMap() }
+            } label: {
+                Label("复制", systemImage: "chevron.down")
+            }
+            .menuIndicator(.hidden)
+            .help("复制会议记录或心智图")
+            .accessibilityLabel(Text("复制"))
         }
-        .labelStyle(.titleAndIcon)
-        .help("导出会议记录、逐字稿或录音（⌘E）；箭头可以直接复制会议记录")
+        .controlGroupStyle(.navigation)
     }
 }
 
@@ -436,6 +473,8 @@ struct MoreMenu: View {
         } label: {
             Label("更多", systemImage: "ellipsis.circle")
         }
+        // 工具列的菜单只显示图标，辅助功能拿不到 Label 的文字，要另外给名字
+        .accessibilityLabel(Text("更多"))
         .help("更多动作")
     }
 }

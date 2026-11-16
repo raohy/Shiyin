@@ -7,8 +7,8 @@ struct TemplateDefinition: Codable, Hashable {
         var instruction: String
     }
 
-    /// 内置段落：summary、decisions、actionItems、openQuestions、topics
-    static let builtinSectionIDs = ["summary", "decisions", "actionItems", "openQuestions", "topics"]
+    /// 内置段落：summary、people（每个人的重点，R92）、decisions、actionItems、openQuestions、topics
+    static let builtinSectionIDs = ["summary", "people", "decisions", "actionItems", "openQuestions", "topics"]
 
     /// 段落名称：界面用界面语言，提示词用会议语言（design §16.5）
     /// prompt：提示词里用（一般语言不查字符串表，design §41.1）
@@ -16,6 +16,7 @@ struct TemplateDefinition: Codable, Hashable {
         let pick = prompt ? language.prompt : language.text
         switch id {
         case "summary": return pick("摘要", "Summary", "要約")
+        case "people": return pick("每个人的重点", "Key points by person", "参加者ごとの要点")
         case "decisions": return pick("决议", "Decisions", "決定事項")
         case "actionItems": return pick("待办", "Action items", "ToDo")
         case "openQuestions": return pick("未决问题", "Open questions", "未決事項")
@@ -55,8 +56,8 @@ struct TemplateDefinition: Codable, Hashable {
 enum BuiltinTemplates {
     static let all: [(id: String, name: String, definition: TemplateDefinition)] = [
         ("general", "一般会议", TemplateDefinition(
-            description: "周会、项目会议、讨论会：摘要、决议、待办、未决问题、议题",
-            sections: ["summary", "decisions", "actionItems", "openQuestions", "topics"], custom: [], instruction: "")),
+            description: "周会、项目会议、讨论会：摘要、每个人的重点、决议、待办、未决问题、议题",
+            sections: ["summary", "people", "decisions", "actionItems", "openQuestions", "topics"], custom: [], instruction: "")),
         ("one-on-one", "一对一", TemplateDefinition(
             description: "主管与成员的一对一会谈",
             sections: ["summary", "actionItems", "openQuestions"],
@@ -88,8 +89,8 @@ enum BuiltinTemplates {
     /// 英文版：英文会议整理时用，英文界面也显示这里的名称和说明
     static let english: [String: (name: String, definition: TemplateDefinition)] = [
         "general": ("General meeting", TemplateDefinition(
-            description: "Team meetings, project meetings, discussions: summary, decisions, action items, open questions, topics",
-            sections: ["summary", "decisions", "actionItems", "openQuestions", "topics"], custom: [], instruction: "")),
+            description: "Team meetings, project meetings, discussions: summary, key points by person, decisions, action items, open questions, topics",
+            sections: ["summary", "people", "decisions", "actionItems", "openQuestions", "topics"], custom: [], instruction: "")),
         "one-on-one": ("One-on-one", TemplateDefinition(
             description: "A one-on-one between a manager and a team member",
             sections: ["summary", "actionItems", "openQuestions"],
@@ -121,8 +122,8 @@ enum BuiltinTemplates {
     /// 日文版：日文会议整理时用（没有日文界面，名称不会显示）
     static let japanese: [String: TemplateDefinition] = [
         "general": TemplateDefinition(
-            description: "定例会議、プロジェクト会議、打ち合わせ：要約、決定事項、ToDo、未決事項、議題",
-            sections: ["summary", "decisions", "actionItems", "openQuestions", "topics"], custom: [], instruction: ""),
+            description: "定例会議、プロジェクト会議、打ち合わせ：要約、参加者ごとの要点、決定事項、ToDo、未決事項、議題",
+            sections: ["summary", "people", "decisions", "actionItems", "openQuestions", "topics"], custom: [], instruction: ""),
         "one-on-one": TemplateDefinition(
             description: "上司とメンバーの1on1",
             sections: ["summary", "actionItems", "openQuestions"],
@@ -182,5 +183,16 @@ extension TemplateRecord {
         if builtin, language.base == .en, let english = BuiltinTemplates.english[id] { return english.definition }
         if builtin, language.base == .ja, let japanese = BuiltinTemplates.japanese[id] { return japanese }
         return TemplateDefinition.decode(definition)
+    }
+}
+
+/// 添加词汇的字段一次粘贴好几个（R94.1）：用换行、逗号、顿号、分号分开，去头尾空白、拿掉空的和重复的（不分大小写，留第一个）
+enum GlossaryInput {
+    static func split(_ text: String) -> [String] {
+        let separators = CharacterSet(charactersIn: "\n\r,，、;；")
+        var seen = Set<String>()
+        return text.components(separatedBy: separators)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
     }
 }

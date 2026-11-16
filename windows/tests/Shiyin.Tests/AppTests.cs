@@ -96,6 +96,77 @@ public sealed class AppTests : IDisposable
 
     // MARK: 錄音存檔、復原
 
+    /// <summary>我的聲音（R80、M§56.1）：一份 enroll 聲紋就是「我」；比對照常帶入；30 份的上限不刪 enroll；重錄換掉、刪除只刪那份</summary>
+    [Fact]
+    public void EnrolledVoiceIsMe()
+    {
+        static float[] OneHot(int i) { var v = new float[40]; v[i] = 1; return v; }
+        Assert.Null(db.Enrollment());
+        db.EnrollVoiceprint("  小魏 ", OneHot(0));
+        Assert.Equal("小魏", db.Enrollment()?.Name);
+        Assert.NotNull(db.PeopleSummaries().Single().EnrolledAt);
+        // 新的會議裡就是我的聲音的說話者直接帶入
+        var first = db.InsertMeeting(new Meeting { SourceFilename = "a" }, null).Id!.Value;
+        db.SaveTranscript(first, [new Segment { MeetingId = first, End = 20, Text = "x", Speaker = 1 }], 1, 1,
+            new Dictionary<int, SpeakerVoice> { [1] = new(OneHot(0), 20, "mic") });
+        Assert.Equal(1, db.MatchVoiceprints(first));
+        Assert.Equal(("小魏", "voiceprint"), (db.Speakers(first).Single().Name, db.Speakers(first).Single().NameSource));
+        // 會議裡學到 31 份：只留最新的 30 份，enroll 不刪
+        for (var i = 1; i <= 31; i++)
+        {
+            var id = db.InsertMeeting(new Meeting { SourceFilename = $"m{i}" }, null).Id!.Value;
+            db.SaveTranscript(id, [new Segment { MeetingId = id, End = 20, Text = "x", Speaker = 1 }], 1, 1,
+                new Dictionary<int, SpeakerVoice> { [1] = new(OneHot(i), 20, "mic") });
+            db.LearnVoiceprint(id, 1, "小魏");
+        }
+        Assert.Equal(31, db.PeopleSummaries().Single(p => p.Name == "小魏").VoiceprintCount);
+        Assert.Equal("小魏", db.Enrollment()?.Name);
+        // 重錄成另一個名字：只剩一份 enroll，小魏留著（會議用到）
+        db.EnrollVoiceprint("小陳", OneHot(39));
+        Assert.Equal("小陳", db.Enrollment()?.Name);
+        Assert.Equal(30, db.PeopleSummaries().Single(p => p.Name == "小魏").VoiceprintCount);
+        // 刪除：enroll 沒了，只靠它存在的小陳拿掉，小魏照舊
+        db.DeleteEnrollment();
+        Assert.Null(db.Enrollment());
+        Assert.Equal(["小魏"], db.PeopleSummaries().Select(p => p.Name));
+    }
+
+    /// <summary>錄「我的聲音」（R80.3、M§56.2）：算有聲音的秒數、完全沒聲音的提示；取說話最多、≥ 8 秒的那一位的聲紋</summary>
+    [Fact]
+    public void VoiceEnrollmentCountsSpeech()
+    {
+        var source = new BurstSource();
+        var enrollment = new VoiceEnrollment(() => source);
+        enrollment.Start();
+        source.Send(12, 0.2f);   // 12 秒說話
+        source.Send(4, 0);       // 4 秒完全沒聲音
+        Assert.InRange(enrollment.VoicedSeconds, 11.9, 12.1);
+        Assert.InRange(enrollment.Seconds, 15.9, 16.1);
+        Assert.True(enrollment.CanFinish);
+        Assert.True(enrollment.MicSilent);
+        Assert.Equal(16 * 16000, enrollment.Stop().Length);
+        Assert.False(enrollment.Recording);
+
+        static Shiyin.Speakers.Diarizer.Output Output(Dictionary<int, double> seconds) =>
+            new([], seconds.Keys.ToDictionary(k => k, k => new float[] { k }), seconds, null, []);
+        Assert.Equal([2f], VoiceEnrollment.BestVoiceprint(Output(new() { [1] = 5, [2] = 9 })));
+        Assert.Null(VoiceEnrollment.BestVoiceprint(Output(new() { [1] = 5 })));
+    }
+
+    sealed class BurstSource : IAudioSource
+    {
+        public Action<float[]>? OnSamples { get; set; }
+        public Action? OnInterruption { get; set; }
+        public void Start() { }
+        public void Stop() { }
+        /// <summary>一次送 seconds 秒（每 0.1 秒一段），amplitude 0 是完全沒聲音</summary>
+        public void Send(double seconds, float amplitude)
+        {
+            for (var n = 0; n < (int)Math.Round(seconds * 10); n++)
+                OnSamples?.Invoke(Enumerable.Range(0, 1600).Select(i => amplitude * MathF.Sin(i * 0.07f)).ToArray());
+        }
+    }
+
     [Fact]
     public async Task RecordingIsSavedAndQueued()
     {
@@ -205,6 +276,78 @@ public sealed class AppTests : IDisposable
         Assert.Null(db.Meeting(id)!.DeletedAt);
         controller.DeletePermanently(id);
         Assert.Null(db.Meeting(id));
+    }
+
+    /// <summary>「人物」的「產生每個人的重點」（R92.4、M§66）：排 summarize，payload 只多 people；沒設整理工具時不排、說原因。草稿的 payload 跟以前一字不差</summary>
+    [Fact]
+    public void GeneratePeopleNotesQueuesPeopleOnlySummarize()
+    {
+        var settings = AppSettings.InMemory(new Dictionary<string, string> { ["llmProvider"] = "none" });
+        var controller = Controller(settings, out _);
+        var errors = new List<string>();
+        controller.Error += errors.Add;
+        var id = db.InsertMeeting(new Meeting { SourceFilename = "a" }, null).Id!.Value;
+        db.SaveTranscript(id, [
+            new Segment { MeetingId = id, Seq = 0, Start = 0, End = 2, Text = "一", Speaker = 1 },
+            new Segment { MeetingId = id, Seq = 1, Start = 2, End = 4, Text = "二", Speaker = 2 },
+        ], 4, 2);
+        db.SaveNotes(id, new MeetingNotes { Title = "週會", Summary = [new("決定省錢")] }, "anthropic", "整理", NotesSource.Generated);
+        controller.GeneratePeopleNotes(id);
+        Assert.Equal(["整理工具設定為「不整理」，請先到設定改成 Claude、Codex 或 API"], errors);
+        Assert.Null(db.LatestJob(id));
+        settings.Set(AppSettings.ProviderKey, "anthropic");
+        settings.HasKey = _ => false;
+        controller.GeneratePeopleNotes(id);
+        Assert.Equal(2, errors.Count);
+        Assert.Null(db.LatestJob(id));
+        settings.HasKey = _ => true;
+        controller.GeneratePeopleNotes(id);
+        var job = db.LatestJob(id)!;
+        Assert.Equal((JobKind.Summarize, JobStatus.Queued, """{"draft":false,"people":true}"""), (job.Kind, job.Status, job.Payload));
+        Assert.Equal(2, errors.Count);
+        Assert.Equal("""{"draft":true}""", JobRunner.Encode(new SummarizePayload(true)));
+        Assert.Equal("""{"draft":false}""", JobRunner.Encode(new SummarizePayload()));
+    }
+
+    /// <summary>
+    /// 「人物」的每一張（R92.2、M§66）：有重點的人才有；名字不分大小寫、去頭尾空白對說話者；說了幾秒、百分比只算正式逐字稿、
+    /// 對不到說話者時沒有；負責人跟名字一樣或包含名字（不分大小寫）的待辦和原本的位置
+    /// </summary>
+    [Fact]
+    public void PeopleCardsFollowSpeakersAndOwners()
+    {
+        var id = db.InsertMeeting(new Meeting { SourceFilename = "a" }, null).Id!.Value;
+        db.SaveTranscript(id, [
+            new Segment { MeetingId = id, Seq = 0, Start = 0, End = 30, Text = "一", Speaker = 1 },
+            new Segment { MeetingId = id, Seq = 1, Start = 30, End = 40, Text = "二", Speaker = 2 },
+            new Segment { MeetingId = id, Seq = 2, Start = 40, End = 100, Text = "三", Speaker = 1 },
+            new Segment { MeetingId = id, Seq = 3, Start = 100, End = 130, Text = "四", Speaker = 3 },
+            new Segment { MeetingId = id, Seq = 4, Start = 130, End = 140, Text = "沒有說話者" },
+        ], 140, 3);
+        db.RenameSpeaker(id, 1, "Amy");
+        db.RenameSpeaker(id, 2, "王小明");
+        db.SaveNotes(id, new MeetingNotes
+        {
+            Summary = [new("決定省錢")],
+            People = [
+                new("  amy ", [new("報告進度", "00:10")]),
+                new("說話者 3", []),
+                new("陳美玲", [new("提議延後")]),
+                new("王小明", [new("回報快取", "00:35"), new("負責部署")]),
+            ],
+            ActionItems = [new("王小明", "寄信", "2026-11-20", "00:36"), new("AMY、王小明", "訂會議室", ""), new("", "沒人負責", "")],
+        }, "anthropic", "整理", NotesSource.Generated);
+        var detail = MeetingDetail.Load(db, id)!;
+        Assert.Equal(new Dictionary<int, double> { [1] = 90, [2] = 10, [3] = 30 }, detail.SpokenSeconds());
+        var cards = detail.PeopleCards(detail.Notes!);
+        Assert.Equal([0, 2, 3], cards.Select(c => c.Index));
+        Assert.Equal([1, null, 2], cards.Select(c => c.Speaker));
+        // 90／130、沒對到、10／130
+        Assert.Equal([90, null, 10], cards.Select(c => c.Seconds));
+        Assert.Equal([69, null, 8], cards.Select(c => c.Percent));
+        Assert.Equal([[1], [], [0, 1]], cards.Select(c => c.Owned.Select(o => o.Index).ToArray()));
+        Assert.True(MeetingDetail.Owns("小明", "小明 "));
+        Assert.False(MeetingDetail.Owns("小明", " "));
     }
 
     [Fact]

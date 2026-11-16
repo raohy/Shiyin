@@ -11,6 +11,36 @@ enum CaptureFormat {
     static let mono = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false)!
 }
 
+/// 「录制系统音频」的权限（design §51.1、D161）：系统没有公开的查法，用私有的 TCCAccessPreflight
+/// （0 允许、1 拒绝、其他还没问过）。符号找不到（系统改了做法）时是 nil，不提示
+enum SystemAudioPermission: String {
+    case granted, denied, notDetermined
+
+    static func status() -> SystemAudioPermission? {
+        #if DEBUG
+        if let debugOverride { return debugOverride }
+        #endif
+        guard let preflight else { return nil }
+        switch preflight("kTCCServiceAudioCapture" as CFString, nil) {
+        case 0: return .granted
+        case 1: return .denied
+        default: return .notDetermined
+        }
+    }
+
+    #if DEBUG
+    /// -debugSystemAudioPermission、shiyinctl systempermission 盖掉查到的权限（design §51.1）
+    nonisolated(unsafe) static var debugOverride = UserDefaults.standard.string(forKey: "debugSystemAudioPermission").flatMap(SystemAudioPermission.init)
+    #endif
+
+    private static let preflight: (@convention(c) (CFString, CFDictionary?) -> Int32)? = {
+        guard let handle = dlopen("/System/Library/PrivateFrameworks/TCC.framework/Versions/A/TCC", RTLD_NOW),
+              let symbol = dlsym(handle, "TCCAccessPreflight") else { return nil }
+        // 回传的是 32 比特的枚举，读成更宽的类型会读到寄存器高位的垃圾
+        return unsafeBitCast(symbol, to: (@convention(c) (CFString, CFDictionary?) -> Int32).self)
+    }()
+}
+
 /// 音源：把收到的音频转成 16 kHz 单声道后交给 `onSamples`。callback 在音频线程上，不能做重的事。
 protocol AudioSource: AnyObject {
     var onSamples: (([Float]) -> Void)? { get set }
@@ -119,7 +149,10 @@ final class MicrophoneSource: MicrophoneInput {
                 }
                 engine.prepare()
                 try engine.start()
-                current = AudioDevices.device(id: input.auAudioUnit.deviceID)
+                // 用系统默认时，engine 收音的可能是它自己建的聚合设备（CADefaultDeviceAggregate-<pid>-0）：
+                // 名字、蓝牙的判断（R58.3）要看真的那支麦克风，也就是系统默认的输入（2026-11-15 真的录音时发现）
+                let device = AudioDevices.device(id: input.auAudioUnit.deviceID)
+                current = device?.isEngineAggregate == true ? AudioDevices.defaultInput() ?? device : device
             } catch {
                 failure = error
             }
@@ -295,7 +328,10 @@ final class FileSource: MicrophoneInput {
                 self.lock.withLock { self.position = end }
                 // 停住的声道照样往前走（时间在过），只是没有送出资料，跟真的设备停了一样
                 if !stalled.contains(0) { self.onSamples?(chunk) }
-                if !stalled.contains(1) { self.mirror?.onSamples?(chunk) }
+                if !stalled.contains(1), let mirror = self.mirror {
+                    // 电脑声音那一声道全是 0：模拟「录制系统音频」被拒绝（design §51.1）
+                    mirror.onSamples?(mirror.silent ? [Float](repeating: 0, count: chunk.count) : chunk)
+                }
                 try? await Task.sleep(for: .seconds(0.1 / speed))
             }
         }
@@ -321,6 +357,8 @@ final class FileSource: MicrophoneInput {
 /// 只负责接收 FileSource 转送的音频，自己不产生资料
 final class MirroredSource: AudioSource {
     var onSamples: (([Float]) -> Void)?
+    /// 送全是 0 的音频（record-sim 的第三个参数 2）
+    var silent = false
     var onInterruption: (() -> Void)?
     func start() throws {}
     func stop() {}
@@ -361,13 +399,15 @@ enum AudioDevices {
         /// 这台 Mac 本身的麦克风。耳机孔的输入连接方式也是内置，要用 data source 排除（2026-11-02：插着有线耳机时，
         /// 蓝牙提示的按钮变成「改用 外接麦克风」）
         var isBuiltIn: Bool { transport == kAudioDeviceTransportTypeBuiltIn && dataSource != AudioDevices.externalMicSource }
+        /// AVAudioEngine 用系统默认的设备时自己建的聚合设备，不是用户看得到、选得到的麦克风
+        var isEngineAggregate: Bool { uid.hasPrefix("CADefaultDeviceAggregate") }
     }
 
     /// 四字码 emic（外接麦克风）
     static let externalMicSource: UInt32 = 0x656D_6963
 
     static func inputDevices() -> [Device] {
-        allDevices().compactMap { id in hasInputStreams(id) ? device(id: id) : nil }
+        allDevices().compactMap { id in hasInputStreams(id) ? device(id: id) : nil }.filter { !$0.isEngineAggregate }
     }
 
     static func device(id: AudioDeviceID) -> Device? {

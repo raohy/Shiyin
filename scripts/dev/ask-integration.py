@@ -110,7 +110,7 @@ try:
                     str(args.app), '--args', '-ApplePersistenceIgnoreState', 'YES', '-AppleLanguages', '(zh-Hans)',
                     '-hasCompletedOnboarding', 'YES', '-hasSeenGuide', 'YES', '-llmProvider', 'none', '-autoSummarize', 'NO',
                     '-correctTranscript', 'NO', '-diarize', 'NO', '-liveTranscription', 'NO', '-compressAudio', 'NO',
-                    '-autoDetectLanguage', 'NO', '-meetingDetection', 'NO', '-globalHotKey', 'NO', '-mcpEnabled', 'NO',
+                    '-autoDetectLanguage', 'NO', '-meetingDetection', 'NO', '-recordingIsland', 'NO', '-globalHotKey', 'NO', '-mcpEnabled', 'NO',
                     '-debugNoCLI', 'YES'], check=True)
     ready_file = base / 'ready.json'
     def ready():

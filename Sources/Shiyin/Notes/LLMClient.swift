@@ -64,6 +64,40 @@ enum LLMProvider: String, CaseIterable, Identifiable {
     }
 }
 
+/// 「其他」的失败是哪一种（design §61.1、R86）：只看 HTTP 状态码、CLI 的结束代码，不看错误的文字（D114）
+enum FailureCause: String, CaseIterable {
+    case http400, http404, http413, http500, http502, http503, http504, http529, httpOther
+    case incomplete
+    case cliExit1, cliExit2, cliExit127, cliSignal, cliExitOther, cliNoOutput, cliError
+    case unknown
+
+    static func http(_ status: Int) -> FailureCause {
+        switch status {
+        case 400: return .http400
+        case 404: return .http404
+        case 413: return .http413
+        case 500: return .http500
+        case 502: return .http502
+        case 503: return .http503
+        case 504: return .http504
+        case 529: return .http529
+        default: return .httpOther
+        }
+    }
+
+    /// CLI 结束了但没有结果：结束代码 0 是没有输出；被信号结束（或 128 以上）是被系统结束
+    static func cli(_ result: SubprocessResult) -> FailureCause {
+        if result.reason == .uncaughtSignal || result.status > 128 { return .cliSignal }
+        switch result.status {
+        case 0: return .cliNoOutput
+        case 1: return .cliExit1
+        case 2: return .cliExit2
+        case 127: return .cliExit127
+        default: return .cliExitOther
+        }
+    }
+}
+
 enum LLMError: LocalizedError {
     case notInstalled(String)
     /// claude / codex 没登录或登录过期（用户反馈：只看到英文的 OAuth 错误，不知道要做什么）
@@ -77,7 +111,8 @@ enum LLMError: LocalizedError {
     case unreachable(String)
     /// OpenAI 兼容 API 没填网址或模型、网址不对；整理工具是「不整理」
     case notConfigured(String)
-    case failed(String)
+    /// 其他的失败；cause 是统计、回报问题用的种类（design §61.1、R86），不含任何文字
+    case failed(String, cause: FailureCause = .unknown)
     case badOutput(String)
     /// 提问的回答格式不对（design §21.8）：不说「会议记录」
     case badAnswer(String)
@@ -102,7 +137,8 @@ enum LLMError: LocalizedError {
                 ? String(localized: "Codex 还没登录或登录已过期，请重新登录后再试一次（终端命令：codex login）。")
                 : String(localized: "Claude Code 还没登录或登录已过期，请重新登录后再试一次（终端命令：claude auth login）。")
         case .missingKey(let name): return String(localized: "还没有填 \(name) 的 API key，请到设置 → 整理工具填写")
-        case .rejected(let detail), .limited(let detail), .unreachable(let detail), .notConfigured(let detail), .failed(let detail): return detail
+        case .rejected(let detail), .limited(let detail), .unreachable(let detail), .notConfigured(let detail): return detail
+        case .failed(let detail, _): return detail
         case .badOutput(let detail): return String(localized: "回传的会议记录格式不正确：\(detail)")
         case .badAnswer(let detail): return String(localized: "回传的回答格式不正确：\(detail)")
         }
@@ -176,7 +212,7 @@ extension Error {
             case .limited: return "LLMError.limited"
             case .unreachable: return "LLMError.unreachable"
             case .notConfigured: return "LLMError.notConfigured"
-            case .failed: return "LLMError.failed"
+            case .failed(_, let cause): return cause == .unknown ? "LLMError.failed" : "LLMError.failed.\(cause.rawValue)"
             case .badOutput: return "LLMError.badOutput"
             case .badAnswer: return "LLMError.badAnswer"
             }

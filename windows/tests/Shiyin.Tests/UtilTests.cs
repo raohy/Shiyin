@@ -181,6 +181,49 @@ public class UtilTests
         }
     }
 
+    /// <summary>每個人的重點（R92、M§66、design-windows §11.25）：空的時候不寫進 JSON（以前的紀錄一字不差）；
+    /// 解碼的寬鬆規則同 Mac 的 Person.init(from:)；改說話者名字、簡體、搜尋；待確認的連結（排序值在 custom 後面）</summary>
+    [Fact]
+    public void PeopleNotes()
+    {
+        const string old = """{"actionItems":[],"custom":[],"decisions":[],"openQuestions":[],"reviewItems":[],"summary":[{"text":"a","time":"00:01"}],"title":"t","topics":[]}""";
+        Assert.Equal(old, MeetingNotes.Decode(old)!.JsonString());
+        var empty = MeetingNotes.Decode(old.Replace("\"title\"", "\"people\":[],\"title\"", StringComparison.Ordinal))!;
+        Assert.Empty(empty.People);
+        Assert.Equal(old, empty.JsonString());
+
+        // 陣列裡有不是物件的：整個 people 當作沒有；name、points 型別不對當作空的；條目可以是字串（v1）
+        Assert.Empty(MeetingNotes.Decode("""{"people":[{"name":"A","points":[]},3]}""")!.People);
+        var loose = MeetingNotes.Decode("""{"people":[{"name":5,"points":"x"},{"points":["提議"]}]}""")!;
+        Assert.Equal(new[] { "", "" }, loose.People.Select(p => p.Name));
+        Assert.Empty(loose.People[0].Points);
+        Assert.Equal("提議", loose.People[1].Points[0].Text);
+        Assert.False(loose.IsEmpty);
+        Assert.Equal("""{"actionItems":[],"custom":[],"decisions":[],"openQuestions":[],"people":[{"name":"","points":[]},{"name":"","points":[{"text":"提議","time":""}]}],"reviewItems":[],"summary":[],"title":"","topics":[]}""",
+            loose.JsonString());
+
+        // 改說話者名字：名字、重點都換；預設名稱後面接數字的（說話者 10）不換
+        var notes = new MeetingNotes
+        {
+            People = [new("說話者 1", [new("同意說話者 10 的提議", "00:05")]), new("說話者 10", [new("負責測試", "00:20")])],
+            Summary = [new("摘要", "00:30")],
+            ReviewItems = [new("00:20", "負責人是說話者 10 嗎？", true)],
+        };
+        var renamed = notes.ReplacingSpeakerName("說話者 1", "王小明", isDefaultName: true);
+        Assert.Equal(new[] { "王小明", "說話者 10" }, renamed.People.Select(p => p.Name));
+        Assert.Equal("同意說話者 10 的提議", renamed.People[0].Points[0].Text);
+        Assert.Equal("00:05", renamed.People[0].Points[0].Time);
+        Assert.Contains("王小明\n同意說話者 10 的提議\n說話者 10\n負責測試", renamed.PlainText);
+        Assert.Equal("说话者 10", notes.Simplified().People[1].Name);
+
+        // 待確認的連結：第幾個人的第幾條
+        var links = ReviewLinks.Compute(notes);
+        Assert.Equal(new[] { 0 }, links[NoteItemRef.Person(1, 0)]);
+        Assert.Single(links);
+        Assert.True(NoteSection.Person > NoteSection.Custom);
+        Assert.Equal("person", NoteItemRef.Person(1, 0).SectionName);
+    }
+
     [Fact]
     public void TimeAndDate()
     {
@@ -231,6 +274,17 @@ public class UtilTests
             Assert.Equal(item.Strings("list"), new Meeting { Participants = item.Str("text")! }.ParticipantList);
         foreach (var item in Items("util/default-speaker-names.json"))
             Assert.Equal(item.Bool("isDefault"), SpeakerNames.IsDefault(item.Str("name")!));
+        // 頭像的字和釉色（M§58、design-windows §11.22）：Mac 的 PersonAvatar.initials、Color.person、Color.speaker
+        static string[] Hexes((uint Light, uint Dark) c) => [c.Light.ToString("X6"), c.Dark.ToString("X6")];
+        var avatars = Golden.ExpectedJson("util/avatars.json");
+        foreach (var item in avatars.GetProperty("people").EnumerateArray())
+        {
+            var name = item.Str("name")!;
+            Assert.True(item.Str("initials") == Avatars.Initials(name), $"「{name}」的頭像：預期 {item.Str("initials")}，實際 {Avatars.Initials(name)}");
+            Assert.Equal(item.Strings("color"), Hexes(Avatars.Speaker(Avatars.PersonIndex(name))));
+        }
+        foreach (var item in avatars.GetProperty("speakers").EnumerateArray())
+            Assert.Equal(item.Strings("color"), Hexes(Avatars.Speaker((int)item.Long("idx")!)));
         foreach (var item in Items("util/transcript-import.json"))
         {
             var input = Golden.Fixtures.GetProperty("transcriptImports").EnumerateArray().First(x => x.Str("ext") == item.Str("ext")).Str("text")!;

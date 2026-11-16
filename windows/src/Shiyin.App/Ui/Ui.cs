@@ -37,6 +37,10 @@ public static class Ui
     public static Brush CardBackground => Resource("CardBackgroundFillColorDefaultBrush", 0xFB, 0xFB, 0xFB, 0x2B, 0x2B, 0x2B);
     public static Brush Subtle => Resource("SubtleFillColorSecondaryBrush", 0xEE, 0xEE, 0xEE, 0x33, 0x33, 0x33);
     public static Brush Divider => Resource("DividerStrokeColorDefaultBrush", 0xE5, 0xE5, 0xE5, 0x3A, 0x3A, 0x3A);
+    /// <summary>強調色的文字（強調色＝青瓷綠，ApplyAccent）：淺色、深色、高對比都由平台給對的顏色</summary>
+    public static Brush AccentText => Resource("AccentTextFillColorPrimaryBrush", 0x24, 0x55, 0x49, 0x8F, 0xC6, 0xB8);
+    /// <summary>強調色的填色（「我」的外圈）</summary>
+    public static Brush AccentFill => Resource("AccentFillColorDefaultBrush", 0x2D, 0x6A, 0x5D, 0x6D, 0xB2, 0xA1);
 
     static object? Lookup(string key)
     {
@@ -69,12 +73,31 @@ public static class Ui
     /// <summary>主視窗的側欄：淺色 #F7F7F7、深色 #2B2B2B，跟內容區分得出來（同 Mac 的側欄）</summary>
     public static T SidebarBackground<T>(T root) where T : FrameworkElement => Surface(root, 0xF7F7F7, 0x2B2B2B);
 
-    /// <summary>不透明的底色，跟著元件的深淺色換（建好之後不會重建的元件用）</summary>
+    static readonly Windows.UI.ViewManagement.AccessibilitySettings Accessibility = new();
+    /// <summary>要一直留著同一個實例，ColorValuesChanged 才會一直收到</summary>
+    static readonly Windows.UI.ViewManagement.UISettings ColorSettings = new();
+
+    /// <summary>Windows 的對比主題（高對比）開著</summary>
+    public static bool HighContrast
+    {
+        get
+        {
+            try { return Accessibility.HighContrast; }
+            catch (Exception e) when (e is System.Runtime.InteropServices.COMException or InvalidCastException) { return false; }
+        }
+    }
+
+    /// <summary>
+    /// 不透明的底色，跟著元件的深淺色換（建好之後不會重建的元件用）。對比主題（高對比）時用系統的視窗底色
+    ///（UISettings 的 Window 顏色，同 SystemColorWindowColor）：不然平台的控制項是對比主題的顏色、底色還是淺色，文字都被加上底板
+    /// </summary>
     static T Surface<T>(T root, uint light, uint darkColor) where T : FrameworkElement
     {
         void Apply()
         {
-            var brush = new SolidColorBrush(root.ActualTheme == ElementTheme.Dark ? Hex(darkColor) : Hex(light));
+            var color = HighContrast ? ColorSettings.UIElementColor(Windows.UI.ViewManagement.UIElementType.Window)
+                : root.ActualTheme == ElementTheme.Dark ? Hex(darkColor) : Hex(light);
+            var brush = new SolidColorBrush(color);
             switch (root)
             {
                 case Panel p: p.Background = brush; break;
@@ -84,6 +107,16 @@ public static class Ui
         }
         Apply();
         root.ActualThemeChanged += (_, _) => Apply();
+        // 對比主題開、關：AccessibilitySettings.HighContrastChanged 在沒打包的桌面 app 訂閱時丟 0x80070490（2026-11-15 虛擬機啟動就當掉），
+        // 改聽 UISettings.ColorValuesChanged（系統顏色換了；不在 UI 執行緒）。訂閱失敗就算了，重新開啟拾音時照樣對；視窗關掉就不再聽
+        var queue = root.DispatcherQueue;
+        Windows.Foundation.TypedEventHandler<Windows.UI.ViewManagement.UISettings, object> changed = (_, _) => queue?.TryEnqueue(() => Guard(Apply));
+        try
+        {
+            ColorSettings.ColorValuesChanged += changed;
+            root.Unloaded += (_, _) => { try { ColorSettings.ColorValuesChanged -= changed; } catch (System.Runtime.InteropServices.COMException) { } };
+        }
+        catch (System.Runtime.InteropServices.COMException e) { Services.Log.Error($"color settings subscribe failed: 0x{e.HResult:X8}"); }
         return root;
     }
 
@@ -112,16 +145,40 @@ public static class Ui
         resources["SystemAccentColorLight3"] = Hex(0x8FC6B8);
     }
 
-    /// <summary>說話者的顏色（8 色循環；青瓷綠、琥珀排在最後，同 Mac）</summary>
+    /// <summary>說話者的顏色（8 色循環；青瓷綠、琥珀排在最後，同 Mac），也是頭像的「釉色」（M§58.1，Core 的 Avatars.Palette）</summary>
     public static SolidColorBrush Speaker(int idx)
     {
-        (uint, uint)[] palette =
-        [
-            (0x3F5BA9, 0x8FA8EE), (0x8E3B6B, 0xE08BBE), (0x4F7A28, 0x9BCB6E), (0x7A4FB5, 0xBFA0EE),
-            (0xA23B3B, 0xEE8E8E), (0x2F7486, 0x7CC4D6), (0x9A5B13, 0xE2A65E), (0x2D6A5D, 0x6DB2A1),
-        ];
-        var (light, d) = palette[(Math.Max(idx, 1) - 1) % palette.Length];
+        var (light, d) = Avatars.Speaker(idx);
         return Brush(light, d);
+    }
+
+    /// <summary>人物頁、側欄的頭像顏色（M§58.1）：照名字算，同一個名字每次都一樣</summary>
+    public static SolidColorBrush Person(string name) => Speaker(Avatars.PersonIndex(name));
+
+    /// <summary>
+    /// 頭像（M§58.2、R83，design-windows §11.22）：圓形，底色是釉色 18% 不透明，字是釉色（粗體，字級是直徑的 0.46）；
+    /// 「我」（R80）外圈一圈青瓷綠。尺寸：逐字稿、待辦 18、會議頁上方 20、側欄 26、人物頁 56（會議內容裡的用 Ui.C 跟著文字大小）
+    /// </summary>
+    public static Border Avatar(string name, SolidColorBrush color, double size, bool isMe = false)
+    {
+        var text = new TextBlock
+        {
+            Text = Avatars.Initials(name), FontSize = Math.Round(size * 0.46, 1), FontWeight = FontWeights.Bold, Foreground = color,
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, TextLineBounds = TextLineBounds.Tight,
+            TextTrimming = TextTrimming.Clip, MaxLines = 1,
+        };
+        var c = color.Color;
+        // Border 的框線畫在裡面（不佔外面的寬度，CLAUDE.md）：外圈用 BorderThickness，大小照樣是直徑
+        var ring = isMe ? Math.Min(2, Math.Max(1.5, size / 14)) : 0;   // 細的一圈，最多 2（同 Mac）
+        var avatar = new Border
+        {
+            Width = size, Height = size, CornerRadius = new CornerRadius(size / 2), Child = text,
+            Background = new SolidColorBrush(Color.FromArgb((byte)Math.Round(255 * 0.18), c.R, c.G, c.B)),
+            BorderBrush = isMe ? AccentFill : null, BorderThickness = new Thickness(ring),
+        };
+        // 名字就在旁邊，螢幕閱讀器不用再唸一次頭像
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAccessibilityView(avatar, Microsoft.UI.Xaml.Automation.Peers.AccessibilityView.Raw);
+        return avatar;
     }
 
     /// <summary>
@@ -206,6 +263,29 @@ public static class Ui
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(b, tooltip);
         b.Click += (_, _) => click();
         return b;
+    }
+
+    /// <summary>
+    /// 沒有框和底色的按鈕（同 Mac 的 .menuStyle(.borderlessButton)，M§59）：文字、圖示青瓷綠，滑過去才有淡淡的底色。
+    /// 會議頁上方的「會議設定」、文件選單用：跟資訊列同一層，不比標題搶眼。
+    /// foreground：字的顏色換掉（心智圖的縮放用次要文字的顏色，同 Mac 的 .secondary，design-windows §11.24）
+    /// </summary>
+    public static T Borderless<T>(T button, Brush? foreground = null) where T : Button
+    {
+        // 平台的按鈕加輕量的樣式覆寫（不換 ControlTemplate）：範本各狀態讀的主題資源換成「subtle」那一組
+        //（跟 ListView 的列、NavigationView 的項目同樣的透明底，滑過去、按下才有底色），文字是強調色的文字
+        var clear = Resource("SubtleFillColorTransparentBrush", 0, 0, 0, 0, 0, 0);
+        foreach (var key in new[] { "ButtonBackground", "ButtonBackgroundDisabled", "ButtonBorderBrush", "ButtonBorderBrushPointerOver", "ButtonBorderBrushPressed", "ButtonBorderBrushDisabled" })
+            button.Resources[key] = clear;
+        button.Resources["ButtonBackgroundPointerOver"] = Subtle;
+        button.Resources["ButtonBackgroundPressed"] = Resource("SubtleFillColorTertiaryBrush", 0xE8, 0xE8, 0xE8, 0x2E, 0x2E, 0x2E);
+        foreach (var key in new[] { "ButtonForeground", "ButtonForegroundPointerOver", "ButtonForegroundPressed" }) button.Resources[key] = foreground ?? AccentText;
+        button.Resources["ButtonForegroundDisabled"] = Resource("TextFillColorDisabledBrush", 0xA0, 0xA0, 0xA0, 0x78, 0x78, 0x78);
+        button.Background = clear;
+        button.BorderThickness = new Thickness(0);
+        button.Foreground = foreground ?? AccentText;
+        button.Padding = new Thickness(6, 3, 6, 3);
+        return button;
     }
 
     public static HyperlinkButton Link(string text, Action click)
@@ -424,6 +504,54 @@ public sealed partial class ReadingColumn : Panel
     {
         var width = ColumnWidth(final.Width);
         foreach (var child in Children) child.Arrange(new Windows.Foundation.Rect(0, 0, width, final.Height));
+        return final;
+    }
+}
+
+/// <summary>
+/// 左右兩塊（同 Mac 的 ViewThatFits）：放得下時同一列，右邊那塊靠右；放不下時右邊那塊換到下一行、靠左。
+/// 會議頁上方的第二列（日期、與會者｜會議設定、文件，M§59）
+/// </summary>
+public sealed partial class LeadingTrailing : Panel
+{
+    public double Spacing { get; set; } = 16;
+    public double LineSpacing { get; set; } = 8;
+    bool fits = true;
+
+    public LeadingTrailing(FrameworkElement leading, FrameworkElement trailing)
+    {
+        Children.Add(leading);
+        Children.Add(trailing);
+    }
+
+    protected override Windows.Foundation.Size MeasureOverride(Windows.Foundation.Size available)
+    {
+        var infinite = new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity);
+        foreach (var child in Children) child.Measure(infinite);
+        var (a, b) = (Children[0].DesiredSize, Children[1].DesiredSize);
+        fits = a.Width + Spacing + b.Width <= available.Width;
+        if (fits) return new Windows.Foundation.Size(double.IsInfinity(available.Width) ? a.Width + Spacing + b.Width : available.Width, Math.Max(a.Height, b.Height));
+        // 放不下：左邊那塊照可用的寬度量（裡面是橫排，超出的會被切掉）
+        Children[0].Measure(new Windows.Foundation.Size(available.Width, double.PositiveInfinity));
+        a = Children[0].DesiredSize;
+        return new Windows.Foundation.Size(available.Width, a.Height + LineSpacing + b.Height);
+    }
+
+    protected override Windows.Foundation.Size ArrangeOverride(Windows.Foundation.Size final)
+    {
+        var (a, b) = (Children[0].DesiredSize, Children[1].DesiredSize);
+        if (fits)
+        {
+            var height = Math.Max(a.Height, b.Height);
+            Children[0].Arrange(new Windows.Foundation.Rect(0, (height - a.Height) / 2, a.Width, a.Height));
+            Children[1].Arrange(new Windows.Foundation.Rect(Math.Max(0, final.Width - b.Width), (height - b.Height) / 2, b.Width, b.Height));
+        }
+        else
+        {
+            Children[0].Arrange(new Windows.Foundation.Rect(0, 0, Math.Min(a.Width, final.Width), a.Height));
+            Children[1].Arrange(new Windows.Foundation.Rect(0, a.Height + LineSpacing, Math.Min(b.Width, final.Width), b.Height));
+        }
+        Clip = new RectangleGeometry { Rect = new Windows.Foundation.Rect(0, 0, final.Width, final.Height) };
         return final;
     }
 }

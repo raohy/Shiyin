@@ -295,6 +295,20 @@ final class AppDatabase: @unchecked Sendable {
                 );
                 """)
         }
+        // 精简逐字稿（R96、design §70）：一句一列；句子删掉（重新转录、删除一句）时跟着删，
+        // 句子的文字改了（编辑、校正、用词修正、拆句）时删掉那一句的精简版，画面上回到原文
+        migrator.registerMigration("v12") { db in
+            try db.execute(sql: """
+                CREATE TABLE clean_lines (
+                  segment_id INTEGER PRIMARY KEY REFERENCES segments(id) ON DELETE CASCADE,
+                  text       TEXT NOT NULL
+                );
+                CREATE TRIGGER clean_lines_text AFTER UPDATE OF text ON segments
+                BEGIN
+                  DELETE FROM clean_lines WHERE segment_id = NEW.id;
+                END;
+                """)
+        }
         return migrator
     }
 
@@ -413,6 +427,77 @@ final class AppDatabase: @unchecked Sendable {
             return files
         }
         files.forEach(removeDocumentFile)
+    }
+
+    /// 从 cut 秒分成两场（R90、design §64）：开始时间 ≥ cut 的段落、标记重点搬到新的一场，时间减 cut；说话者两边各留有段落的，
+    /// 只在新的一场说话的人，声纹改指新的一场。audioExtension 是切好的录音的扩展名（两场相同，原本那场的文件名跟着换，D172）。
+    /// 回传新的一场（录音文件名已经给好，文件由调用的人搬）
+    func splitMeeting(_ id: Int64, at cut: Double, title: String, audioExtension: String?) throws -> Meeting? {
+        try pool.write { db in
+            guard var original = try Meeting.fetchOne(db, key: id) else { return nil }
+            var meeting = original
+            meeting.id = nil
+            meeting.title = title
+            meeting.audioFile = ""
+            meeting.notes = nil
+            meeting.notesBy = nil
+            meeting.notesDraft = 0
+            meeting.userNotes = ""
+            meeting.speakerHintDismissed = false
+            meeting.durationSeconds = original.durationSeconds.map { max(0, $0 - Int(cut.rounded())) }
+            let started = ISO8601DateFormatter().date(from: original.createdAt) ?? Date()
+            meeting.createdAt = ISO8601DateFormatter().string(from: started.addingTimeInterval(cut))
+            meeting.updatedAt = Clock.now()
+            try meeting.insert(db)
+            let newId = meeting.id!
+            if let audioExtension {
+                meeting.audioFile = "\(newId).\(audioExtension)"
+                try meeting.update(db)
+            }
+            try Self.index(db, meetingId: newId, kind: .title, ref: 0, text: meeting.displayTitle)
+
+            let moved = try Segment.filter(Column("meeting_id") == id && Column("start") >= cut).order(Column("seq")).fetchAll(db).compactMap(\.id)
+            for (seq, segmentId) in moved.enumerated() {
+                try db.execute(sql: "UPDATE segments SET meeting_id = ?, seq = ?, start = MAX(0, start - ?), end = MAX(0, end - ?) WHERE id = ?",
+                               arguments: [newId, seq, cut, cut, segmentId])
+            }
+            for chunk in stride(from: 0, to: moved.count, by: 500).map({ Array(moved[$0..<min($0 + 500, moved.count)]) }) {
+                let marks = chunk.map { _ in "?" }.joined(separator: ",")
+                try db.execute(sql: "UPDATE corrections SET meeting_id = ? WHERE segment_id IN (\(marks))", arguments: StatementArguments([newId] + chunk))
+                try db.execute(sql: "UPDATE search SET meeting_id = ? WHERE rowid IN (\(marks))", arguments: StatementArguments([newId] + chunk))
+            }
+            try db.execute(sql: "UPDATE bookmarks SET meeting_id = ?, time = MAX(0, time - ?) WHERE meeting_id = ? AND time >= ?",
+                           arguments: [newId, cut, id, cut])
+
+            func speaks(_ meetingId: Int64, _ idx: Int) throws -> Bool {
+                try Bool.fetchOne(db, sql: "SELECT EXISTS (SELECT 1 FROM segments WHERE meeting_id = ? AND speaker = ?)", arguments: [meetingId, idx]) ?? false
+            }
+            for var speaker in try SpeakerName.filter(Column("meeting_id") == id).fetchAll(db) {
+                if try !speaks(id, speaker.idx), try speaks(newId, speaker.idx) {
+                    try db.execute(sql: "UPDATE voiceprints SET meeting_id = ? WHERE meeting_id = ? AND speaker_idx = ?", arguments: [newId, id, speaker.idx])
+                }
+                speaker.meetingId = newId
+                try speaker.insert(db)
+            }
+            try Self.removeEmptySpeakers(db, meetingId: id)
+            try Self.removeEmptySpeakers(db, meetingId: newId)
+
+            original.durationSeconds = Int(cut.rounded())
+            if let audioExtension { original.audioFile = "\(id).\(audioExtension)" }
+            original.updatedAt = Clock.now()
+            try original.update(db)
+            // 段落换了，说话者的复原对不上（design §24.2）
+            try db.execute(sql: "DELETE FROM speaker_undo WHERE meeting_id = ?", arguments: [id])
+            return meeting
+        }
+    }
+
+    /// 这场会议有没有排队中或执行中的工作（任何种类，含压缩、校正这些辅助工作）
+    func hasActiveJobs(_ meetingId: Int64) throws -> Bool {
+        try pool.read { db in
+            try Job.filter(Column("meeting_id") == meetingId
+                           && [JobStatus.queued.rawValue, JobStatus.running.rawValue].contains(Column("status"))).fetchCount(db) > 0
+        }
     }
 
     /// 移到垃圾桶或还原（R9.3）
@@ -536,6 +621,35 @@ final class AppDatabase: @unchecked Sendable {
             var segment = Segment(meetingId: meetingId, seq: seq, start: start, end: end, text: text, lowConfidence: false,
                                   speaker: nil, kind: kind)
             try segment.insert(db)
+        }
+    }
+
+    /// 某种工作最后一次的记录（辅助工作也算；精简逐字稿失败时要说明，R96）
+    func lastJob(_ meetingId: Int64, kind: JobKind) throws -> Job? {
+        try pool.read { db in
+            try Job.filter(Column("meeting_id") == meetingId && Column("kind") == kind.rawValue).order(Column("id").desc).fetchOne(db)
+        }
+    }
+
+    /// 精简逐字稿（R96）：段落 id → 精简后的文字（空字符串是整句都是赘字）；没产生过是空的
+    func cleanLines(_ meetingId: Int64) throws -> [Int64: String] {
+        try pool.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT c.segment_id, c.text FROM clean_lines c JOIN segments s ON s.id = c.segment_id WHERE s.meeting_id = ?
+                """, arguments: [meetingId])
+            return Dictionary(uniqueKeysWithValues: rows.map { (Int64.fromDatabaseValue($0[0]) ?? 0, String.fromDatabaseValue($0[1]) ?? "") })
+        }
+    }
+
+    /// 存精简逐字稿：这场会议原本的精简版整份换掉；段落已经不在（整理期间被删、重新转录）的跳过
+    func saveCleanLines(_ meetingId: Int64, _ lines: [Int64: String]) throws {
+        try pool.write { db in
+            try db.execute(sql: "DELETE FROM clean_lines WHERE segment_id IN (SELECT id FROM segments WHERE meeting_id = ?)", arguments: [meetingId])
+            for (id, text) in lines {
+                try db.execute(sql: """
+                    INSERT INTO clean_lines (segment_id, text) SELECT id, ? FROM segments WHERE id = ? AND meeting_id = ?
+                    """, arguments: [text, id, meetingId])
+            }
         }
     }
 
@@ -1082,6 +1196,26 @@ final class AppDatabase: @unchecked Sendable {
 
     func deleteTerm(_ id: Int64) throws {
         _ = try pool.write { db in try GlossaryTerm.deleteOne(db, key: id) }
+    }
+
+    /// 一次加好几个（R94.1）：回传实际加进去的个数（已经有的跳过，不分大小写）
+    @discardableResult
+    func addTerms(_ terms: [String]) throws -> Int {
+        try pool.write { db in
+            var added = 0
+            for term in terms {
+                let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                try db.execute(sql: "INSERT OR IGNORE INTO glossary (term, created_at) VALUES (?, ?)", arguments: [trimmed, Clock.now()])
+                added += db.changesCount
+            }
+            return added
+        }
+    }
+
+    /// 批量删除（R94.3）
+    func deleteTerms(_ ids: [Int64]) throws {
+        _ = try pool.write { db in try GlossaryTerm.deleteAll(db, keys: ids) }
     }
 
     /// 词汇表建议（design §17.5、R14.5）：从参加者、改过名字的说话者、接受过的校正、中文会议标题里的英文词找。

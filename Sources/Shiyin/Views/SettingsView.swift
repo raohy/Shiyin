@@ -5,6 +5,8 @@ struct SettingsView: View {
     #if DEBUG
     /// shiyinctl preview settings <标签页>：预览窗口一开始停在哪个标签页（0 整理工具、1 录音与转录、2 说话者与词汇、3 高级）
     nonisolated(unsafe) static var previewTab = 0
+    /// shiyinctl preview settings <标签页> height=<点>：拉高看下面的段落（桌面层的预览窗口卷不了）
+    nonisolated(unsafe) static var previewHeight: CGFloat = 520
     #endif
     @State private var tab: Int = {
         #if DEBUG
@@ -14,6 +16,14 @@ struct SettingsView: View {
         #endif
     }()
 
+    private static var height: CGFloat {
+        #if DEBUG
+        return previewHeight
+        #else
+        return 520
+        #endif
+    }
+
     var body: some View {
         // 四个标签页（R44.5，design §33.3、D110）：只搬位置、加分组，每个项目和存的键都没变
         TabView(selection: $tab) {
@@ -22,7 +32,7 @@ struct SettingsView: View {
             NamesSettings().tabItem { Label("说话者与词汇", systemImage: "person.text.rectangle") }.tag(2)
             AdvancedSettings().tabItem { Label("高级", systemImage: "gearshape.2") }.tag(3)
         }
-        .frame(width: 640, height: 520)
+        .frame(width: 640, height: Self.height)
         .tint(.celadon)
     }
 }
@@ -620,6 +630,7 @@ struct SpeakerSettings: View {
         Toggle("记住说话者的声音，之后的会议自动带入名字", isOn: $voiceprints)
         Text("替说话者取名时，拾音会记下这个人的声音特征。之后的会议认出同一个人，就自动带入名字并标「自动」，不对可以改。声音特征只存在这台 Mac 的数据库，不会上传，也不会放进导出的 .shiyin 封包。")
             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        MyVoiceRow()
         HStack {
             Text("认识的人").font(.headline)
             Spacer()
@@ -639,7 +650,8 @@ struct SpeakerSettings: View {
                     Button("取消") { renaming = nil }.buttonStyle(.link)
                 } else {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(person.name)
+                        // 录过「我的声音」的人（design §56.3、R80.4）
+                        Text(person.enrolledAt != nil ? String(localized: "\(person.name)（我）") : person.name)
                         Text(detailLine(person)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     Spacer()
@@ -655,6 +667,10 @@ struct SpeakerSettings: View {
         } message: {
             Text("已经带入的名字会留着，之后的会议不会再自动带入。")
         }
+        // 人物页（R85.5）
+        if !model.people.isEmpty {
+            Text("也可以在侧栏的「人物」管理").font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     private func detailLine(_ person: PersonSummary) -> String {
@@ -664,17 +680,153 @@ struct SpeakerSettings: View {
     }
 }
 
+/// 我的声音（design §56.3、R80）：录一段自己的声音，第一场会议就认得自己
+struct MyVoiceRow: View {
+    @Environment(AppModel.self) private var model
+    @AppStorage(AppSettings.voiceprintsKey) private var voiceprints = true
+    @State private var showingSheet = false
+
+    var body: some View {
+        let me = model.people.first { $0.enrolledAt != nil }
+        let recording = model.recorder.isRecording
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("我的声音")
+                Group {
+                    if let me, let at = me.enrolledAt {
+                        Text("\(me.name)・已錄（\(String(at.prefix(10)))）")
+                    } else if !voiceprints {
+                        Text("先打开上面的「记住说话者的声音」")
+                    } else if recording {
+                        Text("录音中不能录（麦克风在用）")
+                    } else {
+                        Text("录一段你自己的声音，第一场会议就认得你。")
+                    }
+                }
+                .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if me != nil {
+                Button("重录…") { showingSheet = true }.disabled(!voiceprints || recording)
+                Button("删除") { model.deleteEnrollment() }
+                    .buttonStyle(.link)
+                    .help("只删这份声音特征，会议里的名字照旧")
+            } else {
+                Button("录一段我的声音…") { showingSheet = true }.disabled(!voiceprints || recording)
+            }
+        }
+        .sheet(isPresented: $showingSheet) { VoiceEnrollmentSheet() }
+        #if DEBUG
+        .onChange(of: model.debugSettingsAction) { _, action in
+            if action?.first == "enrollsheet" { model.debugSettingsAction = nil; showingSheet = true }
+        }
+        #endif
+    }
+}
+
+/// 录「我的声音」的窗口（design §56.3）：名字、要念的文字、音量、秒数
+struct VoiceEnrollmentSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var enrollment = VoiceEnrollment()
+    @State private var name = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("录一段我的声音").font(.title3.bold())
+            Text("按「开始」，用平常开会说话的音量念下面这段（约 20～30 秒），念完按「完成」。拾音只用这段声音算出你的声音特征，算完就删掉录音。")
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Text("名字")
+                TextField("名字", text: $name).textFieldStyle(.roundedBorder)
+            }
+            Text(VoiceEnrollment.passage)
+                .font(.title3)
+                .lineSpacing(6)
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                LevelMeter { [enrollment] in enrollment.level }
+                Text(status).font(.callout).monospacedDigit().foregroundStyle(.secondary)
+            }
+            if enrollment.micSilent {
+                Text("麦克风没有收到声音：可能被静音、被其他 app 占用，或选错了麦克风。")
+                    .font(.callout).foregroundStyle(Color.signal).fixedSize(horizontal: false, vertical: true)
+            }
+            if case .failed(let message) = enrollment.phase {
+                Text(message).font(.callout).foregroundStyle(Color.signal).fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Spacer()
+                Button("取消") { enrollment.cancel(); dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                switch enrollment.phase {
+                case .recording:
+                    Button("完成") { save() }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(!enrollment.canFinish || name.trimmingCharacters(in: .whitespaces).isEmpty)
+                case .computing:
+                    ProgressView().controlSize(.small)
+                case .idle, .failed:
+                    Button(enrollment.seconds > 0 ? "重新开始" : "开始") { enrollment.start() }
+                        .keyboardShortcut(.defaultAction)
+                }
+            }
+        }
+        .padding(20)
+        .frame(width: 520)
+        .onAppear { name = model.enrollmentDefaultName }
+        .onDisappear { enrollment.cancel() }
+    }
+
+    private var status: String {
+        switch enrollment.phase {
+        case .recording:
+            return String(localized: "已錄 \(Int(enrollment.seconds)) 秒・有聲音的部分 \(Int(enrollment.voicedSeconds)) 秒（要 10 秒以上）")
+        case .computing:
+            return String(localized: "正在算声音特征…第一次要先下载说话者识别的模型")
+        default:
+            return ""
+        }
+    }
+
+    private func save() {
+        Task {
+            if await enrollment.finish(name: name, model: model) { dismiss() }
+        }
+    }
+}
+
 /// 词汇表（沿用第二版）。是 Form 的一个 Section 的内容（R44.5）：词汇一条一列，不用 List
 struct GlossarySettings: View {
     @Environment(AppModel.self) private var model
     @State private var newTerm = ""
+    /// 搜索（R94.2）、勾选（R94.3）
+    @State private var query = ""
+    @State private var selected: Set<Int64> = []
+    @State private var confirmDelete = false
+
+    /// 勾选里还在词汇表的（勾了之后被单独删掉的不算）
+    private var checked: Set<Int64> { selected.intersection(model.glossary.compactMap(\.id)) }
+
+    /// 目前列出来的词（搜索时只有搜到的）
+    private var shown: [GlossaryTerm] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        return q.isEmpty ? model.glossary : model.glossary.filter { $0.term.range(of: q, options: .caseInsensitive) != nil }
+    }
 
     var body: some View {
         Text("系统名、产品名、人名的正确写法。转录时会当成提示（最多约 150 字），整理时也会参考。实验显示，有没有词汇提示，专有名词的正确率差很多。")
             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-        HStack {
-            TextField("添加词汇，例如产品名或人名", text: $newTerm).textFieldStyle(.roundedBorder).onSubmit(add)
-            Button("添加", action: add).disabled(newTerm.trimmingCharacters(in: .whitespaces).isEmpty)
+        // 一次粘贴好几个也可以（R94.1）：换行、逗号、顿号、分号分开
+        HStack(alignment: .top) {
+            TextField("添加词汇", text: $newTerm, prompt: Text("产品名、人名；可以一次粘贴好几个"), axis: .vertical)
+                .lineLimit(1...4)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit(add)
+            Button("添加", action: add).disabled(newTerm.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         // 词汇表建议（design §17.5）：最多 12 个
         if !model.glossarySuggestions.isEmpty {
@@ -696,13 +848,38 @@ struct GlossarySettings: View {
         if model.glossary.isEmpty {
             Text("还没有词汇。用词修正时勾选「加进词汇表」也会加到这里。").font(.callout).foregroundStyle(.secondary)
         }
-        ForEach(model.glossary) { term in
+        // 搜索（R94.2）：超过 10 个才出现
+        if model.glossary.count > 10 {
+            TextField("搜索词汇", text: $query, prompt: Text("输入要找的字")).textFieldStyle(.roundedBorder)
+        }
+        // 全选、删除勾选的（R94.3）
+        if !shown.isEmpty {
             HStack {
-                Text(term.term)
+                let ids = Set(shown.compactMap(\.id))
+                if ids.isSubset(of: selected) {
+                    Button("取消勾选") { selected.subtract(ids) }.buttonStyle(.link)
+                } else {
+                    Button(query.isEmpty ? "全选" : "全选搜到的 \(ids.count) 个") { selected.formUnion(ids) }.buttonStyle(.link)
+                }
+                Spacer()
+                if !checked.isEmpty {
+                    Button("删除勾选的 \(checked.count) 个…", role: .destructive) { confirmDelete = true }
+                }
+            }
+            .font(.callout)
+        }
+        ForEach(shown) { term in
+            HStack {
+                Toggle(term.term, isOn: Binding(get: { selected.contains(term.id ?? -1) },
+                                                set: { if let id = term.id { if $0 { selected.insert(id) } else { selected.remove(id) } } }))
+                    .toggleStyle(.checkbox)
                 Spacer()
                 Button { model.deleteTerm(term.id!) } label: { Image(systemName: "trash") }
                     .buttonStyle(.borderless).help("删除「\(term.term)」")
             }
+        }
+        if shown.isEmpty && !model.glossary.isEmpty {
+            Text("没有含「\(query)」的词汇").font(.callout).foregroundStyle(.secondary)
         }
         // 公司词汇表（R53.3）：唯读，接在自己的词后面
         if !model.companyGlossary.isEmpty {
@@ -721,10 +898,16 @@ struct GlossarySettings: View {
             .font(.caption).foregroundStyle(.tertiary).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
             // 打开这页时更新公司词汇表（R53.1）
             .task { await EnterpriseServer.shared.refreshGlossary() }
+            .confirmationDialog("删除勾选的 \(checked.count) 个词汇？", isPresented: $confirmDelete) {
+                Button("删除", role: .destructive) {
+                    model.deleteTerms(Array(checked))
+                    selected = []
+                }
+            }
     }
 
     private func add() {
-        model.addTerm(newTerm)
+        model.addTerms(newTerm)
         newTerm = ""
     }
 }
@@ -765,8 +948,11 @@ struct RecordingSettings: View {
     @AppStorage(AppSettings.liveTranscriptionEngineKey) private var liveEngine = "system"
     @AppStorage(AppSettings.autoDetectLanguageKey) private var autoDetect = true
     @AppStorage(AppSettings.diarizeKey) private var diarize = true
+    @AppStorage(AppSettings.diarizationModelKey) private var diarizationModel = Diarizer.Model.standard.rawValue
     @AppStorage(AppSettings.globalHotKeyKey) private var hotKey = true
     @AppStorage(AppSettings.meetingDetectionKey) private var meetingDetection = true
+    @AppStorage(AppSettings.autoStopOnMeetingEndKey) private var autoStopOnMeetingEnd = true
+    @AppStorage(AppSettings.recordingIslandKey) private var recordingIsland = true
     @AppStorage(AppSettings.idleStopKey) private var idleStop = true
     @AppStorage(AppSettings.bookmarkHotKeyKey) private var bookmarkHotKey = true
     @State private var mutedApps: [String] = []
@@ -835,6 +1021,19 @@ struct RecordingSettings: View {
                 Text(verbatim: engineDescription)
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Toggle("转录时识别说话者", isOn: $diarize)
+                // 说话者识别的模型（design §61.2、R87）
+                Picker("说话者识别的模型", selection: $diarizationModel) {
+                    Text("标准").tag(Diarizer.Model.standard.rawValue)
+                    Text("Nemotron-3（实验性，英文会议比较准）").tag(Diarizer.Model.nemotron.rawValue)
+                }
+                .disabled(!diarize)
+                .onChange(of: diarizationModel) { _, value in
+                    if value == Diarizer.Model.nemotron.rawValue { model.models.prepareNemotron() }
+                }
+                if diarizationModel == Diarizer.Model.nemotron.rawValue {
+                    Text("NVIDIA 的模型，最多分 8 人。英文会议的测试（AMI）中，没被插话的句子标对 77% → 90%；中文会议会分出比较多人，还在观察。超过 8 人的会议、模型还没下载好时用标准的。")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
                 Toggle("录音中显示实时逐字稿", isOn: $live)
                 Picker("实时转录引擎", selection: $liveEngine) {
                     Text("macOS 系统识别（低延迟）").tag("system")
@@ -865,7 +1064,14 @@ struct RecordingSettings: View {
             Section("提醒与快捷键") {
                 // 检测在线会议（design §21.7、R19.4）
                 Toggle("检测到在线会议时提醒录音", isOn: $meetingDetection)
-                Text("Zoom、Teams、Webex、Google Meet（浏览器）等开始用麦克风、拾音没在录音时提醒你；会议结束时提醒停止。只提醒，不会自动录音。")
+                // 会议结束时倒数自动停止（design §69、R95）
+                Toggle("会议结束时自动停止录音", isOn: $autoStopOnMeetingEnd)
+                    .disabled(!meetingDetection)
+                // 录音岛（design §57、R81.8）
+                Toggle("在屏幕上方显示录音岛", isOn: $recordingIsland)
+                Text("录音中在屏幕上方正中间（有浏海的 Mac 接在浏海两侧）显示录音的时间和提醒，全屏幕开会、分享画面时也看得到，分享画面拍不到它。检测到在线会议时的「要开始录音吗？」也在这里。")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text("Zoom、Teams、Webex、Google Meet（浏览器）等开始用麦克风、拾音没在录音时提醒你，不会自动开始录音。会议 app 停止用麦克风时倒数 60 秒，没按「继续录」就停止并转录；关掉「自动停止」时只问要不要停止。")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 ForEach(mutedApps, id: \.self) { bundle in
                     HStack {
@@ -934,6 +1140,13 @@ struct ModelRows: View {
         Text("自动检测会议语言用，60 MB。").font(.caption).foregroundStyle(.secondary)
         ModelRow(title: String(localized: "说话者识别模型（FluidAudio）"), state: model.models.diarizerState,
                  start: model.models.prepareDiarizer, pause: nil, delete: nil)
+        // Nemotron-3（R87）：选了或下载过才列
+        if AppSettings.diarizationModel == .nemotron || model.models.nemotronState != .missing {
+            ModelRow(title: String(localized: "说话者识别模型 Nemotron-3（NVIDIA）"), state: model.models.nemotronState,
+                     start: model.models.prepareNemotron, pause: nil,
+                     delete: { model.models.deleteNemotron() }, deleteDisabled: transcribing)
+            Text("说话者识别选「Nemotron-3」时用，约 190 MB。").font(.caption).foregroundStyle(.secondary)
+        }
     }
 }
 
@@ -1020,6 +1233,7 @@ struct ModelRow: View {
 struct AdvancedSettings: View {
     @Environment(AppModel.self) private var model
     @AppStorage(AppSettings.textSizeKey) private var textSize = 0
+    @AppStorage(AppSettings.hideFromScreenSharingKey) private var hideFromScreenSharing = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(Updater.urlKey) private var updateURL = ""
     @State private var showingUsageStats = false
@@ -1035,6 +1249,10 @@ struct AdvancedSettings: View {
                     ForEach(TextSize.levels, id: \.self) { Text(TextSize.label($0)).tag($0) }
                 }
                 Text("记录、逐字稿、提问、实时逐字稿和我的笔记的文字。也可以用 ⌘＋、⌘－ 调整，⌘0 回到标准大小。")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                // 分享画面时藏起拾音的窗口（design §53、R77）
+                Toggle("分享画面时藏起拾音的窗口", isOn: $hideFromScreenSharing)
+                Text("打开后，用 Zoom、Teams、Google Meet 分享整个屏幕时，别人看不到拾音（例如其他会议的记录）。截屏、屏幕录像也拍不到拾音。")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             // 让 AI 工具读取会议（本地 MCP，design §44.4、R69）

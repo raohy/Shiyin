@@ -31,9 +31,10 @@ enum DebugControl {
         switch name {
         case "coach": coachCommand(Array(args.dropFirst()))
         case "select": model.showTrash = false; model.selection = id
-        // notesview list|mindmap：记录标签页切换成条列或心智图（design §42.5；写进共用设置，测完 defaults delete com.weiwei.shiyin notesView）
+        // notesview list|mindmap|people：记录标签页切换成条列、心智图或人物（design §42.5；写进共用设置，测完 defaults delete com.weiwei.shiyin notesView）
         case "notesview":
-            UserDefaults.standard.set(args.count > 1 && args[1].lowercased() == "mindmap" ? "mindMap" : "list", forKey: AppSettings.notesViewKey)
+            let view = args.count > 1 ? args[1].lowercased() : "list"
+            UserDefaults.standard.set(view == "mindmap" ? "mindMap" : view == "people" ? "people" : "list", forKey: AppSettings.notesViewKey)
         case "tab":   // tab <summary|transcript|ask>；旧名称 topics、review、notes 当别名（review 顺便展开待确认、notes 展开我的笔记，design §33.1）
             if let r = DetailTab.resolve(args[1]) {
                 model.tab = r.tab
@@ -44,13 +45,30 @@ enum DebugControl {
         case "retry": model.selection = id; model.retry()
         case "retranscribe": model.selection = id; model.retranscribe()
         case "resummarize": model.selection = id; model.resummarize()
+        case "peoplenotes": model.selection = id; model.generatePeopleNotes()   // 「人物」的「产生每个人的重点」（design §66）
+        case "cleantranscript": model.selection = id; model.generateCleanTranscript()   // 逐字稿「精简」的「产生精简版」（design §70）
+        case "transcriptview": UserDefaults.standard.set(args[1] == "clean" ? "clean" : "original", forKey: AppSettings.transcriptViewKey)
         case "undo": model.selection = id; model.undoNotes()
         case "trash": if let id { model.moveToTrash(id) }
         case "restore": if let id { model.restore(id) }
         case "purge": if let id { model.deletePermanently(id) }
-        case "confirmpurge": model.confirmPurge = id   // 等于在垃圾桶按右键「永久删除…」
+        case "confirmpurge": model.confirmPurge = id.map { [$0] }   // 等于在垃圾桶按右键「永久删除…」
+        // 多选（R88、design §62）：selectmany <id,id,…>（等于 ⌘ 点击）；trashmany、restoremany、purgemany <id,id,…>；
+        // showtrash 0|1；confirmemptytrash（跳出确认）；emptytrash（不经过确认）
+        case "selectmany": model.listSelection = Set(args[1].split(separator: ",").compactMap { Int64($0) })
+        case "trashmany": model.moveToTrash(args[1].split(separator: ",").compactMap { Int64($0) })
+        case "restoremany": model.restore(args[1].split(separator: ",").compactMap { Int64($0) })
+        case "purgemany": model.deletePermanently(args[1].split(separator: ",").compactMap { Int64($0) })
+        case "showtrash": model.showTrash = args.count > 1 && args[1] == "1"
+        case "confirmemptytrash": model.confirmEmptyTrash = true
+        case "emptytrash": model.emptyTrash()
+        // 删除一句（R89、design §63）：deletesegment <会议 id> <段落 id>；分割会议（R90、§64）：splitmeeting <会议 id> <段落 id>（不经过确认），
+        // splitconfirm <会议 id> <段落 id>（跳出确认对话框，等于右键「从这里分成两场…」）
+        case "deletesegment": model.selection = id; model.deleteSegment(Int64(args[2]) ?? 0)
+        case "splitmeeting": model.selection = id; model.splitMeeting(at: Int64(args[2]) ?? 0)
+        case "splitconfirm": model.selection = id; model.tab = .transcript; model.splitMeetingRequest = Int64(args[2])
         case "reviewexpand":
-            // reviewexpand <会议 id> <summary|decisions|actionItems|openQuestions|topic|custom> <位置> [第二个位置]：
+            // reviewexpand <会议 id> <summary|decisions|actionItems|openQuestions|topic|custom|person> <位置> [第二个位置]：
             // 等于点那一条记录旁的待确认标记（R41.2）；位置给 - 就收合。窗口不在目前的桌面时 press 按不到标记，用这个
             model.selection = id
             let a = Int(args.count > 3 ? args[3] : "") ?? 0, b = Int(args.count > 4 ? args[4] : "") ?? 0
@@ -61,6 +79,7 @@ enum DebugControl {
             case "openQuestions": .openQuestions(a)
             case "topic": .topicPoint(a, b)
             case "custom": .custom(a, b)
+            case "person": .person(a, b)
             default: nil
             }
             model.reviewDraft?.expanded = ref
@@ -75,6 +94,7 @@ enum DebugControl {
                 case "openQuestions": .openQuestions(a)
                 case "topic": .topicPoint(a, b)
                 case "custom": .custom(a, b)
+                case "person": .person(a, b)
                 default: nil
                 }
                 model.submitReviewDraft(only: Set(ref.flatMap { model.detail?.reviewLinks[$0] } ?? []))
@@ -129,17 +149,22 @@ enum DebugControl {
         // 检测会议（design §21.7）：meetingapp <bundleID> start|stop；meetingprompts <输出.json>；meetingaction <按钮>
         case "meetingapp": model.meetingDetector.simulated[args[1]] = args[2] == "start"
         case "meetingprompts":
-            let current = MeetingPromptPanel.shared.current
+            let current = RecordingIsland.isEnabled ? RecordingIsland.shared.state.prompt?.prompt : MeetingPromptPanel.shared.current
             let text: String
             switch current {
             case .start(let app): text = "start:\(app.bundleID)"
             case .stop(let app): text = "stop:\(app.bundleID)"
             case nil: text = ""
             }
-            write(["prompt": text, "actions": MeetingPromptPanel.shared.actions.keys.sorted(), "muted": MeetingDetector.muted,
+            let actions = RecordingIsland.isEnabled ? (RecordingIsland.shared.state.prompt?.actions.map(\.id) ?? []).sorted()
+                : MeetingPromptPanel.shared.actions.keys.sorted()
+            write(["prompt": text, "actions": actions, "muted": MeetingDetector.muted,
+                   "countdown": model.meetingEndDeadline.map { max(0, $0.timeIntervalSinceNow) } ?? -1,
                    "recording": model.recorder.isRecording], to: args[1])
-        case "meetingaction": MeetingPromptPanel.shared.perform(args[1])
-        // reportinfo <输出.json>：反馈问题会附上的内容和网址（不打开浏览器、不动剪贴板，design §21.9）
+        case "meetingaction": RecordingIsland.isEnabled ? RecordingIsland.shared.perform(args[1]) : MeetingPromptPanel.shared.perform(args[1])
+        case "island":   // island hover on|off：等于鼠标移到录音岛上、移开（design §57.3）
+            if args.count > 2, args[1] == "hover" { RecordingIsland.shared.state.hover = args[2] == "on"; RecordingIsland.shared.update() }
+        // reportinfo <输出.json>：回报问题会附上的内容和网址（不打开浏览器、不动剪贴板，design §21.9）
         case "reportinfo":
             let text = ProblemReport.text(db: model.db)
             write(["text": text, "url": ProblemReport.url(body: text)?.absoluteString ?? "", "issuesURL": ProblemReport.issuesURL], to: args[1])
@@ -297,6 +322,7 @@ enum DebugControl {
         // voiceprint-eval <设置.json> <输出.json>：设置是 [{"file": 音档, "name": 名称}]；每个文件跑说话者识别，
         // 输出每位说话者的声纹、说话秒数、说话的时段，用来跟 AMI 标注比对、决定门槛（design §21.4.1）
         // 设置的每一项可以加 threshold、minSpeakers、numSpeakers（字符串）换分群设置，比较分出几个人；dump（路径）倒出每个片段的声纹
+        // model：standard、nemotron（R87，design §61.2；没写时用标准的）
         case "voiceprint-eval":
             let config = (try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: args[1])))) as? [[String: String]] ?? []
             let output = args[2]
@@ -326,7 +352,9 @@ enum DebugControl {
                             if let v = item["step"].flatMap(Double.init) { c.segmentation.stepRatio = v }
                             config = c
                         }
-                        let diarization = try await Diarizer.diarize(samples: samples, clustering: clustering, config: config) { _ in }
+                        let diarization = try await Diarizer.diarize(samples: samples, minSpeakers: item["minSpeakers"].flatMap(Int.init),
+                                                                     clustering: clustering, config: config,
+                                                                     model: Diarizer.Model(rawValue: item["model"] ?? "") ?? .standard) { _ in }
                         // dump：<路径>.f32 是每个片段的声纹（256 个 Float32 一笔），<路径>.json 是对应的群、片段、片段里的说话者
                         if let dump = item["dump"] {
                             var floats: [Float] = []
@@ -336,12 +364,15 @@ enum DebugControl {
                                    "local": diarization.chunks.map(\.speakerIndex), "start": diarization.chunks.map(\.startTimeSeconds),
                                    "end": diarization.chunks.map(\.endTimeSeconds)], to: dump + ".json")
                         }
-                        let speakers: [[String: Any]] = diarization.voiceprints.keys.sorted().map { number in
+                        // Nemotron-3 的说话者不一定有声纹（§61.2）：说过话的都列
+                        let numbers = Set(diarization.turns.map(\.speaker)).union(diarization.voiceprints.keys).sorted()
+                        let speakers: [[String: Any]] = numbers.map { number in
                             ["number": number, "seconds": diarization.speechSeconds[number] ?? 0,
                              "embedding": diarization.voiceprints[number] ?? [],
                              "turns": diarization.turns.filter { $0.speaker == number }.map { [$0.start, $0.end] }]
                         }
                         results.append(["name": item["name"] ?? file, "seconds": Double(samples.count) / AudioDecoder.sampleRate,
+                                        "model": diarization.model.rawValue,
                                         "elapsed": Date().timeIntervalSince(started), "speakers": speakers,
                                         "collisionRate": diarization.quality?.collisionRate ?? -1,
                                         "multiSpeakerChunks": diarization.quality?.multiSpeakerChunks ?? -1,
@@ -404,9 +435,11 @@ enum DebugControl {
         // clickat <x> <y> [窗口 id]：在窗口里点一下（点，左上原点，含标题列；默认主窗口）。直接交给 NSWindow.sendEvent，
         // 走 AppKit、SwiftUI 正常的点击判断，窗口在别的桌面（例如用户在全屏幕的 app）也点得到，不碰用户的鼠标
         case "clickat":
+            // 窗口 id 或窗口编号（确认对话框的 sheet 没有 id，用 screencapture 看到的编号）
             let target = args.count > 3 ? args[3] : "main"
             guard let x = Double(args[1]), let y = Double(args[2]),
-                  let window = NSApp.windows.first(where: { $0.isVisible && $0.identifier?.rawValue == target }) else { break }
+                  let window = NSApp.windows.first(where: { $0.isVisible && ($0.identifier?.rawValue == target || "\($0.windowNumber)" == target) })
+            else { break }
             let point = NSPoint(x: x, y: window.frame.height - y)
             for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
                 if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
@@ -414,8 +447,16 @@ enum DebugControl {
                     window.sendEvent(event)
                 }
             }
+        // pressbutton <按钮的字> [窗口编号]：按 AppKit 的按钮（确认对话框的 NSAlert 在桌面层时 AX 看不到、clickat 点不到）
+        case "pressbutton":
+            func find(_ view: NSView) -> NSButton? {
+                if let button = view as? NSButton, button.title == args[1], button.isEnabled { return button }
+                return view.subviews.lazy.compactMap(find).first
+            }
+            let windows = NSApp.windows.filter { $0.isVisible && (args.count < 3 || "\($0.windowNumber)" == args[2]) }
+            windows.lazy.compactMap { $0.contentView.flatMap(find) }.first?.performClick(nil)
         case "bookmark": model.addBookmark(at: Double(args[2]) ?? 0, meetingId: id)
-        case "addterm": model.addTerm(args[1])
+        case "addterm": model.addTerms(args[1].replacingOccurrences(of: "\\n", with: "\n"))   // 一次好几个（R94.1）：「\n」当换行
         case "dismissterm": model.dismissGlossarySuggestion(args[1])
         case "record":
             switch args[1] {
@@ -434,8 +475,37 @@ enum DebugControl {
         case "recordlang":   // recordlang <语言代码>：录音中换会议语言（等于按「改回」；zh、en、ja、yue、ko…）
             if let language = MeetingLanguage(rawValue: args[1]) { model.recorder.switchLanguage(to: language) }
         case "record-sim":
-            // record-sim <音档> <倍速> <both: 1/0>
-            model.startSimulatedRecording(file: URL(fileURLWithPath: args[1]), speed: Double(args[2]) ?? 1, both: args.count > 3 && args[3] == "1")
+            // record-sim <音档> <倍速> <both: 1/0/2>：2 是双声道、电脑声音那一声道全是 0（design §51.1）
+            let channels = args.count > 3 ? args[3] : "0"
+            model.startSimulatedRecording(file: URL(fileURLWithPath: args[1]), speed: Double(args[2]) ?? 1,
+                                          both: channels == "1" || channels == "2", systemSilent: channels == "2")
+        case "reminders": model.selection = id; model.addActionItemsToReminders()   // reminders <会议 id>：等于按「加到提醒事项」（design §52.2）
+        case "reminderdone":   // reminderdone <会议 id> <第几项，0 开始>：假的提醒事项里把那场会议的第几项设成完成
+            let matching = FakeReminders.shared.entries.indices.filter { Reminders.meetingAndKey(FakeReminders.shared.entries[$0].item.url)?.meetingId == id }
+            if let n = Int(args[2]), n < matching.count { FakeReminders.shared.entries[matching[n]].completed = true }
+            model.refreshReminderStatus()
+        case "enrollvoice":   // enrollvoice <音档> <名字>：用音档代替麦克风录「我的声音」（design §56.3）
+            Task {
+                do {
+                    let samples = try await AudioDecoder.decode(URL(fileURLWithPath: args[1]))
+                    try await model.enrollVoice(name: args[2], samples: samples)
+                } catch {
+                    model.errorMessage = error.localizedDescription
+                }
+            }
+        case "enrolldelete": model.deleteEnrollment()
+        case "sidebar":   // sidebar people|meetings：侧栏的「会议｜人物」（design §60.2）
+            model.sidebarMode = args.count > 1 && args[1] == "people" ? .people : .meetings
+            model.reloadPeopleOverview()
+        case "person":   // person <人的 id>：侧栏切到人物、选这个人
+            model.sidebarMode = .people
+            model.reloadPeopleOverview()
+            model.selectedPerson = id
+        case "hidesharing":   // hidesharing on|off：改默认值（只在内存，不写进共用设置；共用设置里有值时以它为准），套用到所有窗口（design §53）
+            UserDefaults.standard.register(defaults: [AppSettings.hideFromScreenSharingKey: args[1] == "on"])
+            WindowSharing.applyAll()
+        case "systempermission":   // systempermission <denied|granted|notDetermined|real>：盖掉查到的「录制系统音频」权限（design §51.1）
+            SystemAudioPermission.debugOverride = SystemAudioPermission(rawValue: args[1])
         case "seek": model.player.seek(to: Double(args[1]) ?? 0, play: args.count > 2 && args[2] == "play")
         case "rate": model.player.setRate(Float(args[1]) ?? 1)
         case "playvolume": model.player.setVolume(Float(args[1]) ?? 1)   // playvolume <0～1>（design §49.3）
@@ -489,6 +559,8 @@ enum DebugControl {
             else { model.copyNotes(args.count > 1 && args[1] == "plain" ? .plain : args.count > 1 && args[1] == "md" ? .markdown : .rich) }
         case "search": model.searchQuery = args.count > 1 ? args[1] : ""
         case "openhit": if let index = Int(args[1]), model.searchResults.indices.contains(index) { model.openSearchHit(model.searchResults[index]) }
+        case "model" where args.count > 2 && args[2] == "nemotron":   // model start|delete nemotron（R87，FluidAudio 下载）
+            args[1] == "start" ? model.models.prepareNemotron() : args[1] == "delete" ? model.models.deleteNemotron() : ()
         case "model":   // model start|pause|delete [breeze|japanese|languageDetection|qwen]（qwen 是两个档一起）
             let which = ModelStore.Model(rawValue: args.count > 2 ? args[2] : "") ?? .breeze
             args[1] == "start" ? model.models.startAll(which) : args[1] == "pause" ? model.models.pauseAll(which) : model.models.deleteAll(which)
@@ -651,10 +723,13 @@ enum DebugControl {
             let prefix = args.count > 1 ? args[1] : "main"
             NSApp.windows.filter { $0.identifier?.rawValue.hasPrefix(prefix) == true }.forEach { $0.close() }
         case "openwindow": model.openWindowById?(args[1])
+        case "windowlevel":   // windowlevel <窗口 id 开头> desktop|normal：放到桌面层（被所有窗口盖住，screencapture -l 照样截得到），不出现在用户的画面上
+            let level = args.count > 2 && args[2] == "desktop" ? NSWindow.Level(Int(CGWindowLevelForKey(.desktopWindow))) : .normal
+            NSApp.windows.filter { $0.identifier?.rawValue.hasPrefix(args[1]) == true }.forEach { $0.level = level }
         case "setkey": try? Keychain.set(args[1], args[2])          // setkey anthropic|openai <key>
         case "delkey": Keychain.delete(args[1])
         case "settings": NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        case "preview":   // preview <settings|onboarding [步骤]|import|rename> [front]（import：导入对话框；rename：说话者的改名小窗口，design §26.2、§24.2）
+        case "preview":   // preview <settings|onboarding [步骤]|import|rename> [front] [height=<点>]（import：导入对话框；rename：说话者的改名小窗口，design §26.2、§24.2）
             // 设置窗口要 app 在前景才打得开；这里把画面放进桌面层的无边框窗口（被所有窗口盖住；
             // 屏幕外的窗口截不到），不抢前景，再用 screencapture -l 截（closewindow <settings|onboarding>-preview 关掉）。
             // preview detail：目前选中的会议页（量长会议的性能用，design §21.12：不在画面上的窗口 SwiftUI 不更新）
@@ -662,7 +737,10 @@ enum DebugControl {
             let detailPage = args.count > 1 && args[1] == "detail"
             // preview settings <标签页编号>：预览窗口一开始停在那个标签页（0 整理工具 … 4 录音、5 模型与保存空间）
             SettingsView.previewTab = args.count > 2 && args[1] == "settings" ? Int(args[2]) ?? 0 : 0
-            let size = detailPage ? NSSize(width: 1100, height: 760) : NSSize(width: 640, height: 560)
+            // height=<点>：设置页要看下面的段落时拉高（桌面层的窗口卷不了）
+            let height = args.first { $0.hasPrefix("height=") }.flatMap { Double($0.dropFirst(7)) }
+            SettingsView.previewHeight = height.map { CGFloat($0) - 40 } ?? 520
+            let size = detailPage ? NSSize(width: 1100, height: 760) : NSSize(width: 640, height: height ?? 560)
             let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless],
                                   backing: .buffered, defer: false)
             // 加 front：放在一般窗口层（会出现在用户画面上），辅助功能才看得到、按得到里面的按钮
@@ -762,6 +840,11 @@ enum DebugControl {
         let model = AppModel.shared
         var out: [String: Any] = [
             "selection": model.selection ?? -1,
+            // 多选、清空垃圾桶、分割会议（design §62、§64）
+            "multiSelected": model.multiSelected, "showTrash": model.showTrash, "trashCount": model.trash.count,
+            "confirmDelete": model.confirmDelete, "deleteTargets": model.deleteTargets, "confirmPurge": model.confirmPurge ?? [],
+            "confirmEmptyTrash": model.confirmEmptyTrash, "splitMeetingRequest": model.splitMeetingRequest ?? -1,
+            "splittingMeeting": model.splittingMeeting ?? -1,
             "tab": model.tab.rawValue, "reviewExpanded": model.reviewExpanded, "userNotesExpanded": model.userNotesExpanded,
             "notesView": UserDefaults.standard.string(forKey: AppSettings.notesViewKey) ?? "list",
             // 本地 MCP（design §44.6）：开关、启动档
@@ -808,6 +891,20 @@ enum DebugControl {
                       "claudeDesktop": DesktopApps.hasClaude],
             "transcriptionEngine": AppSettings.transcriptionEngine,
             "textSize": TextSize.level,   // 会议内容的文字大小（design §38.5）
+            // 提醒事项（design §52.2）：假的列表里的每一项、目前这场会议的状态
+            "reminders": FakeReminders.shared.entries.map { entry -> [String: Any] in
+                ["title": entry.item.title, "notes": entry.item.notes, "url": entry.item.url.absoluteString, "completed": entry.completed,
+                 "due": entry.item.due.map { "\($0.year ?? 0)-\($0.month ?? 0)-\($0.day ?? 0)" } ?? ""]
+            },
+            "reminderStatus": model.reminderStatus,
+            "island": RecordingIsland.shared.debugInfo,   // 录音岛（design §57.3）
+            // 人物页（design §60.2）
+            "sidebarMode": model.sidebarMode.rawValue, "selectedPerson": model.selectedPerson ?? -1,
+            "peopleOverview": model.peopleOverview.map { ["id": $0.id, "name": $0.name, "meetings": $0.meetingCount,
+                                                          "last": $0.lastMeetingDate ?? "", "me": $0.isMe] },
+            // 我的声音（design §56.3）
+            "selfPerson": ((try? model.db.enrollment()) ?? nil).map { ["id": $0.personId, "name": $0.name, "createdAt": $0.createdAt] } as Any,
+            "remindersAccess": Reminders.store.access.rawValue,
             "player": ["loaded": model.player.isLoaded, "playing": model.player.isPlaying,
                        "time": model.player.currentTime, "duration": model.player.duration, "rate": model.player.rate,
                        "mixing": model.player.isMixing,
@@ -818,6 +915,8 @@ enum DebugControl {
                          "liveLines": model.recorder.liveLines.count, "volatile": model.recorder.volatileText,
                          "liveStatus": model.recorder.liveStatus, "permissionDenied": model.recorder.permissionDenied,
                          "levelCheck": model.recorder.levelCheck,   // 收音提醒（design §26.1）
+                         "permissionRestarts": model.recorder.permissionRestarts,   // 允许了权限而重新接上电脑声音（design §51.1）
+                         "systemSilent": model.recorder.systemSilent,
                          "idle": model.recorder.idleInfo,   // 忘了停止录音（design §35）
                          "failure": model.recorder.failureMessage ?? "", "language": model.recorder.language.rawValue,
                          "languageSwitch": model.recorder.languageSwitch.map { "\($0.from.rawValue)→\($0.to.rawValue)" } ?? "",
@@ -834,7 +933,8 @@ enum DebugControl {
                           "preferred": Locale.preferredLanguages.first ?? ""],
             "models": ["breeze": "\(model.models.state)", "japanese": "\(model.models.state(.japanese))",
                        "qwen": "\(model.models.combinedState(.qwen))",
-                       "languageDetection": "\(model.models.state(.languageDetection))", "diarizer": "\(model.models.diarizerState)"],
+                       "languageDetection": "\(model.models.state(.languageDetection))", "diarizer": "\(model.models.diarizerState)",
+                       "nemotron": "\(model.models.nemotronState)", "diarizationModel": AppSettings.diarizationModel.rawValue],
             "exportMeeting": model.exportMeetingId as Any,
             "search": ["query": model.searchQuery, "results": model.searchResults.map { ["meeting": $0.meetingId, "kind": $0.kind.rawValue, "ref": $0.ref, "snippet": $0.snippet] }],
             "trash": model.trash.map { $0.id },
@@ -852,11 +952,12 @@ enum DebugControl {
             "highlightSegment": model.highlightSegment ?? -1,
             "errorMessage": model.errorMessage ?? "",
             "noticeMessage": model.noticeMessage ?? "",
-            // 窗口的最小尺寸（SwiftUI 依内容算的）：录音中卡住的调查用
+            // 窗口的最小尺寸（SwiftUI 依内容算的）：录音中卡住的调查用；sharing 是分享画面时藏不藏（0 none、1 readOnly，design §53）
             "windows": NSApp.windows.map { ["id": $0.identifier?.rawValue ?? "", "title": $0.title, "visible": $0.isVisible,
                                             "minWidth": $0.contentMinSize.width, "minHeight": $0.contentMinSize.height,
                                             "minSizeW": $0.minSize.width, "minSizeH": $0.minSize.height,
-                                            "width": $0.frame.width, "height": $0.frame.height] },
+                                            "width": $0.frame.width, "height": $0.frame.height,
+                                            "number": $0.windowNumber, "sharing": $0.sharingType.rawValue] },
         ]
         if let status = model.detailStatus { out["detailStatus"] = status.label }
         if let detail = model.detail {

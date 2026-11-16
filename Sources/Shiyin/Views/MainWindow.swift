@@ -118,13 +118,28 @@ struct MainView: View {
     @AppStorage("hasSeenGuide") private var hasSeenGuide = false
     @State private var dropTargeted = false
 
+    /// 「从这里分成两场…」那一句的开始时间（R90）
+    private var splitTime: String {
+        guard let id = model.splitMeetingRequest, let segment = model.detail?.segments.first(where: { $0.id == id }) else { return "" }
+        return TimeFormat.string(segment.start)
+    }
+
     var body: some View {
         @Bindable var model = model
         NavigationSplitView {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 380)
         } detail: {
-            if let detail = model.detail {
+            if model.sidebarMode == .people && !model.showTrash && model.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+                // 人物页（design §60.2）
+                if let person = model.peopleOverview.first(where: { $0.id == model.selectedPerson }) {
+                    PersonPage(person: person).id(person.id)
+                } else {
+                    PeopleEmptyView()
+                }
+            } else if model.multiSelected.count > 1 {
+                MultiSelectionView(ids: model.multiSelected)
+            } else if let detail = model.detail {
                 MeetingDetailView(detail: detail)
                     .id(detail.meeting.id)
             } else {
@@ -168,19 +183,63 @@ struct MainView: View {
                   String(localized: "目前是 \(Updater.currentVersion)。更新时拾音会结束并重新打开，会议资料都会保留。")]
                 .filter { !$0.isEmpty }.joined(separator: "\n\n"))
         }
-        .confirmationDialog("永久删除这场会议？", isPresented: Binding(get: { model.confirmPurge != nil }, set: { if !$0 { model.confirmPurge = nil } })) {
+        .confirmationDialog((model.confirmPurge?.count ?? 0) > 1 ? String(localized: "永久删除 \(model.confirmPurge?.count ?? 0) 场会议？")
+                                                                 : String(localized: "永久删除这场会议？"),
+                            isPresented: Binding(get: { model.confirmPurge != nil }, set: { if !$0 { model.confirmPurge = nil } })) {
             Button("永久删除", role: .destructive) {
-                if let id = model.confirmPurge { model.deletePermanently(id) }
+                if let ids = model.confirmPurge { model.deletePermanently(ids) }
             }
         } message: {
             Text("会议记录、逐字稿和录音都会删掉，没办法还原。")
         }
-        .confirmationDialog("把这场会议移到垃圾桶？", isPresented: $model.confirmDelete) {
-            Button("移到垃圾桶", role: .destructive) {
-                if let id = model.deleteTarget { model.moveToTrash(id) }
+        // 清空垃圾桶（R88.3）
+        .confirmationDialog(String(localized: "永久删除垃圾桶里的 \(model.trash.count) 场会议？"), isPresented: $model.confirmEmptyTrash) {
+            Button("清空垃圾桶", role: .destructive) { model.emptyTrash() }
+        } message: {
+            Text("会议记录、逐字稿和录音都会删掉，没办法还原。")
+        }
+        // 从某一句分成两场（R90、design §64）：分开后没办法合并回来（D170）
+        .confirmationDialog(String(localized: "从 \(splitTime) 这句开始分成另一场会议？"),
+                            isPresented: Binding(get: { model.splitMeetingRequest != nil }, set: { if !$0 { model.splitMeetingRequest = nil } })) {
+            Button("分成两场") {
+                if let id = model.splitMeetingRequest { model.splitMeeting(at: id) }
             }
         } message: {
+            Text("这句和之后的逐字稿、录音、标记重点变成新的一场，前面的留在这场；我的笔记、参考文件、提问留在这场。两场都要刷新会议记录。分开后没办法合并回来。")
+        }
+        .confirmationDialog(model.deleteTargets.count > 1 ? String(localized: "把 \(model.deleteTargets.count) 场会议移到垃圾桶？")
+                                                          : String(localized: "把这场会议移到垃圾桶？"), isPresented: $model.confirmDelete) {
+            Button("移到垃圾桶", role: .destructive) { model.moveToTrash(model.deleteTargets) }
+        } message: {
             Text("30 天内都可以从垃圾桶还原。")
+        }
+    }
+}
+
+/// 选了两场以上的会议（R88、design §62）：能一起做的事
+struct MultiSelectionView: View {
+    @Environment(AppModel.self) private var model
+    let ids: [Int64]
+
+    var body: some View {
+        ContentUnavailableView {
+            Label("已选中 \(ids.count) 场会议", systemImage: "square.stack")
+        } description: {
+            Text("按住 ⌘ 点击可以加入或取消，按住 ⇧ 点击一次选一段。")
+        } actions: {
+            HStack {
+                if model.showTrash {
+                    Button("还原") { model.restore(ids) }
+                    Button("永久删除…", role: .destructive) { model.confirmPurge = ids }
+                } else {
+                    FolderMenu(meetingIds: ids, current: model.commonFolder(ids))
+                        .fixedSize()
+                    Button("移到垃圾桶…", role: .destructive) {
+                        model.deleteTargets = ids
+                        model.confirmDelete = true
+                    }
+                }
+            }
         }
     }
 }
@@ -191,10 +250,13 @@ struct SidebarView: View {
     var body: some View {
         @Bindable var model = model
         VStack(spacing: 0) {
-            if model.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
-                meetingList
-            } else {
+            let searching = !model.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty
+            if searching {
                 SearchResultsList()
+            } else if model.sidebarMode == .people && !model.showTrash {
+                peopleList
+            } else {
+                meetingList
             }
             Divider()
             if model.importingCount > 0 {
@@ -219,8 +281,15 @@ struct SidebarView: View {
                 .buttonStyle(.borderless)
                 .foregroundStyle(.secondary)
                 Spacer()
-                // 导入放这里：侧边栏的工具列放不下，会被收进「>>」（design §22.2、R21.5）
-                if !model.showTrash {
+                // 导入放这里：侧边栏的工具列放不下，会被收进「>>」（design §22.2、R21.5）；垃圾桶里换成清空（R88.3）
+                if model.showTrash {
+                    Button { model.confirmEmptyTrash = true } label: {
+                        Label("清空垃圾桶…", systemImage: "trash.slash")
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .disabled(model.trash.isEmpty)
+                } else {
                     Button { model.showFileImporter = true } label: {
                         Label("导入", systemImage: "square.and.arrow.down")
                     }
@@ -234,6 +303,7 @@ struct SidebarView: View {
             .padding(.vertical, 8)
         }
         .searchable(text: $model.searchQuery, placement: .sidebar, prompt: "搜索所有会议")
+        .onAppear { model.reloadPeopleOverview() }
         .toolbar {
             ToolbarItemGroup {
                 RecordingControls()
@@ -251,41 +321,89 @@ struct SidebarView: View {
         }
     }
 
-    private var meetingList: some View {
-        @Bindable var model = model
-        return List(selection: $model.selection) {
-            if model.showTrash {
-                Text("垃圾桶里的会议 30 天后会永久删除").font(.caption).foregroundStyle(.secondary)
-            } else if !model.folders.isEmpty {
-                Section("文件夹") {
-                    FolderRow(name: String(localized: "所有会议"), count: model.meetings.count, symbol: "tray.full", selected: model.folderFilter == nil) {
-                        model.folderFilter = nil
+    /// 侧栏最上面的两组（design §60.2、R85.1）：所有会议、人物，再来是文件夹。跟文件夹同一种列，
+    /// 点了换下面那一段的内容（macOS 的侧栏是导览清单，不放分段控制）
+    @ViewBuilder
+    private var scopeSections: some View {
+        let people = model.sidebarMode == .people
+        Section {
+            FolderRow(name: String(localized: "所有会议"), count: model.meetings.count, symbol: "tray.full",
+                      selected: !people && model.folderFilter == nil) {
+                model.sidebarMode = .meetings
+                model.folderFilter = nil
+            }
+            FolderRow(name: String(localized: "人物"), count: model.peopleOverview.count, symbol: "person.2", selected: people) {
+                model.sidebarMode = .people
+                model.reloadPeopleOverview()
+            }
+        }
+        if !model.folders.isEmpty {
+            Section("文件夹") {
+                ForEach(model.folders, id: \.name) { folder in
+                    FolderRow(name: folder.name, count: folder.count, symbol: "folder", selected: !people && model.folderFilter == folder.name) {
+                        model.sidebarMode = .meetings
+                        model.folderFilter = folder.name
                     }
-                    ForEach(model.folders, id: \.name) { folder in
-                        FolderRow(name: folder.name, count: folder.count, symbol: "folder", selected: model.folderFilter == folder.name) {
-                            model.folderFilter = folder.name
-                        }
-                        .contextMenu {
-                            Button("重命名…") { model.folderPrompt = .rename(folder.name) }
-                            Button("删除文件夹（会议会保留）", role: .destructive) { model.deleteFolder(folder.name) }
-                        }
+                    .contextMenu {
+                        Button("重命名…") { model.folderPrompt = .rename(folder.name) }
+                        Button("删除文件夹（会议会保留）", role: .destructive) { model.deleteFolder(folder.name) }
                     }
                 }
             }
-            Section(model.showTrash || model.folders.isEmpty ? "" : (model.folderFilter ?? String(localized: "所有会议"))) {
+        }
+    }
+
+    /// 人物模式：上面同样是所有会议、人物、文件夹，下面是认识的人（design §60.2）
+    private var peopleList: some View {
+        @Bindable var model = model
+        return List(selection: $model.selectedPerson) {
+            scopeSections
+            Section("人物") {
+                ForEach(model.peopleOverview) { person in
+                    PersonRow(person: person).tag(person.id)
+                }
+                if model.peopleOverview.isEmpty {
+                    Text("在逐字稿点「说话者 1」改成名字，或到设置录一段你自己的声音，拾音就会记住这个人。")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        .selectionDisabled()
+                }
+            }
+        }
+    }
+
+    private var meetingList: some View {
+        @Bindable var model = model
+        // 多选（R88、design §62）：⌘、⇧ 点击；右键在选中的列上是全部
+        return List(selection: $model.listSelection) {
+            if model.showTrash {
+                Text("垃圾桶里的会议 30 天后会永久删除").font(.caption).foregroundStyle(.secondary)
+            } else {
+                scopeSections
+            }
+            Section(model.showTrash ? "" : (model.folderFilter ?? String(localized: "所有会议"))) {
                 ForEach(model.filteredMeetings) { row in
                     MeetingRowView(row: row, status: model.status(row))
                         .tag(row.id)
-                        .contextMenu {
-                            if model.showTrash {
-                                Button("还原") { model.restore(row.id) }
-                                Button("永久删除…", role: .destructive) { model.confirmPurge = row.id }
-                            } else {
-                                FolderMenu(meetingId: row.id, current: row.meeting.folder)
-                                Divider()
-                                Button("移到垃圾桶", role: .destructive) { model.moveToTrash(row.id) }
-                            }
+                }
+            }
+        }
+        .contextMenu(forSelectionType: Int64.self) { selected in
+            let ids = model.filteredMeetings.map(\.id).filter { selected.contains($0) }
+            if !ids.isEmpty {
+                if model.showTrash {
+                    Button("还原") { model.restore(ids) }
+                    Button("永久删除…", role: .destructive) { model.confirmPurge = ids }
+                } else {
+                    FolderMenu(meetingIds: ids, current: model.commonFolder(ids))
+                    Divider()
+                    if ids.count == 1 {
+                        Button("移到垃圾桶", role: .destructive) { model.moveToTrash(ids) }
+                    } else {
+                        Button("把 \(ids.count) 场会议移到垃圾桶…", role: .destructive) {
+                            model.deleteTargets = ids
+                            model.confirmDelete = true
                         }
+                    }
                 }
             }
         }
@@ -324,31 +442,32 @@ struct FolderRow: View {
 /// 「移到文件夹」菜单：既有的文件夹、新文件夹、移出文件夹（R9.2）
 struct FolderMenu: View {
     @Environment(AppModel.self) private var model
-    /// nil：目前选中的会议。工具列的菜单可能沿用之前创建的，按下时才决定是哪一场，不然会移到上一场会议
-    var meetingId: Int64? = nil
+    /// nil：目前选中的会议。工具列的菜单可能沿用之前建立的，按下时才决定是哪一场，不然会移到上一场会议
+    var meetingIds: [Int64]? = nil
+    /// 这几场现在在的文件夹（空字符串是不在文件夹里）；多选而且在不同文件夹时是 nil
     var current: String? = nil
 
-    private var target: Int64? { meetingId ?? model.selection }
-    private var folder: String { current ?? model.detail?.meeting.folder ?? "" }
+    private var targets: [Int64] { meetingIds ?? [model.selection].compactMap { $0 } }
 
     var body: some View {
         Menu("移到文件夹", systemImage: "folder") {
-            if meetingId == nil {
-                // 工具列的菜单内容不会更新，列出全部文件夹和固定的「移出文件夹」，选到原本的文件夹时 AppModel 会说明
+            if meetingIds == nil || current == nil {
+                // 工具列的菜单内容不会更新，列出全部文件夹和固定的「移出文件夹」，选到原本的文件夹时 AppModel 会说明；
+                // 多选而且在不同文件夹时也是这样
                 ForEach(model.folders, id: \.name) { item in
-                    Button(item.name) { if let target { model.moveToFolder(target, folder: item.name) } }
+                    Button(item.name) { model.moveToFolder(targets, folder: item.name) }
                 }
                 if !model.folders.isEmpty { Divider() }
-                Button("新文件夹…") { if let target { model.folderPrompt = .create(target) } }
-                Button("移出文件夹") { if let target { model.moveToFolder(target, folder: "") } }
-            } else {
+                Button("新文件夹…") { if !targets.isEmpty { model.folderPrompt = .create(targets) } }
+                Button("移出文件夹") { model.moveToFolder(targets, folder: "") }
+            } else if let folder = current {
                 ForEach(model.folders.filter { $0.name != folder }, id: \.name) { item in
-                    Button(item.name) { if let target { model.moveToFolder(target, folder: item.name) } }
+                    Button(item.name) { model.moveToFolder(targets, folder: item.name) }
                 }
                 if !model.folders.filter({ $0.name != folder }).isEmpty { Divider() }
-                Button("新文件夹…") { if let target { model.folderPrompt = .create(target) } }
+                Button("新文件夹…") { if !targets.isEmpty { model.folderPrompt = .create(targets) } }
                 if !folder.isEmpty {
-                    Button("移出「\(folder)」") { if let target { model.moveToFolder(target, folder: "") } }
+                    Button("移出「\(folder)」") { model.moveToFolder(targets, folder: "") }
                 }
             }
         }
@@ -367,7 +486,7 @@ struct FolderPromptModifier: ViewModifier {
             Button(confirmTitle) {
                 let value = name.trimmingCharacters(in: .whitespacesAndNewlines)
                 switch model.folderPrompt {
-                case .create(let id)?: if !value.isEmpty { model.moveToFolder(id, folder: value) }
+                case .create(let ids)?: if !value.isEmpty { model.moveToFolder(ids, folder: value) }
                 case .rename(let old)?: model.renameFolder(old, to: value)
                 case nil: break
                 }
@@ -503,36 +622,44 @@ struct RecordingControls: View {
                     .help("停止录音并开始转录（⌘R）")
             }
         } else {
-            // 这两个选项是之后录音的设置，选完画面不会变，跳一个提示让人知道选到了
-            Menu {
-                Picker("录音来源", selection: Binding(get: { source }, set: { value in
-                    source = value
-                    model.noticeMessage = String(localized: "之后的录音：\(Self.sourceLabel(value))")
-                })) {
-                    ForEach(["mic", "both", "system"], id: \.self) { Text(Self.sourceLabel($0)).tag($0) }
+            // 这两个选项是之后录音的设置，选完画面不会变，跳一个提示让人知道选到了。
+            // 按钮和箭头分成两个控制项（A11Y1）：分割菜单（Menu 的 primaryAction）箭头那一半在辅助功能里没有名字，VoiceOver 读不出来
+            ControlGroup {
+                Button { model.startRecording() } label: {
+                    Label(MeetingLanguage.ui(zh: "录音", en: "Record"), systemImage: "record.circle")
                 }
-                .pickerStyle(.inline)
-                // 麦克风（R58.1、design §38.2）：跟设置页同一个设置
-                if source != "system" {
-                    Picker("麦克风", selection: Binding(get: { device }, set: { model.switchMicrophone($0) })) {
-                        MicrophoneOptions(saved: device)
+                .help("开始录音（⌘R），用\(language.uiName)识别；点右边的箭头可以改录音来源和语言")
+                Menu {
+                    Picker("录音来源", selection: Binding(get: { source }, set: { value in
+                        source = value
+                        model.noticeMessage = String(localized: "之后的录音：\(Self.sourceLabel(value))")
+                    })) {
+                        ForEach(["mic", "both", "system"], id: \.self) { Text(Self.sourceLabel($0)).tag($0) }
                     }
                     .pickerStyle(.inline)
+                    // 麦克风（R58.1、design §38.2）：跟设置页同一个设置
+                    if source != "system" {
+                        Picker("麦克风", selection: Binding(get: { device }, set: { model.switchMicrophone($0) })) {
+                            MicrophoneOptions(saved: device)
+                        }
+                        .pickerStyle(.inline)
+                    }
+                    Picker("会议语言", selection: Binding(get: { language }, set: { value in
+                        language = value
+                        model.noticeMessage = String(localized: "之后的录音都用\(value.uiName)")
+                    })) {
+                        ForEach(MeetingLanguage.allCases) { Text($0.name).tag($0) }
+                    }
+                    .pickerStyle(.inline)
+                } label: {
+                    Label("录音选项", systemImage: "chevron.down")
                 }
-                Picker("会议语言", selection: Binding(get: { language }, set: { value in
-                    language = value
-                    model.noticeMessage = String(localized: "之后的录音都用\(value.uiName)")
-                })) {
-                    ForEach(MeetingLanguage.allCases) { Text($0.name).tag($0) }
-                }
-                .pickerStyle(.inline)
-            } label: {
-                Label(MeetingLanguage.ui(zh: "录音", en: "Record"), systemImage: "record.circle")
-            } primaryAction: {
-                model.startRecording()
+                .menuIndicator(.hidden)
+                .help("录音来源、麦克风、会议语言")
+                .accessibilityLabel(Text("录音选项"))
             }
-            .help("开始录音（⌘R），用\(language.uiName)识别；点右边的箭头可以改录音来源和语言")
-            // 工具列的菜单创建一次就不会更新勾选，选项变了（含接上、拔掉麦克风）就换一个新的菜单
+            .controlGroupStyle(.navigation)
+            // 工具列的菜单建立一次就不会更新勾选，选项变了（含接上、拔掉麦克风）就换一个新的菜单
             .id("\(source)-\(language.rawValue)-\(device)-\(MicrophoneMonitor.shared.signature)")
         }
     }
