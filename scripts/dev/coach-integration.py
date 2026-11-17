@@ -105,6 +105,16 @@ def quit_app():
     time.sleep(.7)
 
 
+def remove_organizing_migrations(connection):
+    # 仅用于临时夹具：还原为本 fork 同步前的数据库结构。
+    connection.execute('DROP INDEX meetings_series')
+    connection.execute('ALTER TABLE meetings DROP COLUMN series_id')
+    connection.execute('ALTER TABLE meetings DROP COLUMN folder_decided')
+    for table in ['folder_rules', 'series_rejected', 'series', 'folders']:
+        connection.execute('DROP TABLE ' + table)
+    connection.execute("DELETE FROM grdb_migrations WHERE identifier IN ('v13','v14','v15')")
+
+
 def query(sql, parameters=(), target_home=home):
     with sqlite3.connect(f'file:{target_home}/shiyin.sqlite?mode=ro', uri=True) as connection:
         return connection.execute(sql, parameters).fetchall()
@@ -268,6 +278,7 @@ try:
     upgrade_home.mkdir()
     with sqlite3.connect(home / 'shiyin.sqlite') as source, sqlite3.connect(upgrade_home / 'shiyin.sqlite') as target:
         source.backup(target)
+        remove_organizing_migrations(target)
         target.execute('DROP TRIGGER clean_lines_text')
         target.execute('DROP TABLE clean_lines')
         target.execute("DELETE FROM grdb_migrations WHERE identifier='v12'")
@@ -284,6 +295,7 @@ try:
         'SELECT state FROM meeting_assistance WHERE meeting_id=?', (failure_id,))[0][0]
     with sqlite3.connect(home / 'shiyin.sqlite') as source, sqlite3.connect(v11_home / 'shiyin.sqlite') as target:
         source.backup(target)
+        remove_organizing_migrations(target)
         target.execute('DROP TRIGGER clean_lines_text')
         target.execute('DROP TABLE clean_lines')
         target.execute("DELETE FROM grdb_migrations WHERE identifier='v12'")
@@ -299,6 +311,24 @@ try:
         check(backup.execute('SELECT state FROM meeting_assistance WHERE meeting_id=?', (failure_id,)).fetchone()[0]
               == original_preparation and not backup.execute("SELECT identifier FROM grdb_migrations WHERE identifier='v12'").fetchall(),
               '备份保留原 v11 助手数据及迁移版本')
+    quit_app()
+    v12_home = base / 'v12-home'
+    v12_home.mkdir()
+    with sqlite3.connect(home / 'shiyin.sqlite') as source, sqlite3.connect(v12_home / 'shiyin.sqlite') as target:
+        source.backup(target)
+        remove_organizing_migrations(target)
+        target.execute("UPDATE meetings SET folder='保留的旧文件夹' WHERE id=?", (failure_id,))
+        target.execute('''INSERT INTO segments(meeting_id,seq,start,"end",text,low_confidence,kind)
+                          VALUES (?,0,0,1,'测试原文',0,'final')''', (failure_id,))
+        segment = target.execute('SELECT last_insert_rowid()').fetchone()[0]
+        target.execute('INSERT INTO clean_lines(segment_id,text) VALUES (?,?)', (segment, '保留的精简稿'))
+    launch(v12_home)
+    check(query('SELECT text FROM clean_lines WHERE segment_id=?', (segment,), target_home=v12_home)[0][0]
+          == '保留的精简稿', 'v12 升级保留已有精简稿')
+    check(bool(query("SELECT identifier FROM grdb_migrations WHERE identifier='v15'", target_home=v12_home))
+          and bool(query("SELECT name FROM folders WHERE name='保留的旧文件夹'", target_home=v12_home)),
+          '文件夹迁移到 v15 并保留旧会议分类')
+    check(bool(list((v12_home / 'backups').glob('*before-v13.sqlite'))), 'v13 文件夹迁移前保留 v12 备份')
     quit_app()
     tools = base / 'tools'
     tools.mkdir()

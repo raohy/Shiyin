@@ -309,7 +309,83 @@ final class AppDatabase: @unchecked Sendable {
                 END;
                 """)
         }
+        // 文件夹自动归类、定期会议（design §72、§73；定期会议 v15 拿掉）
+        migrator.registerMigration("v13") { db in
+            try db.execute(sql: """
+                CREATE TABLE series (
+                  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name           TEXT NOT NULL,
+                  weekday        INTEGER NOT NULL,
+                  minute         INTEGER,
+                  interval_weeks INTEGER NOT NULL DEFAULT 1,
+                  people         TEXT NOT NULL DEFAULT '[]',
+                  created_at     TEXT NOT NULL
+                );
+                CREATE TABLE series_rejected (
+                  key        TEXT PRIMARY KEY,
+                  created_at TEXT NOT NULL
+                );
+                CREATE TABLE folder_rules (
+                  folder      TEXT PRIMARY KEY,
+                  keywords    TEXT NOT NULL DEFAULT '[]',
+                  people      TEXT NOT NULL DEFAULT '[]',
+                  template_id TEXT,
+                  series_id   INTEGER REFERENCES series(id) ON DELETE SET NULL,
+                  created_at  TEXT NOT NULL
+                );
+                ALTER TABLE meetings ADD COLUMN folder_decided INTEGER NOT NULL DEFAULT 0;
+                ALTER TABLE meetings ADD COLUMN series_id INTEGER REFERENCES series(id) ON DELETE SET NULL;
+                CREATE INDEX meetings_series ON meetings(series_id);
+                """)
+        }
+        // 文件夹自己存在，可以是空的（R104、design §78）：现有会议的文件夹、有自动加入条件的文件夹都放进去
+        migrator.registerMigration("v14") { db in
+            try db.execute(sql: """
+                CREATE TABLE folders (
+                  name       TEXT PRIMARY KEY,
+                  created_at TEXT NOT NULL
+                );
+                INSERT OR IGNORE INTO folders (name, created_at) SELECT DISTINCT folder, ? FROM meetings WHERE folder <> '';
+                INSERT OR IGNORE INTO folders (name, created_at) SELECT folder, created_at FROM folder_rules;
+                """, arguments: [Clock.now()])
+        }
+        // 拿掉定期会议（R99、design §73、D177）：每个定期会议换成同名的文件夹，里面不在文件夹的会议移进去；
+        // 文件夹条件的定期会议拿掉（条件都空了就删掉）。表、字段留着不用（拿掉有外键的字段要重建整张 meetings）
+        migrator.registerMigration("v15") { db in
+            var names: [Int64: String] = [:]
+            for row in try Row.fetchAll(db, sql: "SELECT id, name FROM series ORDER BY id") {
+                let id: Int64 = row["id"]
+                let name = (row["name"] as String? ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !name.isEmpty else { continue }
+                names[id] = name
+                try db.execute(sql: "INSERT OR IGNORE INTO folders (name, created_at) VALUES (?, ?)", arguments: [name, Clock.now()])
+                try db.execute(sql: "UPDATE meetings SET folder = ?, folder_decided = 1 WHERE series_id = ? AND folder = ''",
+                               arguments: [name, id])
+            }
+            try db.execute(sql: """
+                UPDATE folder_rules SET series_id = NULL;
+                DELETE FROM folder_rules WHERE keywords = '[]' AND people = '[]' AND template_id IS NULL;
+                UPDATE meetings SET series_id = NULL WHERE series_id IS NOT NULL;
+                DELETE FROM series;
+                DELETE FROM series_rejected;
+                """)
+            if !names.isEmpty { Self.replaceSeriesKeys(names) }
+        }
         return migrator
+    }
+
+    /// 侧栏展开、排序的键（UserDefaults）：series:<id> 换成 folder:<名称>（migration v15）；换完跟原本的文件夹重复时留前面的
+    nonisolated static func replaceSeriesKeys(_ names: [Int64: String]) {
+        let defaults = UserDefaults.standard
+        for key in [AppSettings.sidebarExpandedKey, AppSettings.sidebarOrderKey] {
+            guard let list = defaults.stringArray(forKey: key), list.contains(where: { $0.hasPrefix("series:") }) else { continue }
+            var seen = Set<String>()
+            let replaced = list.compactMap { item -> String? in
+                guard item.hasPrefix("series:") else { return item }
+                return Int64(item.dropFirst("series:".count)).flatMap { names[$0] }.map { "folder:" + $0 }
+            }.filter { seen.insert($0).inserted }
+            defaults.set(replaced, forKey: key)
+        }
     }
 
     // MARK: 会议
@@ -397,15 +473,45 @@ final class AppDatabase: @unchecked Sendable {
         guard !ids.isEmpty else { return }
         try pool.write { db in
             for id in ids {
-                try db.execute(sql: "UPDATE meetings SET folder = ?, updated_at = ? WHERE id = ?", arguments: [folder, Clock.now(), id])
+                // 自己移进、移出文件夹后不再自动放、不再建议（design §72）
+                try db.execute(sql: "UPDATE meetings SET folder = ?, folder_decided = 1, updated_at = ? WHERE id = ?", arguments: [folder, Clock.now(), id])
+            }
+            if !folder.isEmpty {
+                try db.execute(sql: "INSERT OR IGNORE INTO folders (name, created_at) VALUES (?, ?)", arguments: [folder, Clock.now()])
             }
         }
     }
 
+    /// 建一个空的文件夹（R104）
+    func createFolder(_ name: String) throws {
+        try pool.write { db in
+            try db.execute(sql: "INSERT OR IGNORE INTO folders (name, created_at) VALUES (?, ?)", arguments: [name, Clock.now()])
+        }
+    }
+
+    /// 文件夹表里的名字（会议都移走了也还在）
+    func folderNames() throws -> [String] {
+        try pool.read { db in try String.fetchAll(db, sql: "SELECT name FROM folders") }
+    }
+
     /// 改名或删除（newName 为空字符串）一个文件夹，垃圾桶里的会议也一起改
+    /// 改名时条件跟着改名；newName 是空的（删除文件夹）时条件一起删（design §72）
     func renameFolder(_ old: String, to newName: String) throws {
         try pool.write { db in
             try db.execute(sql: "UPDATE meetings SET folder = ?, updated_at = ? WHERE folder = ?", arguments: [newName, Clock.now(), old])
+            let targetHasRule = try Bool.fetchOne(db, sql: "SELECT 1 FROM folder_rules WHERE folder = ?", arguments: [newName]) ?? false
+            if newName.isEmpty || targetHasRule {
+                try db.execute(sql: "DELETE FROM folder_rules WHERE folder = ?", arguments: [old])
+            } else {
+                try db.execute(sql: "UPDATE folder_rules SET folder = ? WHERE folder = ?", arguments: [newName, old])
+            }
+            // 文件夹表（R104）：删除、改成已经有的名字时拿掉旧的，不然改名
+            let targetExists = try Bool.fetchOne(db, sql: "SELECT 1 FROM folders WHERE name = ?", arguments: [newName]) ?? false
+            if newName.isEmpty || targetExists {
+                try db.execute(sql: "DELETE FROM folders WHERE name = ?", arguments: [old])
+            } else {
+                try db.execute(sql: "UPDATE folders SET name = ? WHERE name = ?", arguments: [newName, old])
+            }
         }
     }
 
@@ -830,6 +936,10 @@ final class AppDatabase: @unchecked Sendable {
         }
     }
 
+    func renameBookmark(_ id: Int64, label: String) throws {
+        try pool.write { db in try db.execute(sql: "UPDATE bookmarks SET label = ? WHERE id = ?", arguments: [label, id]) }
+    }
+
     func deleteBookmark(_ id: Int64) throws {
         _ = try pool.write { db in try Bookmark.deleteOne(db, key: id) }
     }
@@ -1210,6 +1320,19 @@ final class AppDatabase: @unchecked Sendable {
                 added += db.changesCount
             }
             return added
+        }
+    }
+
+    /// 改一个词（R100）：改成已经有的词时合并（删掉这一个）
+    func renameTerm(_ id: Int64, to term: String) throws {
+        let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        try pool.write { db in
+            if try Int64.fetchOne(db, sql: "SELECT id FROM glossary WHERE term = ? AND id != ?", arguments: [trimmed, id]) != nil {
+                try db.execute(sql: "DELETE FROM glossary WHERE id = ?", arguments: [id])
+            } else {
+                try db.execute(sql: "UPDATE glossary SET term = ? WHERE id = ?", arguments: [trimmed, id])
+            }
         }
     }
 

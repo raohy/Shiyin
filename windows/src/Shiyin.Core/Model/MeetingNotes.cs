@@ -129,6 +129,7 @@ public sealed record MeetingNotes
         // people 是空的時不寫（同 Mac 的 MeetingNotes.encode，M§66）：以前的會議紀錄、沒有這一段的會議紀錄存起來跟以前一字不差
         if (People.Count > 0)
             obj.Add("people", new JNode.Arr(People.Select(p => (JNode)new JNode.Obj().Add("name", p.Name).Add("points", Items(p.Points)))));
+        // 以前定期會議的 followUps（M§73，D177 拿掉）不讀不寫：以前存的解碼時略過，存回去時就沒了
         return obj;
     }
 

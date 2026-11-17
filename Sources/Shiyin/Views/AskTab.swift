@@ -93,15 +93,15 @@ struct AskInputBar: View {
             }
             HStack(spacing: 10) {
                 TextField(placeholder, text: $question, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.sheet)
                     .lineLimit(1...4)
                     .onSubmit(submit)
                 Button("提问", action: submit)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(SheetPillButtonStyle(.primary))
                     .disabled(busy || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.askUnavailableReason != nil)
                 if let onClear {
                     Menu {
-                        Button("清除问答记录", role: .destructive, action: onClear)
+                        DestructiveMenuButton(String(localized: "清除问答记录"), action: onClear)
                     } label: { Image(systemName: "ellipsis.circle") }
                     .menuStyle(.borderlessButton)
                     .menuIndicator(.hidden)

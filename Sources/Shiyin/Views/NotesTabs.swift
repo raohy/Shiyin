@@ -73,13 +73,19 @@ struct ItemList: View {
             ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                 let ref = ref(index)
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text("•").foregroundStyle(.secondary)
-                        (Text(item.text)).meetingText()
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if !item.time.isEmpty { TimeButton(time: item.time).font(.caption.monospacedDigit()) }
-                        if let ref, let detail { ReviewMarker(ref: ref, count: detail.reviewCount(ref)) }
+                    if let ref, detail != nil, model.editingNoteItem == ref {
+                        // 就地改这一条（R100、design §74）
+                        NoteItemEditor(ref: ref)
+                    } else {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("•").foregroundStyle(.secondary)
+                            (Text(item.text)).meetingText()
+                                .selectableUnlessEditable(ref != nil && detail != nil)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if !item.time.isEmpty { TimeButton(time: item.time).font(.caption.monospacedDigit()) }
+                            if let ref, let detail { ReviewMarker(ref: ref, count: detail.reviewCount(ref)) }
+                        }
+                        .noteItemActions(ref: detail == nil ? nil : ref, text: item.text, time: item.time)
                     }
                     if let ref, let detail, model.reviewDraft?.expanded == ref {
                         InlineReviewCard(detail: detail, indexes: detail.reviewLinks[ref] ?? [])
@@ -143,9 +149,10 @@ struct InlineReviewCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
                     Button("收合") { draft.expanded = nil }
+                        .buttonStyle(SheetPillButtonStyle(.secondary, compact: true))
                     // 只送这一条对到的题目（R41.2），题数也只算这几题
                     Button(draft.submitTitle(only: shown)) { model.submitReviewDraft(only: shown) }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(SheetPillButtonStyle(.primary, compact: true))
                         .disabled(!draft.hasSomethingToSubmit(only: shown) || model.detailStatus?.isActive == true)
                 }
             }
@@ -178,7 +185,7 @@ struct NotesPlaceholder: View {
                 Button("设置整理工具") { openSettings() }
             } else if AppSettings.provider != .none, let problem = model.summarizerProblem {
                 // 选了整理工具但还没准备好（没登录、没有 key…，R45.4）：说原因，给修的按钮
-                // 不加 fixedSize：这里不在 ScrollView 里，量最小高度时整个窗口的内容会被往上推（CLAUDE.md）
+                // 不加 fixedSize：这里不在 ScrollView 里，量最小高度时整个窗口的内容会被往上推
                 Text("整理工具还没设置好：\(problem.message)")
                     .foregroundStyle(.secondary)
                 Button(problem.actionTitle) {
@@ -287,6 +294,10 @@ struct NotesPage: View {
         // 加入、移除文档之后还没刷新（R61.8）：提示列不跟着文字大小（R59.2）
         if let id = detail.meeting.id, model.documentsChanged.contains(id) {
             DocumentsBanner().environment(\.textScale, 1)
+        }
+        // 这场很像某个文件夹里的会议（R98.3）
+        if let id = detail.meeting.id, let suggestion = model.folderSuggestion(for: detail.meeting) {
+            FolderSuggestionBanner(meetingId: id, suggestion: suggestion).environment(\.textScale, 1)
         }
         if detail.reviewCount > 0 { ReviewBanner(detail: detail) }
         EditBar(viewMode: $notesView, disabled: model.detailStatus?.isActive == true,
@@ -529,8 +540,11 @@ struct ActionItemsTable: View {
                             .foregroundStyle(item.owner.isEmpty ? Color.signal : Color.primary)
                     }
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        if let ref, detail != nil, model.editingNoteItem == ref {
+                            NoteItemEditor(ref: ref)
+                        } else {
                         Text(item.task).meetingText()
-                            .textSelection(.enabled)
+                            .selectableUnlessEditable(ref != nil && detail != nil)
                             .fixedSize(horizontal: false, vertical: true)
                         if !item.time.isEmpty { TimeButton(time: item.time).font(.caption.monospacedDigit()) }
                         if let ref, let detail { ReviewMarker(ref: ref, count: detail.reviewCount(ref)) }
@@ -541,7 +555,9 @@ struct ActionItemsTable: View {
                                 .contentFont(.caption)
                                 .help(done ? "已在提醒事项里完成" : "已加到提醒事项")
                         }
+                        }
                     }
+                    .noteItemActions(ref: detail == nil || model.editingNoteItem == ref ? nil : ref, text: item.task, time: item.time)
                     .gridColumnAlignment(.leading)
                     Text(item.due.isEmpty ? "—" : item.due)
                         .monospacedDigit()
@@ -585,13 +601,14 @@ struct NotesEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("编辑会议记录").font(.headline)
+                Text("编辑会议记录").font(.title3).fontWeight(.bold)
                 Spacer()
                 Button("取消") { onFinish(false) }
+                    .buttonStyle(SheetPillButtonStyle(.secondary, compact: true))
                     .keyboardShortcut(.cancelAction)
                 Button("完成") { onFinish(true) }
+                    .buttonStyle(SheetPillButtonStyle(.primary, compact: true))
                     .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
             }
             .padding(.horizontal, 32)
             .padding(.vertical, 10)
@@ -662,7 +679,7 @@ struct NotesEditor: View {
                         }
                     }
                 }
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.sheetCompact)
                 .contentFont()   // 文字大小（design §38.5）
                 .frame(maxWidth: 720 * scale, alignment: .leading)
                 .padding(.horizontal, 32)

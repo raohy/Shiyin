@@ -40,6 +40,8 @@ public sealed class Meeting
     public int? MinSpeakers { get; set; }
     public double? SpeakerCheck { get; set; }
     public bool SpeakerHintDismissed { get; set; }
+    /// <summary>v12（M§72）：資料夾已經決定了（自動放過、自己移過、建議按了不用）。定期會議的 series_id 欄位留著不用（D177）</summary>
+    public bool FolderDecided { get; set; }
 
     public MeetingLanguage MeetingLanguage => MeetingLanguages.Parse(Language) ?? MeetingLanguage.Zh;
 
@@ -132,7 +134,7 @@ public sealed class NotesVersion
     public string CreatedAt { get; set; } = Clock.Now();
 }
 
-public enum JobKind { Transcribe, Summarize, Revise, Compress, Correct, NameSpeakers, Rediarize }
+public enum JobKind { Transcribe, Summarize, Revise, Compress, Correct, NameSpeakers, Rediarize, Clean }
 public enum JobLane { Transcribe, Llm, Assist }
 public enum JobStatus { Queued, Running, Done, Failed, Cancelled }
 
@@ -148,6 +150,7 @@ public static class JobKinds
         JobKind.Compress => "compress",
         JobKind.Correct => "correct",
         JobKind.NameSpeakers => "nameSpeakers",
+        JobKind.Clean => "clean",
         _ => "rediarize",
     };
 
@@ -163,8 +166,9 @@ public static class JobKinds
 
     /// <summary>背景的輔助工作：不發通知、不改會議的狀態</summary>
     /// <summary>要用整理工具的工作（M§34）</summary>
-    public static bool UsesSummarizer(this JobKind k) => k is JobKind.Summarize or JobKind.Revise or JobKind.Correct or JobKind.NameSpeakers;
-    public static bool IsAuxiliary(this JobKind k) => k is JobKind.Compress or JobKind.Correct or JobKind.NameSpeakers or JobKind.Rediarize;
+    public static bool UsesSummarizer(this JobKind k) => k is JobKind.Summarize or JobKind.Revise or JobKind.Correct or JobKind.NameSpeakers or JobKind.Clean;
+    /// <summary>精簡逐字稿（M§70）也是輔助工作：在輔助線、不發通知</summary>
+    public static bool IsAuxiliary(this JobKind k) => k is JobKind.Compress or JobKind.Correct or JobKind.NameSpeakers or JobKind.Rediarize or JobKind.Clean;
 
     public static string Code(this JobLane l) => l switch { JobLane.Llm => "llm", JobLane.Assist => "assist", _ => "transcribe" };
     public static JobLane? ParseLane(string? code) => code switch { "transcribe" => JobLane.Transcribe, "llm" => JobLane.Llm, "assist" => JobLane.Assist, _ => null };

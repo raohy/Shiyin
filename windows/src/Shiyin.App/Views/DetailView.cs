@@ -31,6 +31,8 @@ public sealed class DetailView
     readonly RecordingPanel recording;
     readonly PlayerBar playerBar;
     readonly NotesTabs notes;
+    /// <summary>紀錄分頁（DEBUG 的控制通道：就地改一條紀錄）</summary>
+    public NotesTabs Notes => notes;
     readonly ReviewTab review;
     readonly AskTab ask;
     /// <summary>待確認的回答（M§31.2）：待確認分頁和紀錄旁的就地回答共用；跟著目前的會議（Show 時同步）</summary>
@@ -143,6 +145,8 @@ public sealed class DetailView
     public void UpdateStatus()
     {
         if (detail is null || IsTrashed) return;
+        // 逐字稿「精簡」產生中的進度（R96）
+        if (window.State.Tab == DetailTab.Transcript && !IsRecordingThis) transcript.UpdateClean();
         if (StatusKey() == statusKey)
         {
             if (statusLiveText is not null && host.Controller.Status(Detail) is MeetingStatus.Transcribing t)
@@ -215,8 +219,9 @@ public sealed class DetailView
     FrameworkElement InfoRow()
     {
         var meeting = Detail.Meeting;
-        // 每一項上下置中（名字是按鈕時比一般的文字高一點）
-        var info = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16 };
+        // 每一項上下置中（名字是按鈕時比一般的文字高一點）。放不下時換行，不切掉：資料夾、日期、長度加上四位與會者和「自動」，
+        // 英文介面在一般的視窗寬度會超出、最後一位被切一半（2026-11-16 英文巡檢；Mac 的 HStack 是把字縮成省略號）
+        var info = new FlowPanel { Spacing = 16, LineSpacing = 6 };
         if (meeting.Folder.Length > 0) info.Children.Add(Ui.Row(4, new SymbolIcon(Symbol.Folder) { Foreground = Ui.Secondary }, Ui.Text(meeting.Folder, 13, color: Ui.Secondary, wrap: false)));
         info.Children.Add(Ui.Text($"{meeting.MeetingDate} {DateText.Weekday(meeting.MeetingDate, MeetingLanguages.Interface)}", 13, color: Ui.Secondary, wrap: false));
         if (meeting.DurationSeconds is not null) info.Children.Add(Ui.Text(L.Ui(TimeFormat.Duration(meeting.DurationSeconds, MeetingLanguages.Interface)), 13, color: Ui.Secondary, wrap: false));
@@ -276,8 +281,15 @@ public sealed class DetailView
         var name = Ui.Text(Detail.Speakers[idx], 13, color: Ui.Speaker(idx), wrap: false);
         if (Detail.SpeakerSources.GetValueOrDefault(idx) != "voiceprint")
         {
+            // 點名字重新命名、右鍵：重新命名…、合併到 ▸（R100，同逐字稿點說話者）
             name.VerticalAlignment = VerticalAlignment.Center;
-            return Ui.Row(5, avatar, name);
+            var chip = new HyperlinkButton { Content = Ui.FollowForeground(Ui.Row(5, avatar, name)), Padding = new Thickness(0), MinHeight = 0, VerticalAlignment = VerticalAlignment.Center };
+            var rename = SpeakerRenameFlyout(idx);
+            chip.Click += (_, _) => rename.ShowAt(chip);
+            chip.ContextFlyout = SpeakerMenu(idx, chip, rename);
+            ToolTipService.SetToolTip(chip, L.F("重新命名「%@」，整場的逐字稿和會議紀錄都會跟著改", Detail.Speakers[idx]));
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(chip, Detail.Speakers[idx]);
+            return chip;
         }
         var menu = new MenuFlyout();
         var others = Detail.SpeakerCandidates.GetValueOrDefault(idx) ?? [];
@@ -291,7 +303,7 @@ public sealed class DetailView
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(Ui.Item(L.F("不是%@（不知道是誰）", Detail.Speakers[idx]), () => host.Controller.RejectVoiceprintMatch(meeting.Id!.Value, idx)));
         // 頭像也放進按鈕裡：點頭像、點名字都打開同一個選單（R83.2）
-        var button = new HyperlinkButton { Content = Ui.Row(5, avatar, name), Padding = new Thickness(0), MinHeight = 0, VerticalAlignment = VerticalAlignment.Center };
+        var button = new HyperlinkButton { Content = Ui.FollowForeground(Ui.Row(5, avatar, name)), Padding = new Thickness(0), MinHeight = 0, VerticalAlignment = VerticalAlignment.Center };
         button.Click += (_, _) => menu.ShowAt(button);
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, L.F("%@（自動）", Detail.Speakers[idx]));
         var badge = new Border
@@ -301,7 +313,50 @@ public sealed class DetailView
         };
         var auto = Ui.Row(4, button, badge);
         ToolTipService.SetToolTip(auto, L.T("拾音認出這個人的聲音，自動帶入名字。不對的話點名字"));
+        // 右鍵（R100）：重新命名…、合併到 ▸（點名字照舊是「是別人／不是他」的選單）
+        button.ContextFlyout = SpeakerMenu(idx, button, SpeakerRenameFlyout(idx));
         return auto;
+    }
+
+    /// <summary>會議頁上方說話者的右鍵（R100、M§74）：重新命名…、合併到 ▸（其他說話者，同逐字稿的合併 R36）</summary>
+    MenuFlyout SpeakerMenu(int idx, FrameworkElement anchor, Flyout rename)
+    {
+        var meetingId = Detail.Meeting.Id!.Value;
+        var menu = new MenuFlyout();
+        menu.Items.Add(Ui.Item(L.T("重新命名…"), () => rename.ShowAt(anchor), icon: Symbol.Rename));
+        var others = Detail.Speakers.Keys.Order().Where(k => k != idx).ToList();
+        if (others.Count > 0)
+        {
+            var merge = new MenuFlyoutSubItem { Text = L.T("合併到"), Icon = new SymbolIcon(Symbol.People) };
+            foreach (var other in others) merge.Items.Add(Ui.Item(Detail.Speakers[other], () => host.Controller.MergeSpeaker(meetingId, idx, other)));
+            menu.Items.Add(merge);
+        }
+        return menu;
+    }
+
+    /// <summary>重新命名一位說話者（R100）：名字選好，Enter 儲存；整場的逐字稿和會議紀錄都會跟著改</summary>
+    Flyout SpeakerRenameFlyout(int idx)
+    {
+        var meetingId = Detail.Meeting.Id!.Value;
+        var current = Detail.Speakers[idx];
+        // 同彈窗的元件（R106.4）：標題粗體、同一種框、圓角按鈕
+        var box = Sheet.TextField(current, L.T("名字"));
+        box.Width = 280;
+        var flyout = new Flyout();
+        void Save()
+        {
+            var text = box.Text.Trim();
+            flyout.Hide();
+            if (text.Length > 0 && text != current) host.Controller.RenameSpeaker(meetingId, idx, text);
+        }
+        var save = Sheet.Pill(L.T("儲存"), Sheet.Kind.Primary, click: Save);
+        box.TextChanged += (_, _) => save.IsEnabled = box.Text.Trim().Length > 0;
+        box.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) { e.Handled = true; Save(); } };
+        var actions = Ui.Row(8, Sheet.Pill(L.T("取消"), click: flyout.Hide), save);
+        actions.HorizontalAlignment = HorizontalAlignment.Right;
+        flyout.Content = Ui.Column(12, Ui.Text(L.T("說話者名字"), 18, bold: true), box, actions);
+        flyout.Opened += (_, _) => { box.Focus(FocusState.Programmatic); box.SelectAll(); };
+        return flyout;
     }
 
     /// <summary>
@@ -401,7 +456,8 @@ public sealed class DetailView
         if (left is FrameworkElement l) l.VerticalAlignment = VerticalAlignment.Center;
         if (right is FrameworkElement rr) rr.VerticalAlignment = VerticalAlignment.Center;
         var bar = right is FrameworkElement r ? Ui.Bar(null, left as FrameworkElement, r, 12) : (FrameworkElement)left;
-        return new Border { Child = bar, Padding = new Thickness(14, 8, 14, 8), CornerRadius = new CornerRadius(8), Background = background };
+        // 對比主題時沒有底色、一圈細框（Ui.Tinted）
+        return Ui.Tinted(new Border { Child = bar, Padding = new Thickness(14, 8, 14, 8), CornerRadius = new CornerRadius(8) }, background);
     }
 
     Border TrashBanner()
@@ -533,7 +589,7 @@ public sealed class DetailView
         menu.Items.Add(Ui.Item(L.T("複製會議紀錄：純文字（貼到 Slack、訊息）"), () => CopyNotes(id, "plain")));
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(Ui.Item(L.T("複製心智圖（圖片）"), () => _ = CopyMindMap(id)));
-        var button = new SplitButton { Content = Ui.Row(6, new SymbolIcon(Symbol.Share), Ui.Text(L.T("匯出"), wrap: false)), Flyout = menu };
+        var button = Ui.IgnoreStrayKeyUp(new SplitButton { Content = Ui.Row(6, new SymbolIcon(Symbol.Share), Ui.Text(L.T("匯出"), wrap: false)), Flyout = menu });
         button.Click += (_, _) => _ = Dialogs.Export(window, id);
         // 內容是圖示加文字時，無障礙名稱不會自動帶出來
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, L.T("匯出"));
@@ -913,7 +969,7 @@ public sealed class LevelMeter
         for (var i = 0; i < segments; i++)
         {
             var lit = i < level * segments;
-            bars[i].Fill = !lit ? colors?.Off ?? Ui.Subtle : i >= segments - 3 ? colors?.Peak ?? Ui.Signal : colors?.On ?? Ui.Celadon;
+            bars[i].Fill = !lit ? colors?.Off ?? Ui.Track : i >= segments - 3 ? colors?.Peak ?? Ui.Signal : colors?.On ?? Ui.Celadon;
         }
     }
 }

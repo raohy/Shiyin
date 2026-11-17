@@ -214,9 +214,38 @@ final class AppModel {
             if oldValue != selection {
                 reviewExpanded = false
                 userNotesExpanded = false
-                reloadDetail()
+                reloadDetailAfterMouseUp()
             }
         }
+    }
+    @ObservationIgnored private var pendingDetailReload: Timer?
+    #if DEBUG
+    /// 验证用：当成左键按着（`mousehold on|off`）
+    @ObservationIgnored var debugMouseHeld = false
+    #endif
+
+    /// 侧栏的列按下去就选中，接着可能是拖动：按着鼠标时先不换右边的会议页，放开才加载（design §77）。
+    /// 长会议加载、重画要 0.3 秒左右，主线程卡住时拖动会顿一下、拖不太动（2026-11-17 用户回报）。
+    /// 计时器排在一般模式：拖动中（事件追踪模式）不会跑，放开后才换
+    private func reloadDetailAfterMouseUp() {
+        pendingDetailReload?.invalidate()
+        pendingDetailReload = nil
+        guard leftMouseHeld else { reloadDetail(); return }
+        pendingDetailReload = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
+            MainActor.assumeIsolated {
+                guard let self, !self.leftMouseHeld else { return }
+                timer.invalidate()
+                self.pendingDetailReload = nil
+                self.reloadDetail()
+            }
+        }
+    }
+
+    private var leftMouseHeld: Bool {
+        #if DEBUG
+        if debugMouseHeld { return true }
+        #endif
+        return NSEvent.pressedMouseButtons & 1 != 0
     }
     /// 会议列表的多选（R88、design §62）：两场以上时右边显示「已选中 N 场会议」；`selection` 照旧是目前这场
     var selectedMeetings: Set<Int64> = []
@@ -228,6 +257,8 @@ final class AppModel {
             if newValue.count <= 1 { selection = newValue.first }
         }
     }
+    /// ⇧ 点击的起点：上一次（没按 ⇧）点的那场（design §77）
+    @ObservationIgnored var selectionAnchor: Int64?
     /// 选了两场以上时的那几场（列表的顺序），不然是空的
     var multiSelected: [Int64] {
         selectedMeetings.count > 1 ? filteredMeetings.map(\.id).filter { selectedMeetings.contains($0) } : []
@@ -247,11 +278,41 @@ final class AppModel {
     /// 已经有会议记录、之后才加入或移除文档的会议（R61.8）：记录标签页顶部提示刷新。只记在内存
     var documentsChanged: Set<Int64> = []
     var filter = ""
+    /// 列表的排序、分组（R97、design §71）：记住；筛选只记这次，换筛选时取消多选
+    var meetingSort = MeetingSort(rawValue: UserDefaults.standard.string(forKey: AppSettings.meetingSortKey) ?? "") ?? .dateDesc {
+        didSet { UserDefaults.standard.set(meetingSort.rawValue, forKey: AppSettings.meetingSortKey) }
+    }
+    var meetingGrouping = MeetingGrouping(rawValue: UserDefaults.standard.string(forKey: AppSettings.meetingGroupingKey) ?? "") ?? .none {
+        didSet { UserDefaults.standard.set(meetingGrouping.rawValue, forKey: AppSettings.meetingGroupingKey) }
+    }
+    var meetingFilter = MeetingFilter() { didSet { if oldValue != meetingFilter { selectedMeetings = [] } } }
+    /// 侧栏的收合（R101、design §75）：收起来的段落、在原地展开的文件夹；记住
+    var sidebarCollapsed = Set(UserDefaults.standard.stringArray(forKey: AppSettings.sidebarCollapsedKey) ?? []) {
+        didSet { if oldValue != sidebarCollapsed { UserDefaults.standard.set(sidebarCollapsed.sorted(), forKey: AppSettings.sidebarCollapsedKey) } }
+    }
+    var sidebarExpanded = Set(UserDefaults.standard.stringArray(forKey: AppSettings.sidebarExpandedKey) ?? []) {
+        didSet { if oldValue != sidebarExpanded { UserDefaults.standard.set(sidebarExpanded.sorted(), forKey: AppSettings.sidebarExpandedKey) } }
+    }
+    /// 文件夹拖动排好的顺序（R103.2、design §77），键同 sidebarExpanded
+    var sidebarOrder = UserDefaults.standard.stringArray(forKey: AppSettings.sidebarOrderKey) ?? [] {
+        didSet { if oldValue != sidebarOrder { UserDefaults.standard.set(sidebarOrder, forKey: AppSettings.sidebarOrderKey) } }
+    }
+    /// 从 Finder 拖到文件夹上的文件要导入到哪个文件夹（R103.3）：逐字稿、封包当下就用，录音等导入的对话框按下去才用
+    var importFolderOverride: String?
+    var pendingImportFolder: String?
+    /// 每场会议连到哪些人物（「有谁参加」筛选），跟人物总览一起读
+    var meetingPeople: [Int64: Set<Int64>] = [:]
     /// 侧栏目前只看的文件夹；nil 是所有会议（R9.2）
-    var folderFilter: String? { didSet { if oldValue != folderFilter { selectedMeetings = [] } } }
-    /// 正在输入名称的文件夹动作：添加（要移入的会议）或改名（旧名称）
-    var folderPrompt: FolderPrompt?
-    enum FolderPrompt: Equatable { case create([Int64]), rename(String) }
+    var folderFilter: String? {
+        didSet { if oldValue != folderFilter { selectedMeetings = [] } }
+    }
+    /// 文件夹的自动加入条件（R98、design §72）；正在编辑哪个文件夹的条件
+    var folderRules: [FolderRule] = []
+    /// 文件夹表里的名字（R104：空的文件夹也在）
+    var folderNames: [String] = []
+    var editingFolderRule: String?
+    /// 重命名的弹窗（R102、design §76）：会议、文件夹、新文件夹、人物、标记都用这一个
+    var renameTarget: RenameTarget?
     var glossary: [GlossaryTerm] = []
     var glossarySuggestions: [GlossarySuggestion] = []
     /// 公司词汇表（R53）：设置页显示、建议的新词要排除
@@ -301,6 +362,9 @@ final class AppModel {
         do {
             try Paths.ensureDirectories()
             db = try AppDatabase(path: Paths.database.path, documentsRoot: Paths.documentsDir)
+            // migration v15 可能把侧栏的键换过（定期会议换成文件夹，design §73）：重读
+            sidebarExpanded = Set(UserDefaults.standard.stringArray(forKey: AppSettings.sidebarExpandedKey) ?? [])
+            sidebarOrder = UserDefaults.standard.stringArray(forKey: AppSettings.sidebarOrderKey) ?? []
         } catch {
             // 迁移在交易里进行，失败时原本的资料不会被改到（N3）；说明清楚后结束，不要直接闪退
             let alert = NSAlert()
@@ -322,6 +386,7 @@ final class AppModel {
         coach.onChange = { [weak self] id in self?.reloadAssistance(id) }
         runner.onChange = { [weak self] in self?.reload() }
         runner.onFinished = { [weak self] job, error in self?.jobFinished(job, error: error) }
+        runner.onOrganized = { [weak self] id, folder in self?.organized(id, folder: folder) }
         runner.canStartTranscription = { [weak self] in
             guard let self else { return true }
             return self.recorder.finishingLiveCount == 0 && !self.recorder.isUsingQwenLive
@@ -445,6 +510,9 @@ final class AppModel {
             // 公司已经有的词不再建议（R53.3）
             glossarySuggestions = try db.glossarySuggestions().filter { !CompanyGlossary.contains($0.term) }
             templates = try db.templates()
+            meetingPeople = try db.meetingPeople()
+            folderRules = try db.folderRules()
+            folderNames = try db.folderNames()
             queuedCount = try db.activeJobs().filter { $0.status == .queued }.count
         } catch {
             errorMessage = error.localizedDescription
@@ -453,7 +521,9 @@ final class AppModel {
             self.selection = nil
         }
         // 文件夹里最后一场会议移走后，文件夹就不存在了，回到所有会议
-        if let folderFilter, !meetings.contains(where: { $0.meeting.folder == folderFilter }) { self.folderFilter = nil }
+        // 有自动加入条件的文件夹没有会议也留着（design §72）
+        if let folderFilter, !meetings.contains(where: { $0.meeting.folder == folderFilter }),
+           !folderRules.contains(where: { $0.folder == folderFilter }) { self.folderFilter = nil }
         reloadDetail()
     }
 
@@ -482,14 +552,25 @@ final class AppModel {
 
     /// 现有的文件夹和各自的场数（不含垃圾桶），依名称排序
     var folders: [(name: String, count: Int)] {
-        let counts = Dictionary(grouping: meetings.filter { !$0.meeting.folder.isEmpty }, by: \.meeting.folder).mapValues(\.count)
+        var counts = Dictionary(grouping: meetings.filter { !$0.meeting.folder.isEmpty }, by: \.meeting.folder).mapValues(\.count)
+        // 有自动加入条件的文件夹、文件夹表里的（R104：自己建的空文件夹）没有会议也列出来（design §72、§78）
+        for rule in folderRules where counts[rule.folder] == nil { counts[rule.folder] = 0 }
+        for name in folderNames where counts[name] == nil { counts[name] = 0 }
         return counts.map { (name: $0.key, count: $0.value) }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     /// 新会议要放进的文件夹：正在看某个文件夹时就放那里
-    var currentFolder: String { showTrash ? "" : folderFilter ?? "" }
+    var currentFolder: String { importFolderOverride ?? (showTrash ? "" : folderFilter ?? "") }
 
     func moveToFolder(_ id: Int64, folder: String) { moveToFolder([id], folder: folder) }
+
+    /// 建一个空的文件夹（R104，「文件夹」标题的「+」、⇧⌘N）
+    func createFolder(_ name: String) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !folders.contains(where: { $0.name == name }) else { return }
+        perform { try db.createFolder(name) }
+        noticeMessage = String(localized: "已建立文件夹「\(name)」")
+    }
 
     /// 移到文件夹（R9.2）；多选时一起移（R88），已经在那里的跳过
     func moveToFolder(_ ids: [Int64], folder: String) {
@@ -522,6 +603,14 @@ final class AppModel {
         guard !name.isEmpty, name != old else { return }
         // 先切换筛选，reload 时才不会因为旧名称不存在而跳回所有会议
         if folderFilter == old { folderFilter = name }
+        if sidebarExpanded.contains(Self.folderKey(old)) {
+            sidebarExpanded.remove(Self.folderKey(old))
+            sidebarExpanded.insert(Self.folderKey(name))
+        }
+        if let i = sidebarOrder.firstIndex(of: Self.folderKey(old)) {
+            // 改成已经有的文件夹（合并）时留原本那个的位置
+            if sidebarOrder.contains(Self.folderKey(name)) { sidebarOrder.remove(at: i) } else { sidebarOrder[i] = Self.folderKey(name) }
+        }
         perform { try db.renameFolder(old, to: name) }
     }
 
@@ -529,6 +618,8 @@ final class AppModel {
     func deleteFolder(_ name: String) {
         perform { try db.renameFolder(name, to: "") }
         if folderFilter == name { folderFilter = nil }
+        setRow(Self.folderKey(name), expanded: false)
+        sidebarOrder.removeAll { $0 == Self.folderKey(name) }
     }
 
     func reloadDetail(forceAudio: Bool = false) {
@@ -573,12 +664,15 @@ final class AppModel {
         }
     }
 
+    /// 列表上的会议：文件夹、筛选（垃圾桶不筛选）、排序（R97、design §71）
     var filteredMeetings: [MeetingRow] {
         var source = showTrash ? trash : meetings
+        if listShowsOthersOnly { source = source.filter { $0.meeting.folder.isEmpty } }
         if !showTrash, let folderFilter { source = source.filter { $0.meeting.folder == folderFilter } }
+        if !showTrash, meetingFilter.isActive { source = source.filter { matches($0, meetingFilter) } }
         let keyword = filter.trimmingCharacters(in: .whitespaces)
-        guard !keyword.isEmpty else { return source }
-        return source.filter { $0.meeting.displayTitle.localizedCaseInsensitiveContains(keyword) }
+        if !keyword.isEmpty { source = source.filter { $0.meeting.displayTitle.localizedCaseInsensitiveContains(keyword) } }
+        return sorted(source)
     }
 
     func status(_ row: MeetingRow) -> MeetingStatus {
@@ -699,8 +793,11 @@ final class AppModel {
         let urls = pendingImport
         pendingImport = []
         showImportSheet = false
+        var options = options
+        if let folder = pendingImportFolder, options.folder.isEmpty { options.folder = folder }
+        pendingImportFolder = nil
         importFiles(urls, options: urls.count == 1 ? options : ImportOptions(participants: options.participants, templateId: options.templateId,
-                                                                              language: options.language))
+                                                                              folder: options.folder, language: options.language))
     }
 
     /// 从 Dock 或 Finder 导入：不跳对话框，直接用默认值
@@ -943,6 +1040,7 @@ final class AppModel {
         reload()
         showTrash = trash.contains { $0.id == id }
         selection = id
+        expandToShow(id)
         openMainWindow?()
     }
 
@@ -1704,6 +1802,11 @@ final class AppModel {
     var sidebarMode: SidebarMode = .meetings
     var selectedPerson: Int64?
     var peopleOverview: [PersonOverview] = []
+    /// 移除一个人的确认（R85.7、design §60.2）
+    var confirmRemovePerson: Int64?
+    /// 每一种东西都能直接改、删（R100、design §74）：删除文件夹的确认、正在就地改的那一条记录
+    var confirmDeleteFolder: String?
+    var editingNoteItem: NoteItemRef?
 
     func reloadPeople() {
         people = (try? db.peopleSummaries()) ?? []

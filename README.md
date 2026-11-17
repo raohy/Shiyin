@@ -259,7 +259,6 @@ app 会检查新版的签名是否跟目前的 app 相符。执行过 `make-sign
 | [`docs/design-windows.md`](docs/design-windows.md) | Windows 版跟 Mac 不同的地方、标准答案、验证环境 |
 | [`docs/website.md`](docs/website.md) | 官网的需求和设计 |
 | [`docs/tasks.md`](docs/tasks.md) | 还没完成的任务 |
-| [`CLAUDE.md`](CLAUDE.md) | 开发与验证时要注意的事 |
 
 ### 项目结构
 

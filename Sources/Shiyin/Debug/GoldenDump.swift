@@ -30,6 +30,7 @@ enum GoldenDump {
             exports(fixtures, &dump)
             mindMaps(fixtures, &dump)
             utilities(fixtures, &dump)
+            organize(&dump)
             pipeline(fixtures, &dump)
             server(fixtures, &dump)
             try database(fixtures, &dump)
@@ -685,6 +686,46 @@ enum GoldenDump {
             return ["segment": s.segment, "original": s.original, "suggestion": s.suggestion, "reason": s.reason,
                     "applied": applied ?? NSNull(), "reverted": applied.flatMap { TranscriptCorrection.revert(s, in: $0) } ?? NSNull()]
         })
+    }
+
+    // MARK: 分类（design §72）：输入和结果写在同一个文件，Windows 读输入算一次比对结果
+
+    private static func organize(_ w: inout Writer) {
+        let titleSets: [[String]] = [["产品周会 10/19", "产品周会 10/26"], ["11月3日 设计讨论", "11月10日 设计讨论"], ["Q3 Sync 1", "Q3 Sync 2"],  // l10n-skip
+                                     ["A", "B"], ["周会", "周会"], ["Weekly Sync", "Sync with Bob", "Bob 1:1"], ["ab 1", "ab 2"],  // l10n-skip
+                                     ["Remote Control Project Kickoff Meeting", "Remote Control Design: Recap", "Conceptual Design Meeting: Recap"],
+                                     ["Sprint Review 3", "Sprint Review 4", "Sprint review"], ["产品周会A", "产品周会B"]]  // l10n-skip
+        w.json("util/common-word.json", titleSets.map { ["titles": $0, "word": MeetingSimilarity.commonWord($0) ?? NSNull()] as Object })
+        // 文件夹的条件、建议
+        let rule = FolderRule(folder: "产品", keywords: ["周会", "sync"], people: [1, 2], templateId: "one-on-one")  // l10n-skip
+        let ruleCases: [(String, [Int64], String)] = [
+            ("产品周会", [], "general"), ("Weekly SYNC", [], "general"), ("x", [1], "general"), ("x", [1, 2, 5], "general"),  // l10n-skip
+            ("x", [], "one-on-one"), ("x", [], "general")]
+        w.json("util/folder-rule-match.json", ruleCases.map { title, people, template -> Object in
+            ["title": title, "attended": people, "templateId": template,
+             "matches": rule.matches(title: title, attended: Set(people), templateId: template)] as Object
+        })
+        func folderInput(_ id: Int64, _ folder: String, _ title: String, _ people: [Int64]) -> FolderSuggester.Input {
+            FolderSuggester.Input(id: id, folder: folder, title: title, people: Set(people))
+        }
+        let others = [folderInput(1, "客户", "客户 A 需求访谈", [2, 3]), folderInput(2, "客户", "客户 A 追踪", [1, 2, 3]),  // l10n-skip
+                      folderInput(3, "设计", "设计评审 10/1", [4]), folderInput(4, "设计", "设计评审 10/8", [5]), folderInput(5, "设计", "Kickoff", [4]),  // l10n-skip
+                      folderInput(6, "单场", "单场会议", [2, 3])]  // l10n-skip
+        let suggestCases = [folderInput(10, "", "需求确认", [2, 3]), folderInput(11, "", "设计评审 11/5", [1]),  // l10n-skip
+                            folderInput(12, "", "会议 11/5", [9]), folderInput(13, "", "客户 A 结案", [2, 3])]  // l10n-skip
+        w.json("util/folder-suggest.json", [
+            "others": others.map { ["id": $0.id, "folder": $0.folder, "title": $0.title, "people": $0.people.sorted()] as Object },
+            "cases": suggestCases.map { c -> Object in
+                let s = FolderSuggester.best(for: c, among: others)
+                var reason: Object = [:]
+                switch s?.reason {
+                case .people(let ids)?: reason = ["people": ids]
+                case .title(let word)?: reason = ["title": word]
+                case nil: break
+                }
+                return ["id": c.id, "title": c.title, "people": c.people.sorted(), "folder": s?.folder ?? NSNull(), "count": s?.count ?? 0, "reason": reason]
+            }] as Object)
+
     }
 
     // MARK: 转录流程的规则

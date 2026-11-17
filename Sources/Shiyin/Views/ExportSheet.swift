@@ -11,55 +11,59 @@ struct ExportSheet: View {
     @State private var times = true
     @State private var speakers = true
     @State private var working = false
-    @State private var shareAnchor: NSView?
+    /// 「分享…」的位置：分享菜单（Mail、AirDrop、消息；R7.5）从按钮下面打开
+    @State private var shareAnchor = MenuAnchorBox()
     /// 打开时那一场会议的资料（design §20.9）：对话框开着时选中的会议换了也不变
     @State private var bundle: ExportBundle?
 
     var body: some View {
+        // 同其他弹窗的样子（R106、design §80）
         VStack(alignment: .leading, spacing: 16) {
-            Group {
-                if let meeting = bundle?.meeting { Text("导出「\(meeting.displayTitle)」") } else { Text("导出") }
-            }
-            .font(.title3.weight(.semibold))
-            .lineLimit(2)
-            Form {
-                Picker("项目", selection: $item) {
-                    ForEach(ExportItem.allCases) { item in
-                        Text(item.label).tag(item)
-                            .disabled(item == .audio && bundle?.meeting.hasAudio != true || item == .mindMap && !hasMindMap)
+            SheetHeader(title: bundle.map { String(localized: "导出「\($0.meeting.displayTitle)」") } ?? String(localized: "导出"))
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    SheetFieldLabel(String(localized: "项目"))
+                    SheetMenuField(options: ExportItem.allCases.map { ($0, $0.label) }, selection: $item) { item in
+                        item == .audio && bundle?.meeting.hasAudio != true || item == .mindMap && !hasMindMap
                     }
                 }
-                Picker("格式", selection: $format) {
-                    ForEach(item.formats, id: \.self) { Text(formatLabel($0)).tag($0) }
+                VStack(alignment: .leading, spacing: 6) {
+                    SheetFieldLabel(String(localized: "格式"))
+                    SheetMenuField(options: item.formats.map { ($0, formatLabel($0)) }, selection: $format)
+                        .disabled(item.formats.count == 1)
                 }
-                .disabled(item.formats.count == 1)
-                if item == .transcript {
+            }
+            if item == .transcript {
+                HStack(spacing: 18) {
                     Toggle("包含时间点", isOn: $times).disabled(format == "srt" || format == "vtt")
                     Toggle("包含说话者", isOn: $speakers)
                 }
+                .toggleStyle(.checkbox)
             }
-            .formStyle(.columns)
             Text(hint)
                 .font(.callout)
                 .foregroundStyle(item == .notes && !hasNotes ? Color.signal : .secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
-                ShareButton { await exportToTemp() }
+                Button("分享…") { Task { await share() } }
+                    .buttonStyle(SheetPillButtonStyle(.secondary))
+                    .background(MenuAnchor(box: shareAnchor))
+                    .disabled(working)
                 if working {
                     ProgressView().controlSize(.small)
                     Text("正在导出…").foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("取消", role: .cancel) { dismiss() }
+                Button("取消") { dismiss() }
+                    .buttonStyle(SheetPillButtonStyle(.secondary))
                     .keyboardShortcut(.cancelAction)
                 Button("存档…") { Task { await save() } }
+                    .buttonStyle(SheetPillButtonStyle(.primary))
                     .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
                     .disabled(working)
             }
         }
-        .padding(20)
-        .frame(width: 460)
+        .sheetChrome(width: 480)
         .onChange(of: item) { _, newValue in format = newValue.formats[0] }
         // 还没有会议记录（整理中或整理失败）时，默认改导出逐字稿（用户反馈：导出的会议记录只有标题）
         .onAppear {
@@ -112,6 +116,11 @@ struct ExportSheet: View {
         }
     }
 
+    private func share() async {
+        guard let url = await exportToTemp(), let view = shareAnchor.view else { return }
+        NSSharingServicePicker(items: [url]).show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
+    }
+
     private func exportToTemp() async -> URL? {
         guard let dir = try? Paths.makeTempDirectory() else { return nil }
         let url = dir.appendingPathComponent(model.suggestedFilename(item, format: format, meeting: bundle?.meeting))
@@ -121,36 +130,6 @@ struct ExportSheet: View {
         } catch {
             model.errorMessage = error.localizedDescription
             return nil
-        }
-    }
-}
-
-/// 分享按钮（Mail、AirDrop、消息；R7.5）
-struct ShareButton: NSViewRepresentable {
-    let makeFile: () async -> URL?
-
-    func makeNSView(context: Context) -> NSButton {
-        let button = NSButton(title: String(localized: "分享…"), target: context.coordinator, action: #selector(Coordinator.share(_:)))
-        button.bezelStyle = .push
-        return button
-    }
-
-    func updateNSView(_ nsView: NSButton, context: Context) {
-        context.coordinator.makeFile = makeFile
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator(makeFile: makeFile) }
-
-    @MainActor
-    final class Coordinator: NSObject {
-        var makeFile: () async -> URL?
-        init(makeFile: @escaping () async -> URL?) { self.makeFile = makeFile }
-
-        @objc func share(_ sender: NSButton) {
-            Task {
-                guard let url = await makeFile() else { return }
-                NSSharingServicePicker(items: [url]).show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
-            }
         }
     }
 }

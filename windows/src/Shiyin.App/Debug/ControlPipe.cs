@@ -13,9 +13,9 @@ namespace Shiyin.App.Debug;
 
 /// <summary>
 /// DEBUG 的控制通道（design-windows §15.3，對應 Mac 的 DebugControl）：named pipe「shiyin-debug」，一行一個指令（JSON 陣列），回一行 JSON。
-/// 驗證時用 shiyinctl.exe 送指令，不送鍵盤事件（CLAUDE.md）。只在 DEBUG 建置裡有
+/// 驗證時用 shiyinctl.exe 送指令，不送鍵盤事件。只在 DEBUG 建置裡有
 /// </summary>
-public static class ControlPipe
+public static partial class ControlPipe
 {
     public const string Name = "shiyin-debug";
 
@@ -56,6 +56,8 @@ public static class ControlPipe
     static JsonNode Run(AppHost host, App app, string[] args)
     {
         var main = (MainWindow?)typeof(App).GetField("main", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(app);
+        // 會議列表的排序、分組、篩選，資料夾自動歸類，定期會議（M§71～§73、design-windows §11.30～§11.32）
+        if (Organize(host, main, args) is { } organized) return organized;
         switch (args.FirstOrDefault())
         {
             case "state": return State(host, main);
@@ -79,6 +81,18 @@ public static class ControlPipe
             case "peoplenotes" when args.Length > 1 && long.TryParse(args[1], out var peopleMeeting):
                 host.Controller.GeneratePeopleNotes(peopleMeeting);
                 return Ok;
+            // cleantranscript <會議 id>：等於按逐字稿「精簡」的「產生精簡版」（M§70、design-windows §11.29，同 Mac）；
+            // transcriptview original|clean：逐字稿的「原文｜精簡」（寫進測試家目錄的 settings.json）
+            case "cleantranscript" when args.Length > 1 && long.TryParse(args[1], out var cleanMeeting):
+                host.Controller.GenerateCleanTranscript(cleanMeeting);
+                return Ok;
+            case "transcriptview" when args.Length > 1:
+                host.Settings.Set(AppSettings.TranscriptViewKey, args[1] == "clean" ? "clean" : "original");
+                main?.Refresh();
+                return Ok;
+            // addterm <文字>：新增詞彙（R94.1，同 Mac 的 addterm：「\n」當換行、一次好幾個），回傳說明（沒有要說的是空的）
+            case "addterm" when args.Length > 1:
+                return new JsonObject { ["message"] = host.Controller.AddTerms(args[1].Replace("\\n", "\n")) ?? "" };
             // seek <秒> [play]、toggle：播放（同 Mac）
             case "seek" when args.Length > 1 && double.TryParse(args[1], System.Globalization.CultureInfo.InvariantCulture, out var seekTo):
                 host.Player.Seek(seekTo, args.Length > 2 && args[2] == "play");
@@ -461,6 +475,39 @@ public static class ControlPipe
                 ? MindMap.TopicRanges(topicNotes, Math.Max(host.Player.Duration, topicDetail.Meeting.DurationSeconds ?? 0), MindMap.TopicLabel(MeetingLanguages.Interface))
                 : []).Select(r => (JsonNode)new JsonObject { ["branch"] = r.Branch, ["title"] = r.Title, ["start"] = r.Start, ["end"] = r.End })]),
             ["userNotesExpanded"] = main?.State.UserNotesExpanded,
+            // 精簡逐字稿（M§70、design-windows §11.29）：原文｜精簡、選取中的會議有幾句精簡版（0 是還沒產生）、上次失敗的原因、產生中的進度
+            ["transcriptView"] = host.Settings.TranscriptView,
+            ["cleanLines"] = main?.State.Detail?.CleanLines.Count,
+            ["cleanEmpty"] = main?.State.Detail?.CleanLines.Count(p => p.Value.Length == 0),
+            ["cleanFailure"] = main?.State.Detail?.CleanFailure,
+            ["cleaning"] = main?.State.Detail?.Meeting.Id is long cleaningId && host.Controller.CleaningProgress(cleaningId) is { Active: true } cleaning
+                ? new JsonObject { ["progress"] = cleaning.Progress } : null,
+            // 詞彙表（R94）
+            ["glossary"] = new JsonArray([.. host.Db.Glossary().Select(t => (JsonNode)t.Term)]),
+            // 會議列表、資料夾的條件（M§71、§72，同 Mac 的 list、folderRules）
+            ["list"] = ListState(main),
+            ["folderRules"] = FolderRulesState(main),
+            // 移除一個人的確認開著時是誰（R85.7，同 Mac；沒有是 -1）、人物頁改名的輸入框開著沒（Mac 沒有）
+            ["confirmRemovePerson"] = main?.RemovingPerson ?? -1,
+            // 每一種東西都能直接改、刪（R100，同 Mac）：刪除資料夾的確認開著時是哪個；就地改的那一條
+            ["confirmDeleteFolder"] = main?.DeletingFolder ?? "",
+            // 重新命名的對話框開著時要改的東西（R102，同 Mac：meeting(42)、folder("客戶")、newFolder([1, 2])…；沒開是空字串）
+            ["renameTarget"] = Dialogs.RenamingTarget?.Key ?? "",
+            // 照 Sheet 樣子的對話框（R106、design-windows §11.39）開著時是它的標題，沒開是空字串
+            ["sheet"] = Dialogs.OpenSheet ?? "",
+            ["editingNoteItem"] = main?.NotesTabs.EditingItem(main.State.Detail)?.ToString() ?? "",
+            ["bookmarks"] = new JsonArray([.. (main?.State.Detail?.Bookmarks ?? []).Select(b => (JsonNode)new JsonObject { ["id"] = b.Id, ["time"] = b.Time, ["label"] = b.Label })]),
+            // 側欄的收合（R101，同 Mac）：收起來的段落、在原地展開的資料夾和定期會議
+            ["sidebarCollapsed"] = new JsonArray([.. SidebarCollapse.Collapsed(host.Settings).Order(StringComparer.Ordinal).Select(x => (JsonNode)x)]),
+            ["sidebarExpanded"] = new JsonArray([.. SidebarCollapse.Expanded(host.Settings).Order(StringComparer.Ordinal).Select(x => (JsonNode)x)]),
+            // 「資料夾」那一段實際的順序（R103.2，同 Mac）、匯入的對話框開著沒
+            ["sidebarOrder"] = new JsonArray([.. (main?.SidebarKeys() ?? []).Select(x => (JsonNode)x)]),
+            ["showImportSheet"] = Dialogs.ImportOpen,
+            // 側欄的資料夾（R104，同 Mac）：資料夾表、會議的資料夾、自動加入條件的聯集和場數
+            ["folders"] = new JsonArray([.. (main?.State.Folders ?? []).Select(f => (JsonNode)new JsonObject { ["name"] = f.Name, ["count"] = f.Count })]),
+            ["folderRuleDialog"] = Dialogs.EditingFolderRule,
+            // 會議結束的倒數（R95、M§69）：剩幾秒，沒在倒數是 -1（同 Mac 的 meetingprompts 的 countdown）
+            ["meetingEndCountdown"] = host.MeetingEnd.Remaining(DateTime.UtcNow),
             ["reviewInline"] = main?.ReviewDraft.Expanded?.ToString(),
             // 會議的參考文件（M§39.7）：選取中的會議
             ["documents"] = new JsonArray([.. (main?.State.Detail?.Documents ?? []).Select(d =>
@@ -499,7 +546,7 @@ public static class ControlPipe
             {
                 ["enabled"] = island.Enabled, ["visible"] = island.AppWindow.IsVisible, ["mode"] = island.Mode,
                 ["frame"] = new JsonArray(island.Frame.X, island.Frame.Y, island.Frame.W, island.Frame.H),
-                ["hintKey"] = island.HintKey ?? "", ["prompt"] = island.Prompt?.Message ?? "",
+                ["hintKey"] = island.HintKey ?? "", ["prompt"] = island.Prompt?.Message ?? "", ["promptText"] = island.PromptText ?? "",
                 ["actions"] = new JsonArray([.. (island.Prompt?.Actions ?? []).Select(a => (JsonNode)a.Id)]),
             } : null,
             // 人物頁（M§60.2）

@@ -121,6 +121,9 @@ def _hans_catalog(path):
         return 0, []
     cat = json.loads(path.read_text())
     overrides = json.loads((L10N / "zh-Hans-overrides.json").read_text(encoding="utf-8"))
+    if cat["sourceLanguage"] == "zh-Hans":
+        from t2s import convert
+        overrides = {**{convert(key): value for key, value in overrides.items()}, **overrides}
     changed, problems = 0, []
     for key, entry in cat["strings"].items():
         locs = entry.get("localizations", {})
@@ -128,7 +131,7 @@ def _hans_catalog(path):
             if locs.pop("zh-Hans", None) is not None:
                 changed += 1
             continue
-        value = key if cat["sourceLanguage"] == "zh-Hans" and to_simplified(key) == key else _hans_value(key, overrides)
+        value = overrides.get(key, key if cat["sourceLanguage"] == "zh-Hans" and to_simplified(key) == key else _hans_value(key, overrides))
         if to_simplified(value) != value:
             problems.append(f"還有繁體字：{key} → {value}")
         if PLACEHOLDER.findall(value) != PLACEHOLDER.findall(key):

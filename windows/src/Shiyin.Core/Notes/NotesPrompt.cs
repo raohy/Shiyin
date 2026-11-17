@@ -5,7 +5,10 @@ namespace Shiyin.Notes;
 /// <summary>校稿時使用者的一題回答</summary>
 public sealed record ReviewAnswer(string Time, string Question, string Answer);
 
-/// <summary>整理需要的材料；Documents 是會議參考資料（M§39.3、R61.5），沒有文件時提示詞跟以前一字不差</summary>
+/// <summary>
+/// 整理需要的材料；Documents 是會議參考資料（M§39.3、R61.5），沒有文件時提示詞跟以前一字不差。
+/// 定期會議的上一場（M§73）D177 拿掉
+/// </summary>
 public sealed record NotesContext(
     Meeting Meeting, IReadOnlyList<Segment> Segments, IReadOnlyDictionary<int, string> Speakers,
     IReadOnlyList<Bookmark> Bookmarks, IReadOnlyList<string> Glossary, TemplateDefinition Template,

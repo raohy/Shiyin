@@ -22,11 +22,6 @@ struct PersonPage: View {
     let person: PersonOverview
     @State private var meetings: [PersonMeeting] = []
     @State private var items: [PersonActionItem] = []
-    @State private var renaming = false
-    /// 名字旁的铅笔打开的改名（R85.6；同「更多 → 改名…」的输入框，接在铅笔下面）
-    @State private var editingName = false
-    @State private var renameText = ""
-    @State private var confirmDelete = false
 
     var body: some View {
         ReadingColumn {
@@ -60,6 +55,7 @@ struct PersonPage: View {
                         }
                         .buttonStyle(.plain)
                         .help("打开这场会议")
+                        .floatingRowMenu { model.meetingLinkMenu(entry.meeting) }
                     }
                 }
             }
@@ -77,77 +73,58 @@ struct PersonPage: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(person.name).contentTitleFont(26).textSelection(.enabled).lineLimit(1)
-                    Button { renameText = person.name; editingName = true } label: { Image(systemName: "pencil") }
+                    Button { model.renameTarget = .person(person.id) } label: { Image(systemName: "pencil") }
                         .buttonStyle(.borderless)
                         .foregroundStyle(Color.celadon)
-                        .help("改名")
-                        .accessibilityLabel(Text("改名"))
-                        .popover(isPresented: $editingName, arrowEdge: .bottom) { renameForm }
+                        .help("重命名")
+                        .accessibilityLabel(Text("重命名"))
                     if person.isMe {
                         Text("我").font(.callout).foregroundStyle(.secondary)
                     }
                 }
                 Text(Self.summaryLine(person, long: true)).font(.callout).foregroundStyle(.secondary)
+                actions
             }
             Spacer(minLength: 0)
         }
         .padding(.bottom, 4)
-        .confirmationDialog("删除「\(person.name)」的声音特征？", isPresented: $confirmDelete) {
-            Button("删除", role: .destructive) {
-                model.deletePerson(person.id)
-                model.selectedPerson = nil
-            }
-        } message: {
-            Text("已经带入的名字会留着，之后的会议不会再自动带入。")
-        }
     }
 
-    private var moreMenu: some View {
+    /// 标题下面看得到的动作（R100）：合并到、移除这个人；重命名是名字旁的铅笔，右上角「更多」照旧
+    private var actions: some View {
         let others = model.peopleOverview.filter { $0.id != person.id }
-        return Menu {
-            Button("改名…") { renameText = person.name; renaming = true }
+        return HStack(spacing: 16) {
             if !others.isEmpty {
-                Menu("合并到") {
+                Menu {
                     ForEach(others) { other in
                         Button(other.name) {
                             model.renamePerson(person.id, to: other.name)
                             model.selectedPerson = other.id
                         }
                     }
+                } label: {
+                    Label("合并到", systemImage: "arrow.triangle.merge")
                 }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help("同一个人被记成两个名字时，合并成一个")
             }
-            Divider()
-            Button("删除声音特征…", role: .destructive) { confirmDelete = true }
+            Button("移除这个人…", systemImage: "person.badge.minus", role: .destructive) { model.confirmRemovePerson = person.id }
+                .foregroundStyle(.red)
+        }
+        .buttonStyle(.borderless)
+        .font(.callout)
+        .padding(.top, 4)
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            PersonMenuItems(person: person)
         } label: {
             Label("更多", systemImage: "ellipsis.circle")
         }
         .accessibilityLabel(Text("更多"))
-        .help("改名、跟另一个名字合并（同一个人被记成两个名字时）、删除声音特征")
-        .popover(isPresented: $renaming, arrowEdge: .bottom) { renameForm }
-    }
-
-    private var renameForm: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            TextField("名字", text: $renameText).textFieldStyle(.roundedBorder).frame(width: 220)
-                .onSubmit(saveRename)
-            HStack {
-                Spacer()
-                Button("取消") { renaming = false; editingName = false }.keyboardShortcut(.cancelAction)
-                Button("保存", action: saveRename).keyboardShortcut(.defaultAction)
-                    .disabled(renameText.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-        }
-        .padding(16)
-    }
-
-    private func saveRename() {
-        let name = renameText.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty else { return }
-        model.renamePerson(person.id, to: name)
-        renaming = false
-        editingName = false
-        // 改成已经有的名字时合并过去，选那个人
-        model.selectedPerson = model.peopleOverview.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.id
+        .help("重命名、跟另一个名字合并（同一个人被记成两个名字时）、移除这个人")
     }
 
     /// 他负责的待办：事项、期限、哪一场会议和时间点（点了打开那场、从那里播放）
@@ -200,6 +177,35 @@ struct PersonPage: View {
     static func spoke(_ seconds: Double) -> String {
         let minutes = Int((seconds / 60).rounded())
         return minutes < 1 ? String(localized: "说了不到 1 分钟") : String(localized: "说了 \(minutes) 分钟")
+    }
+}
+
+/// 一个人的动作（R85.7）：人物页的「更多」和侧栏人物列的右键菜单共用
+struct PersonMenuItems: View {
+    @Environment(AppModel.self) private var model
+    let person: PersonOverview
+
+    var body: some View {
+        Group {
+            let others = model.peopleOverview.filter { $0.id != person.id }
+            Button("重命名…", systemImage: "pencil") {
+                model.selectedPerson = person.id
+                model.renameTarget = .person(person.id)
+            }
+            if !others.isEmpty {
+                Menu("合并到", systemImage: "person.2") {
+                    ForEach(others) { other in
+                        Button(other.name) {
+                            model.renamePerson(person.id, to: other.name)
+                            model.selectedPerson = other.id
+                        }
+                    }
+                }
+            }
+            Divider()
+            DestructiveMenuButton(String(localized: "移除这个人…"), systemImage: "person.crop.circle.badge.minus") { model.confirmRemovePerson = person.id }
+        }
+        .menuIcons()
     }
 }
 

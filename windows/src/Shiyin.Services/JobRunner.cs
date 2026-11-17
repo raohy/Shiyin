@@ -73,6 +73,10 @@ public sealed class JobRunner
     public event Action<long>? EditedDraftReplaced;
     /// <summary>重新辨識說話者做完（分出幾位）或失敗（M§23.3）</summary>
     public event Action<long, int?, Exception?>? Rediarized;
+    /// <summary>企業伺服器連不上太久，自動改在這台電腦轉錄了（R93、M§67）：App 發通知</summary>
+    public event Action<long>? ServerFallback;
+    /// <summary>自動放進資料夾了（M§72）：會議 id、資料夾；App 提示「「X」已放進「Y」」</summary>
+    public event Action<long, string?>? Organized;
 
     /// <summary>匿名使用統計（design-windows §12.10）；沒給（測試）就不累計</summary>
     public UsageStats? Usage { get; init; }
@@ -214,6 +218,7 @@ public sealed class JobRunner
                     case JobKind.Correct: await Correct(job, state, cancel.Token); break;
                     case JobKind.NameSpeakers: await NameSpeakers(job, state, cancel.Token); break;
                     case JobKind.Rediarize: await Task.Run(() => Rediarize(job, state, cancel.Token)); break;
+                    case JobKind.Clean: await Clean(job, state, cancel.Token); break;
                 }
             }
             catch (Exception e)
@@ -339,6 +344,9 @@ public sealed class JobRunner
     /// <summary>正式轉錄用企業伺服器（R50.1）：選了而且登入過（登入失效也算，工作停著等重新登入）</summary>
     public bool UsesEnterprise => Enterprise is { HasAccount: true } && settings.TranscriptionEngine == "server";
 
+    /// <summary>企業伺服器連不上連續多久就自動改在這台電腦轉錄（R93）；DEBUG 的 --set serverAutoLocalSeconds 改短</summary>
+    public TimeSpan ServerAutoLocalAfter { get; init; } = ServerTranscriber.DefaultAutoLocalAfter;
+
     /// <summary>使用者按了「改在這台電腦轉錄」的工作（R50.5）：只在記憶體，app 重開後照設定</summary>
     readonly HashSet<long> localJobs = [];
 
@@ -378,10 +386,12 @@ public sealed class JobRunner
                     if (TranscribeOnServer(job, state, trimmed ?? paths.AudioPath(meeting), options, payload, cancel) is not { } remote) return;
                     (ran, transcribedWith, onServer) = (remote.Transcription, remote.TranscribedWith, true);
                 }
-                catch (ServerTranscriber.SwitchToLocalException)
+                catch (ServerTranscriber.SwitchToLocalException switched)
                 {
-                    // 改在這台電腦轉（R50.5）：用本機的引擎，模型還沒下載好就先下載、先用快速辨識（同 D35）
+                    // 改在這台電腦轉（R50.5）：用本機的引擎，模型還沒下載好就先下載、先用快速辨識（同 D35）；
+                    // 連不上太久自動改的（R93）發通知
                     state.Server = null;
+                    if (switched.Automatic) ServerFallback?.Invoke(job.MeetingId);
                     if (!settings.UseFastTranscriber) models.AutoStart(ModelStore.Model.Breeze);
                     models.AutoStart(ModelStore.Model.Diarization);
                 }
@@ -427,6 +437,9 @@ public sealed class JobRunner
             var matched = db.MatchVoiceprints(job.MeetingId);
             if (matched > 0) Log.Info($"voiceprints matched {matched} speakers");
         }
+        // 說話者對到人物之後：照資料夾的條件放（M§72；人物的條件要先對到人）
+        var filed = db.AutoFile(job.MeetingId);
+        if (filed is not null) Organized?.Invoke(job.MeetingId, filed);
         if (settings.CompressAudio && Importer.Extension(meeting.AudioFile) == "wav") db.Enqueue(job.MeetingId, JobKind.Compress);
         // 校正在輔助線、整理在整理線，兩個同時開始（M§21.2、R20.1）。
         // 整理工具還沒準備好（沒登入、沒有 key…）就都不排，不會「整理失敗」（R45.4、M§34.2）
@@ -463,6 +476,7 @@ public sealed class JobRunner
                 Progress = p => state.Progress = p,
                 ShouldContinue = () => IsStillRunning(job),
                 SwitchToLocal = () => IsLocal(job),
+                AutoLocalAfter = ServerAutoLocalAfter,
                 OnServer = note => { state.Server = note; Changed?.Invoke(); },
                 OnRemoteId = remoteId => { if (job.Id is long id) db.SetJobPayload(id, Encode(payload with { RemoteId = remoteId })); },
             };
@@ -652,6 +666,55 @@ public sealed class JobRunner
         }
     }
 
+    // MARK: 精簡逐字稿（R96、M§70）
+
+    /// <summary>
+    /// 每一句都存（同 Mac）：整理工具改過的用改過的，沒改的存原文（有沒有產生過看有沒有這份）；中文會議用簡體時轉成簡體。
+    /// 失敗照一般的工作記下原因（逐字稿的「精簡」寫「上次產生精簡版失敗：…」）；輔助工作，不發通知
+    /// </summary>
+    async Task Clean(Job job, RunningJob state, CancellationToken cancel)
+    {
+        if (db.Meeting(job.MeetingId) is not { } meeting) return;
+        var provider = settings.Provider;
+        if (provider == LLMProvider.None) throw LLMException.NotConfigured(L.T("還沒設定整理工具，請到設定選擇 Claude、Codex 或 API"));
+        var segments = db.Segments(job.MeetingId);
+        if (segments.Count == 0) return;
+        state.Provider = provider;
+        state.Stage = L.T("產生精簡版");
+        var language = meeting.MeetingLanguage;
+        var names = db.Speakers(job.MeetingId).ToDictionary(s => s.Idx, s => s.Name);
+        var context = new TranscriptCleanup.Context(language, segments.Select(s =>
+            (s.Text, s.Speaker is int i ? names.TryGetValue(i, out var n) ? n : language.DefaultSpeaker(i) : null)).ToList());
+        var changed = new Dictionary<int, string>();
+        for (var start = 0; start < segments.Count; start += TranscriptCleanup.ChunkSize)
+        {
+            var end = Math.Min(start + TranscriptCleanup.ChunkSize, segments.Count);
+            var json = await llm.GenerateJson(provider, settings.Model, TranscriptCleanup.System(language),
+                TranscriptCleanup.Prompt(context, start, end), TranscriptCleanup.Format, cancel);
+            foreach (var line in TranscriptCleanup.Validate(ParseCleanLines(json, provider), context, start, end)) changed[line.Segment] = line.Text;
+            state.Progress = (double)end / segments.Count;
+        }
+        if (!IsStillRunning(job)) return;
+        var lines = new Dictionary<long, string>();
+        for (var i = 0; i < segments.Count; i++)
+            if (segments[i].Id is long id) lines[id] = changed.TryGetValue(i, out var text) ? settings.Script(text, language) : segments[i].Text;
+        db.SaveCleanLines(job.MeetingId, lines);
+    }
+
+    static List<TranscriptCleanup.Line> ParseCleanLines(string json, LLMProvider provider)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.GetProperty("lines").EnumerateArray().Select(e => new TranscriptCleanup.Line(
+                e.GetProperty("segment").GetInt32(), e.GetProperty("text").GetString() ?? "")).ToList();
+        }
+        catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
+        {
+            throw LLMException.BadOutput(e.Message + provider.BadOutputHint());
+        }
+    }
+
     // MARK: 壓縮（M§6.4）
 
     async Task Compress(Job job, CancellationToken cancel)
@@ -728,6 +791,8 @@ public sealed class JobRunner
         var replacedEdited = db.SaveNotes(job.MeetingId, notes, provider.Code(), answers is null ? L.T("重新整理") : L.T("校稿"),
             answers is null ? NotesSource.Generated : NotesSource.Revised);
         if (replacedEdited) EditedDraftReplaced?.Invoke(job.MeetingId);
+        // 整理完有標題了，照資料夾的條件放（M§72）
+        if (db.AutoFile(job.MeetingId) is { } folder) Organized?.Invoke(job.MeetingId, folder);
         return answers is not null || hadDraft == 0;
     }
 }

@@ -48,6 +48,103 @@ enum DebugControl {
         case "peoplenotes": model.selection = id; model.generatePeopleNotes()   // 「人物」的「产生每个人的重点」（design §66）
         case "cleantranscript": model.selection = id; model.generateCleanTranscript()   // 逐字稿「精简」的「产生精简版」（design §70）
         case "transcriptview": UserDefaults.standard.set(args[1] == "clean" ? "clean" : "original", forKey: AppSettings.transcriptViewKey)
+        case "reload": model.reloadPeopleOverview(); model.reload()   // 直接改数据库之后重读
+        // 文件夹自动归类（design §72）
+        case "folderrule":   // folderrule <文件夹> <JSON|-> [apply]：JSON 是 {"keywords":[…],"people":[id…],"templateId":…}
+            var rule = FolderRule(folder: args[1])
+            if args[2] != "-", let data = args[2].data(using: .utf8),
+               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                rule.keywords = object["keywords"] as? [String] ?? []
+                rule.people = (object["people"] as? [NSNumber] ?? []).map(\.int64Value)
+                rule.templateId = object["templateId"] as? String
+            }
+            model.saveFolderRule(rule, applyNow: args.count > 3 && args[3] == "apply")
+        case "editfolderrule": model.editingFolderRule = args[1]   // 打开条件的编辑
+        case "autofile":
+            if let id, let folder = try? model.db.autoFile(id) { model.organized(id, folder: folder) }
+        case "foldersuggest":   // foldersuggest <会议 id> <输出.json>
+            if let id, let meeting = try? model.db.meeting(id) {
+                let s = model.folderSuggestion(for: meeting)
+                var reason: [String: Any] = [:]
+                switch s?.reason {
+                case .people(let ids)?: reason = ["people": ids]
+                case .title(let word)?: reason = ["title": word]
+                case nil: break
+                }
+                write(["folder": s?.folder ?? "", "count": s?.count ?? 0, "reason": reason,
+                       "text": s.map { model.folderSuggestionText($0) } ?? ""], to: args[2])
+            }
+        case "foldersuggestion":   // foldersuggestion accept|dismiss <会议 id>
+            if let mid = Int64(args[2]), let meeting = try? model.db.meeting(mid) {
+                if args[1] == "accept", let s = model.folderSuggestion(for: meeting) {
+                    model.acceptFolderSuggestion(mid, folder: s.folder)
+                } else if args[1] == "dismiss" {
+                    model.dismissFolderSuggestion(mid)
+                }
+            }
+        // 每一种东西都能直接改、删（R100、design §74）
+        case "renamemeetingui": if let id { model.requestRenameMeeting(id) }   // 等于侧栏右键「重命名…」、Return
+        case "folderdeleteui": model.confirmDeleteFolder = args[1]              // 等于文件夹的「删除文件夹…」、Delete，打开确认
+        // 侧栏的收合（R101、design §75）
+        case "sidebarsection": if args.count > 2 { model.setSection(args[1], expanded: args[2] == "on") }   // sidebarsection <folders|meetings|people|group:…> on|off
+        case "sidebarexpand": if args.count > 2 { model.setRow(args[1], expanded: args[2] == "on") }     // sidebarexpand <folder:名称> on|off
+        case "sidebarkey":   // sidebarkey return|delete：等于在侧栏按 Return、Delete（照现在选到的）
+            if args[1] == "return" { _ = model.sidebarReturn() } else { model.sidebarDelete() }
+        case "noteitem":   // noteitem <editui|edit|delete> <summary|decisions|actionItems|openQuestions|topic|custom|person> <位置> [第二个位置] [文字]
+            let a = Int(args.count > 3 ? args[3] : "") ?? 0
+            let twoLevel = ["topic", "custom", "person"].contains(args[2])
+            let b = twoLevel ? Int(args.count > 4 ? args[4] : "") ?? 0 : 0
+            let ref: NoteItemRef? = switch args[2] {
+            case "summary": .summary(a)
+            case "decisions": .decisions(a)
+            case "actionItems": .actionItems(a)
+            case "openQuestions": .openQuestions(a)
+            case "topic": .topicPoint(a, b)
+            case "custom": .custom(a, b)
+            case "person": .person(a, b)
+            default: nil
+            }
+            let textIndex = twoLevel ? 5 : 4
+            if let ref {
+                switch args[1] {
+                case "editui": model.editingNoteItem = ref
+                case "edit": model.editNoteItem(ref, text: args.count > textIndex ? args[textIndex] : "")
+                case "delete": model.deleteNoteItem(ref)
+                default: model.editingNoteItem = nil
+                }
+            }
+        case "bookmarkrename": if let id { model.renameBookmark(id, label: args[2]) }
+        case "bookmarkrenameui": if let id { model.renameTarget = .bookmark(id) }
+        case "menupick": if args.count > 1 { pickNextMenu(args.dropFirst().joined(separator: " ")) }   // menupick <项目>：接下来打开的菜单选这一项
+        // 自己画的菜单（R105）：floatpick <项目>（子菜单「移到文件夹 ▸ 客户」）选开着的那一项；floatclose 关掉
+        case "floatpick": if args.count > 1 { FloatingMenuController.shared.debugPick(args.dropFirst().joined(separator: " ")) }
+        case "floatclose": FloatingMenuController.shared.close()
+        case "floatothers": FloatingMenuController.shared.ignoreOtherApps = args.count > 1 && args[1] == "off"   // floatothers off：点别的 app 不关菜单
+        case "foldernew": if args.count > 1 { model.createFolder(args[1]) }   // 等于按「文件夹」标题的「+」建立（R104）
+        case "importinto": if args.count > 2 { model.importDropped([URL(fileURLWithPath: args[2])], into: args[1]) }   // 等于从 Finder 把文件拖到文件夹（R103.3）
+        // 重命名的弹窗（R102、design §76）：renameui <meeting|folder|person|bookmark|newfolder> <id、名称或会议 id,…>
+        case "renameui":
+            guard args.count > 2 else { break }
+            switch args[1] {
+            case "meeting": if let i = Int64(args[2]) { model.renameTarget = .meeting(i) }
+            case "folder": model.renameTarget = .folder(args[2])
+            case "person": if let i = Int64(args[2]) { model.renameTarget = .person(i) }
+            case "bookmark": if let i = Int64(args[2]) { model.renameTarget = .bookmark(i) }
+            case "newfolder": model.renameTarget = .newFolder(args[2].split(separator: ",").compactMap { Int64($0) })
+            default: break
+            }
+        case "termrename": if let id { model.renameTerm(id, to: args[2]) }
+        // 会议列表的排序、分组、筛选（design §71）
+        case "listsort": if let sort = MeetingSort(rawValue: args[1]) { model.meetingSort = sort }
+        case "listgroup": if let grouping = MeetingGrouping(rawValue: args[1]) { model.meetingGrouping = grouping }
+        case "listfilter":
+            switch args[1] {
+            case "review": model.meetingFilter.needsReview.toggle()
+            case "mine": model.meetingFilter.myActionItems.toggle()
+            case "person": model.meetingFilter.personId = args.count > 2 ? Int64(args[2]) : nil
+            case "template": model.meetingFilter.templateId = args.count > 2 ? args[2] : nil
+            default: model.meetingFilter = MeetingFilter()
+            }
         case "undo": model.selection = id; model.undoNotes()
         case "trash": if let id { model.moveToTrash(id) }
         case "restore": if let id { model.restore(id) }
@@ -230,6 +327,11 @@ enum DebugControl {
                                                  "lastTitle": $0.lastMeetingTitle ?? "", "lastDate": $0.lastMeetingDate ?? ""] }], to: args[1])
         case "personrename": if let id { model.renamePerson(id, to: args[2]) }
         case "persondelete": if let id { model.deletePerson(id) }
+        case "personremove": model.confirmRemovePerson = id   // 等于选了「移除这个人…」（R85.7），打开确认
+        case "personrenameui":   // 等于选了「改名…」（更多、侧栏右键，R85.7）：选那个人、打开铅笔下面的输入框
+            model.sidebarMode = .people
+            model.selectedPerson = id
+            if let id { model.renameTarget = .person(id) }
         case "peopledeleteall": model.deleteAllPeople()
         case "template": model.selection = id; model.setTemplate(args[2])
         case "language": model.selection = id; model.setMeetingLanguage(MeetingLanguage(rawValue: args[2]) ?? .zh)
@@ -445,6 +547,92 @@ enum DebugControl {
                 if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                                                   windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) {
                     window.sendEvent(event)
+                }
+            }
+        // mouseat <left|right|double|move> <x> <y> <窗口 id 或编号> [菜单输出.json]：同 clickat，直接交给 NSWindow.sendEvent，
+        // 不碰用户的鼠标、不用切到那个桌面（R100 自己验收）。给了输出档时，接下来打开的菜单（右键、「⋯」）把项目写出来再关掉
+        case "mouseat":
+            guard args.count > 4, let x = Double(args[2]), let y = Double(args[3]),
+                  let window = NSApp.windows.first(where: { $0.isVisible && ($0.identifier?.rawValue == args[4] || "\($0.windowNumber)" == args[4]) })
+            else { break }
+            // 最后一个参数 app：走 NSApp.sendEvent（经过 app 的事件监看、NSApp.currentEvent 是这一下；自己画的菜单的右键靠它）
+            let viaApp = args.last == "app"
+            if args.count > 5, args[5] != "app" { captureNextMenu(to: args[5], keep: args.count > 6 ? Double(args[6]) ?? 0 : 0) }
+            let point = NSPoint(x: x, y: window.frame.height - y)
+            func deliver(_ event: NSEvent) { if viaApp { NSApp.sendEvent(event) } else { window.sendEvent(event) } }
+            func send(_ type: NSEvent.EventType, clicks: Int) {
+                if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                  windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1) {
+                    deliver(event)
+                }
+            }
+            // 从 CGEvent 产生：带按键编号（右键是 1；NSEvent.mouseEvent 做的右键按键编号是 0，SwiftUI 会当成左键点击）。
+            // NSEvent(cgEvent:) 没有窗口时 locationInWindow 是屏幕座标，所以把位置放成「数值等于窗口座标」，交给 sendEvent 时落在同一点
+            func sendCG(_ type: CGEventType, _ button: CGMouseButton, clicks: Int64) {
+                let height = NSScreen.screens.first?.frame.height ?? 0
+                guard let cg = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: CGPoint(x: point.x, y: height - point.y),
+                                       mouseButton: button) else { return }
+                cg.setIntegerValueField(.mouseEventClickState, value: clicks)
+                if let event = NSEvent(cgEvent: cg) { deliver(event) }
+            }
+            switch args[1] {
+            case "clickq", "clickqcmd", "clickqshift":
+                // 按下、放开都排进事件队列，同真的点一下：经过手势识别、NSApp.currentEvent 是这一下，
+                // 表格按下后自己从队列拿放开（直接 sendEvent 的话这些都不一样，2026-11-17 验侧栏点击卡住时发现）
+                let flags: NSEvent.ModifierFlags = args[1] == "clickqcmd" ? .command : args[1] == "clickqshift" ? .shift : []
+                for (type, pressure) in [(NSEvent.EventType.leftMouseDown, Float(1)), (.leftMouseUp, 0)] {
+                    if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
+                                                      windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: pressure) {
+                        NSApp.postEvent(event, atStart: false)
+                    }
+                }
+            case "right": send(.rightMouseDown, clicks: 1); send(.rightMouseUp, clicks: 1)
+            case "cgright": sendCG(.rightMouseDown, .right, clicks: 1); sendCG(.rightMouseUp, .right, clicks: 1)
+            case "cgleft": sendCG(.leftMouseDown, .left, clicks: 1); sendCG(.leftMouseUp, .left, clicks: 1)
+            case "cgdouble":
+                sendCG(.leftMouseDown, .left, clicks: 1); sendCG(.leftMouseUp, .left, clicks: 1)
+                sendCG(.leftMouseDown, .left, clicks: 2); sendCG(.leftMouseUp, .left, clicks: 2)
+            case "double": send(.leftMouseDown, clicks: 1); send(.leftMouseUp, clicks: 1); send(.leftMouseDown, clicks: 2); send(.leftMouseUp, clicks: 2)
+            case "move": send(.mouseMoved, clicks: 0)
+            default: send(.leftMouseDown, clicks: 1); send(.leftMouseUp, clicks: 1)
+            }
+        case "eventlog":   // eventlog <输出档|off>：把收到的鼠标、按键事件写下来（查外面送的事件有没有进来；三指拖移的事件、拖动开始了没）
+            if let eventMonitor { NSEvent.removeMonitor(eventMonitor); self.eventMonitor = nil }
+            eventLogPath = nil
+            if args[1] != "off" {
+                let path = args[1]
+                FileManager.default.createFile(atPath: path, contents: nil)
+                eventLogPath = path
+                eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp, .leftMouseDragged, .rightMouseDown, .mouseMoved, .keyDown, .pressure]) { event in
+                    let mouse = event.type != .keyDown
+                    note("\(event.type.rawValue) win=\(event.windowNumber) loc=\(Int(event.locationInWindow.x)),\(Int(event.locationInWindow.y)) clicks=\(mouse && event.type != .pressure ? event.clickCount : 0) key=\(mouse ? -1 : Int(event.keyCode)) subtype=\(mouse ? Int(event.subtype.rawValue) : -1) pressure=\(mouse ? event.pressure : 0) buttons=\(NSEvent.pressedMouseButtons)")
+                    return event
+                }
+            }
+        case "appearance":   // appearance light|dark|system：只改这个 app 的外观（巡检浅色、深色用，不动系统设置）
+            NSApp.appearance = args[1] == "light" ? NSAppearance(named: .aqua) : args[1] == "dark" ? NSAppearance(named: .darkAqua) : nil
+        case "capturemenu": captureNextMenu(to: args[1])   // capturemenu <输出.json>：接下来打开的菜单写出项目后关掉（配合外面送的真的鼠标事件）
+        // keyat <return|delete|escape|f2> <窗口 id 或编号>：按键直接交给那个窗口（给第一回应者，同真的按键）
+        case "keyat":
+            guard args.count > 2, let window = NSApp.windows.first(where: { $0.isVisible && ($0.identifier?.rawValue == args[2] || "\($0.windowNumber)" == args[2]) })
+            else { break }
+            let (code, chars): (UInt16, String) = switch args[1] {
+            case "delete": (51, "\u{7f}")
+            case "escape": (53, "\u{1b}")
+            case "f2": (120, String(UnicodeScalar(NSF2FunctionKey)!))
+            case "down": (125, String(UnicodeScalar(NSDownArrowFunctionKey)!))
+            case "up": (126, String(UnicodeScalar(NSUpArrowFunctionKey)!))
+            case "right": (124, String(UnicodeScalar(NSRightArrowFunctionKey)!))
+            case "left": (123, String(UnicodeScalar(NSLeftArrowFunctionKey)!))
+            default: (36, "\r")
+            }
+            // 第四个参数 app：走 NSApp.sendEvent（会经过 app 的事件监看，自己画的菜单的键盘靠它）
+            let throughApp = args.count > 3 && args[3] == "app"
+            for type in [NSEvent.EventType.keyDown, .keyUp] {
+                if let event = NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                windowNumber: window.windowNumber, context: nil, characters: chars, charactersIgnoringModifiers: chars,
+                                                isARepeat: false, keyCode: code) {
+                    if throughApp { NSApp.sendEvent(event) } else { window.sendEvent(event) }
                 }
             }
         // pressbutton <按钮的字> [窗口编号]：按 AppKit 的按钮（确认对话框的 NSAlert 在桌面层时 AX 看不到、clickat 点不到）
@@ -726,6 +914,28 @@ enum DebugControl {
         case "windowlevel":   // windowlevel <窗口 id 开头> desktop|normal：放到桌面层（被所有窗口盖住，screencapture -l 照样截得到），不出现在用户的画面上
             let level = args.count > 2 && args[2] == "desktop" ? NSWindow.Level(Int(CGWindowLevelForKey(.desktopWindow))) : .normal
             NSApp.windows.filter { $0.identifier?.rawValue.hasPrefix(args[1]) == true }.forEach { $0.level = level }
+        // windowshot <窗口 id 或编号> <输出.png>：app 自己把窗口的内容画成图（屏幕上锁、窗口在桌面层或别的桌面也画得出来，
+        // 输入框这些 AppKit 组件照样画；snapshot 的 ImageRenderer 画不出来）
+        case "windowshot":
+            guard args.count > 2, let window = NSApp.windows.first(where: { $0.identifier?.rawValue == args[1] || "\($0.windowNumber)" == args[1] }),
+                  let view = window.contentView, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }
+            view.cacheDisplay(in: view.bounds, to: rep)
+            // 画出来的内容没有窗口的底色（材质、背景是窗口服务器画的），先铺上窗口的底色再叠上去
+            let output = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: rep.pixelsWide, pixelsHigh: rep.pixelsHigh,
+                                          bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                          colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+            output.size = view.bounds.size
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: output)
+            window.effectiveAppearance.performAsCurrentDrawingAppearance {
+                NSColor.windowBackgroundColor.setFill()
+                view.bounds.fill()
+            }
+            rep.draw(in: view.bounds, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            NSGraphicsContext.restoreGraphicsState()
+            try? output.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: args[2]))
+        case "exportui": model.openExportSheet()   // 等于按工具列的「导出」
+        case "mousehold": model.debugMouseHeld = args.count > 1 && args[1] == "on"   // mousehold on|off：当成左键按着（选中会议时先不换会议页，design §77）
         case "setkey": try? Keychain.set(args[1], args[2])          // setkey anthropic|openai <key>
         case "delkey": Keychain.delete(args[1])
         case "settings": NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
@@ -750,13 +960,24 @@ enum DebugControl {
             window.identifier = NSUserInterfaceItemIdentifier(onboarding ? "onboarding-preview" : detailPage ? "detail-preview" : "settings-preview")
             window.title = window.identifier!.rawValue
             window.isReleasedWhenClosed = false
-            if args.count > 1 && (args[1] == "import" || args[1] == "rename") {
+            // editinfo、replace：会议页里自己打开的弹窗（编辑会议信息、用词修正，design §80），用目前选中的会议
+            if args.count > 1, ["import", "rename", "editinfo", "replace", "rediarize", "noteseditor"].contains(args[1]) {
                 window.identifier = NSUserInterfaceItemIdentifier("\(args[1])-preview")
                 window.title = window.identifier!.rawValue
-                let view = args[1] == "import"
-                    ? AnyView(ImportSheet(urls: [URL(fileURLWithPath: "/tmp/周会 0827.m4a")]).environment(model))   // l10n-skip
-                    : AnyView(RenameSpeakerForm(name: .constant("说话者 2"), mergeTargets: [(1, "小明"), (3, "说话者 3")],   // l10n-skip
-                                                onMerge: { _ in }, onSave: {}))
+                let view: AnyView = switch args[1] {
+                case "import": AnyView(ImportSheet(urls: [URL(fileURLWithPath: "/tmp/周会 0827.m4a")]).environment(model))   // l10n-skip
+                case "editinfo":
+                    if let meeting = model.detail?.meeting { AnyView(EditInfoForm(meeting: meeting) {}.environment(model)) } else { AnyView(EmptyView()) }
+                case "replace": AnyView(ReplaceSheet(initialFind: "Lumeo").environment(model))
+                case "noteseditor":   // 编辑会议记录（记录标签页的「编辑」，R6.6）
+                    if let notes = model.detail?.notes {
+                        AnyView(NotesEditor(notes: .constant(notes)) { _ in }.frame(width: 900, height: 560).environment(model))
+                    } else { AnyView(EmptyView()) }
+                case "rediarize":   // 重新识别说话者（示范会议没有录音，requestRediarize 打不开）
+                    { model.rediarizeMeetingId = model.selection; return AnyView(RediarizeSheet().environment(model)) }()
+                default: AnyView(RenameSpeakerForm(name: .constant("说话者 2"), automatic: true, onReject: {},   // l10n-skip
+                                                   mergeTargets: [(1, "小明"), (3, "说话者 3")], onMerge: { _ in }, onSave: {}))   // l10n-skip
+                }
                 window.contentView = NSHostingView(rootView: view.background(Color(nsColor: .windowBackgroundColor)))
                 window.setContentSize(window.contentView!.fittingSize)
             } else if detailPage {
@@ -847,6 +1068,22 @@ enum DebugControl {
             "splittingMeeting": model.splittingMeeting ?? -1,
             "tab": model.tab.rawValue, "reviewExpanded": model.reviewExpanded, "userNotesExpanded": model.userNotesExpanded,
             "notesView": UserDefaults.standard.string(forKey: AppSettings.notesViewKey) ?? "list",
+            "folderRules": model.folderRules.map { ["folder": $0.folder, "keywords": $0.keywords, "people": $0.people,
+                                                    "templateId": $0.templateId ?? ""] as [String: Any] },
+            "confirmRemovePerson": model.confirmRemovePerson ?? -1,
+            "confirmDeleteFolder": model.confirmDeleteFolder ?? "",
+            "renameTarget": model.renameTarget?.id ?? "",
+            "editingNoteItem": model.editingNoteItem.map { "\($0)" } ?? "",
+            "sidebarCollapsed": model.sidebarCollapsed.sorted(), "sidebarExpanded": model.sidebarExpanded.sorted(),
+            "sidebarOrder": model.sidebarFolderItems.map(\.key), "showImportSheet": model.showImportSheet,
+            "floatingMenu": FloatingMenuController.shared.debugTitles, "floatingMenuState": FloatingMenuController.shared.debugState,
+            "floatingMenuWindow": FloatingMenuController.shared.debugWindowNumber,
+            "list": ["sort": model.meetingSort.rawValue, "group": model.effectiveGrouping.rawValue,
+                     "filter": ["review": model.meetingFilter.needsReview, "mine": model.meetingFilter.myActionItems,
+                                "person": model.meetingFilter.personId ?? -1, "template": model.meetingFilter.templateId ?? ""] as [String: Any],
+                     "filterSummary": model.filterSummary, "myName": model.myName ?? "",
+                     "ids": model.filteredMeetings.map(\.id),
+                     "groups": model.meetingGroups.map { ["title": $0.title, "count": $0.rows.count] as [String: Any] }] as [String: Any],
             // 本地 MCP（design §44.6）：开关、启动档
             "mcp": ["enabled": AppSettings.mcpEnabled, "launcher": MCPSetup.launcherURL.path,
                     "launcherExists": FileManager.default.fileExists(atPath: MCPSetup.launcherURL.path)] as [String: Any],
@@ -880,6 +1117,15 @@ enum DebugControl {
             "menuBarSymbol": model.menuBarSymbol,
             "micStatus": AVCaptureDevice.authorizationStatus(for: .audio).rawValue,
             "openMainWindowReady": model.openMainWindow != nil,
+            "detailMeeting": model.detail?.meeting.id ?? -1,
+            // 侧栏的表格（拖动，design §77）：直直往上下拖会不会开始拖动
+            "sidebarTables": NSApp.windows.filter { $0.identifier?.rawValue == "main" }.flatMap { window -> [[String: Any]] in
+                func tables(_ view: NSView) -> [NSTableView] { (view as? NSTableView).map { [$0] } ?? view.subviews.flatMap(tables) }
+                return window.contentView.map(tables)?.map {
+                    ["class": String(describing: type(of: $0)), "verticalMotionCanBeginDrag": $0.verticalMotionCanBeginDrag,
+                     "allowsMultipleSelection": $0.allowsMultipleSelection, "rows": $0.numberOfRows]
+                } ?? []
+            },
             "running": model.runner.running.map { lane, r in
                 ["lane": lane.rawValue, "job": r.job.id ?? 0, "kind": r.job.kind.rawValue, "stage": r.stage, "progress": r.progress ?? -1,
                  "remaining": r.remaining ?? -1, "server": r.server.map { ["text": $0.text, "waiting": $0.waiting] } as Any] },
@@ -1012,6 +1258,78 @@ enum DebugControl {
             return nil
         }
         return NSApp.windows.lazy.filter(\.isVisible).compactMap { $0.contentView.flatMap(find) }.first
+    }
+
+    /// 下一个开始追踪的菜单（右键菜单、「⋯」）：项目写到 path（子菜单展开成「父 ▸ 子」），然后关掉，不留在用户画面上
+    private static var menuObserver: NSObjectProtocol?
+    private static var eventMonitor: Any?
+    private static var eventLogPath: String?
+    private static let eventLogStart = ProcessInfo.processInfo.systemUptime
+
+    /// eventlog 开着时写一行（拖动开始了没这类，事件以外的东西也写进同一份）
+    static func note(_ text: String) {
+        guard let path = eventLogPath else { return }
+        let line = String(format: "%.3f ", ProcessInfo.processInfo.systemUptime - eventLogStart) + text + "\n"
+        if let handle = FileHandle(forWritingAtPath: path) { handle.seekToEndOfFile(); handle.write(Data(line.utf8)); try? handle.close() }
+    }
+    /// keep：菜单留着几秒再关（给外面截屏）
+    /// 接下来打开的菜单（右键、「⋯」）直接选标题是 title 的那一项（子菜单用「移到文件夹 ▸ 客户」），等于用户点了它
+    private static func pickNextMenu(_ title: String) {
+        if let menuObserver { NotificationCenter.default.removeObserver(menuObserver) }
+        menuObserver = NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: nil) { note in
+            guard let menu = note.object as? NSMenu, menu.supermenu == nil, menu != NSApp.mainMenu else { return }
+            if let observer = menuObserver { NotificationCenter.default.removeObserver(observer); menuObserver = nil }
+            nonisolated(unsafe) let tracked = menu
+            RunLoop.main.perform(inModes: [.common]) {
+                MainActor.assumeIsolated {
+                    tracked.update()
+                    var current: NSMenu? = tracked
+                    let path = title.components(separatedBy: " ▸ ")
+                    for (i, part) in path.enumerated() {
+                        guard let m = current, let index = m.items.firstIndex(where: { $0.title == part }) else { break }
+                        if i == path.count - 1 {
+                            tracked.cancelTracking()
+                            m.performActionForItem(at: index)
+                        } else {
+                            m.items[index].submenu?.update()
+                            current = m.items[index].submenu
+                        }
+                    }
+                    tracked.cancelTracking()
+                }
+            }
+        }
+    }
+
+    private static func captureNextMenu(to path: String, keep: Double = 0) {
+        if let menuObserver { NotificationCenter.default.removeObserver(menuObserver) }
+        menuObserver = NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: nil) { note in
+            guard let menu = note.object as? NSMenu, menu.supermenu == nil, menu != NSApp.mainMenu else { return }
+            if let observer = menuObserver { NotificationCenter.default.removeObserver(observer); menuObserver = nil }
+            func titles(_ m: NSMenu, _ prefix: String) -> [String] {
+                m.items.flatMap { item -> [String] in
+                    let hidden = item.isHidden ? "（隐藏）" : ""
+                    if item.isSeparatorItem { return [prefix + "——" + hidden] }
+                    let header = item.isSectionHeader ? "【段落】" : ""
+                    let line = prefix + header + item.title + (item.isEnabled ? "" : "（禁用）") + (item.state == .on ? "（✓）" : "") + hidden
+                    return [line] + (item.submenu.map { titles($0, prefix + item.title + " ▸ ") } ?? [])
+                }
+            }
+            // SwiftUI 的菜单内容在开始追踪时才补齐，等一下再读（菜单追踪时主线程在 event tracking 模式，要排在 common）
+            nonisolated(unsafe) let tracked = menu
+            RunLoop.main.perform(inModes: [.common]) {
+                MainActor.assumeIsolated {
+                    tracked.update()
+                    write(["items": titles(tracked, "")], to: path)
+                    if keep > 0 {
+                        let timer = Timer(timeInterval: keep, repeats: false) { _ in MainActor.assumeIsolated { tracked.cancelTracking() } }
+                        RunLoop.main.add(timer, forMode: .common)
+                    } else {
+                        tracked.cancelTracking()
+                    }
+                }
+            }
+        }
     }
 
     private static func write(_ object: [String: Any], to path: String) {

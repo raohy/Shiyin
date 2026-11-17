@@ -118,12 +118,6 @@ struct MainView: View {
     @AppStorage("hasSeenGuide") private var hasSeenGuide = false
     @State private var dropTargeted = false
 
-    /// 「从这里分成两场…」那一句的开始时间（R90）
-    private var splitTime: String {
-        guard let id = model.splitMeetingRequest, let segment = model.detail?.segments.first(where: { $0.id == id }) else { return "" }
-        return TimeFormat.string(segment.start)
-    }
-
     var body: some View {
         @Bindable var model = model
         NavigationSplitView {
@@ -165,7 +159,12 @@ struct MainView: View {
                 openWindow(id: "guide")
             }
         }
-        .modifier(FolderPromptModifier())
+        // 重命名、新文件夹的弹窗（R102、design §76）
+        .sheet(item: Binding(get: { model.renameTarget }, set: { model.renameTarget = $0 })) { RenameSheet(target: $0) }
+        // 文件夹的自动加入条件（design §72）
+        .sheet(item: Binding(get: { model.editingFolderRule.map(EditingFolder.init) }, set: { model.editingFolderRule = $0?.name })) {
+            FolderRuleSheet(folder: $0.name)
+        }
         // 有新版时询问（R10.6）
         .alert(String(localized: "拾音 \(model.updater.prompt?.version ?? "") 可以更新了"), isPresented: Binding(
             get: { model.updater.prompt != nil }, set: { if !$0 { model.updater.prompt = nil } })) {
@@ -183,36 +182,8 @@ struct MainView: View {
                   String(localized: "目前是 \(Updater.currentVersion)。更新时拾音会结束并重新打开，会议资料都会保留。")]
                 .filter { !$0.isEmpty }.joined(separator: "\n\n"))
         }
-        .confirmationDialog((model.confirmPurge?.count ?? 0) > 1 ? String(localized: "永久删除 \(model.confirmPurge?.count ?? 0) 场会议？")
-                                                                 : String(localized: "永久删除这场会议？"),
-                            isPresented: Binding(get: { model.confirmPurge != nil }, set: { if !$0 { model.confirmPurge = nil } })) {
-            Button("永久删除", role: .destructive) {
-                if let ids = model.confirmPurge { model.deletePermanently(ids) }
-            }
-        } message: {
-            Text("会议记录、逐字稿和录音都会删掉，没办法还原。")
-        }
-        // 清空垃圾桶（R88.3）
-        .confirmationDialog(String(localized: "永久删除垃圾桶里的 \(model.trash.count) 场会议？"), isPresented: $model.confirmEmptyTrash) {
-            Button("清空垃圾桶", role: .destructive) { model.emptyTrash() }
-        } message: {
-            Text("会议记录、逐字稿和录音都会删掉，没办法还原。")
-        }
-        // 从某一句分成两场（R90、design §64）：分开后没办法合并回来（D170）
-        .confirmationDialog(String(localized: "从 \(splitTime) 这句开始分成另一场会议？"),
-                            isPresented: Binding(get: { model.splitMeetingRequest != nil }, set: { if !$0 { model.splitMeetingRequest = nil } })) {
-            Button("分成两场") {
-                if let id = model.splitMeetingRequest { model.splitMeeting(at: id) }
-            }
-        } message: {
-            Text("这句和之后的逐字稿、录音、标记重点变成新的一场，前面的留在这场；我的笔记、参考文件、提问留在这场。两场都要刷新会议记录。分开后没办法合并回来。")
-        }
-        .confirmationDialog(model.deleteTargets.count > 1 ? String(localized: "把 \(model.deleteTargets.count) 场会议移到垃圾桶？")
-                                                          : String(localized: "把这场会议移到垃圾桶？"), isPresented: $model.confirmDelete) {
-            Button("移到垃圾桶", role: .destructive) { model.moveToTrash(model.deleteTargets) }
-        } message: {
-            Text("30 天内都可以从垃圾桶还原。")
-        }
+        // 删除、移除、分成两场的确认（R106、design §80）：同一种弹窗，取代系统的确认对话框
+        .sheet(item: Binding(get: { model.activeConfirmation }, set: { if $0 == nil { model.clearConfirmations() } })) { ConfirmSheet(request: $0) }
     }
 }
 
@@ -246,6 +217,8 @@ struct MultiSelectionView: View {
 
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var trashTargeted = false
 
     var body: some View {
         @Bindable var model = model
@@ -279,7 +252,9 @@ struct SidebarView: View {
                           systemImage: model.showTrash ? "chevron.backward" : "trash")
                 }
                 .buttonStyle(.borderless)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(trashTargeted ? Color.celadon : .secondary)
+                // 会议拖到这里＝移到垃圾桶（R103.1，可以还原）
+                .meetingDrop(enabled: !model.showTrash, targeted: $trashTargeted) { model.moveToTrash($0) }
                 Spacer()
                 // 导入放这里：侧边栏的工具列放不下，会被收进「>>」（design §22.2、R21.5）；垃圾桶里换成清空（R88.3）
                 if model.showTrash {
@@ -327,8 +302,8 @@ struct SidebarView: View {
     private var scopeSections: some View {
         let people = model.sidebarMode == .people
         Section {
-            FolderRow(name: String(localized: "所有会议"), count: model.meetings.count, symbol: "tray.full",
-                      selected: !people && model.folderFilter == nil) {
+            // 所有会议是回到默认的画面，不画选到的样子；人物模式时人物亮
+            FolderRow(name: String(localized: "所有会议"), count: model.meetings.count, symbol: "tray.full", selected: false) {
                 model.sidebarMode = .meetings
                 model.folderFilter = nil
             }
@@ -337,20 +312,48 @@ struct SidebarView: View {
                 model.reloadPeopleOverview()
             }
         }
-        if !model.folders.isEmpty {
-            Section("文件夹") {
-                ForEach(model.folders, id: \.name) { folder in
-                    FolderRow(name: folder.name, count: folder.count, symbol: "folder", selected: !people && model.folderFilter == folder.name) {
-                        model.sidebarMode = .meetings
-                        model.folderFilter = folder.name
-                    }
-                    .contextMenu {
-                        Button("重命名…") { model.folderPrompt = .rename(folder.name) }
-                        Button("删除文件夹（会议会保留）", role: .destructive) { model.deleteFolder(folder.name) }
-                    }
+        // 段落可以收起；每个文件夹可以在原地展开最近的会议（R101、design §75）。一直显示，标题右边「+」建空的文件夹（R104、design §78）
+        Section {
+            if model.isSectionExpanded("folders") {
+                SidebarFolderRows()
+                if model.folders.isEmpty {
+                    Text("按 + 添加文件夹").font(.callout).foregroundStyle(.secondary).selectionDisabled()
                 }
             }
+        } header: {
+            HStack(spacing: 6) {
+                // 段落标题跟「+」在辅助功能里并成一个组件，按下去要是「+」，收合改成有名字的动作（同会议列表的标题）
+                SidebarSectionHeader(title: String(localized: "文件夹"), key: "folders", besideMenu: true)
+                Spacer(minLength: 4)
+                // 不用 Button：List 里的 SwiftUI 按钮会让整个表格的点击卡住（见 sidebarClick）
+                SidebarHeaderIcon(systemName: "plus")
+                    .sidebarClick { model.renameTarget = .newFolder([]) }
+                    .padding(.trailing, SidebarHeaderIcon.trailing)
+                    .help("新文件夹")
+                    .accessibilityElement()
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityLabel(Text("新文件夹"))
+                    .accessibilityAction { model.renameTarget = .newFolder([]) }
+            }
         }
+    }
+
+    /// 一场会议的列：右边的「⋯」跟右键同一份（R100）；选到的是多选里的一场时，菜单对整个多选
+    private func meetingRow(_ row: MeetingRow) -> some View {
+        let selected = model.listSelection.contains(row.id)
+        return MeetingRowView(row: row, status: model.status(row))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            // 拖到文件夹、其他会议的标题、垃圾桶（R103.1）；在多选里时拖整个多选。点一下选中（⌘、⇧ 多选）也在这里，
+            // 不经过 List 自己的点击、拖动（design §77）。垃圾桶里的不能拖。把手只盖内容，不盖右边的「⋯」
+            .sidebarDragHandle(type: model.showTrash ? nil : .shiyinMeetingIDs, label: row.meeting.displayTitle,
+                               data: { Data(model.dragIDs(for: row.id).map(String.init).joined(separator: ",").utf8) }) {
+                model.clickMeetingRow(row.id, modifiers: $0)
+            }
+            // 「⋯」和右键：自己画的菜单（R105）；选到的是多选里的一场时，菜单对整个多选
+            .floatingRowMenu(selected: selected) { model.meetingMenu(model.dragIDs(for: row.id)) }
+            .sidebarSelectableRow(selected: selected)
+            .tag(row.id)
     }
 
     /// 人物模式：上面同样是所有会议、人物、文件夹，下面是认识的人（design §60.2）
@@ -358,17 +361,27 @@ struct SidebarView: View {
         @Bindable var model = model
         return List(selection: $model.selectedPerson) {
             scopeSections
-            Section("人物") {
-                ForEach(model.peopleOverview) { person in
-                    PersonRow(person: person).tag(person.id)
+            Section {
+                if model.isSectionExpanded("people") {
+                    ForEach(model.peopleOverview) { person in
+                        PersonRow(person: person)
+                            .floatingRowMenu(selected: model.selectedPerson == person.id) { model.personMenu(person) }
+                            .sidebarSelectableRow(selected: model.selectedPerson == person.id)
+                            .tag(person.id)
+                    }
+                    if model.peopleOverview.isEmpty {
+                        Text("在逐字稿点「说话者 1」改成名字，或到设置录一段你自己的声音，拾音就会记住这个人。")
+                            .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            .selectionDisabled()
+                    }
                 }
-                if model.peopleOverview.isEmpty {
-                    Text("在逐字稿点「说话者 1」改成名字，或到设置录一段你自己的声音，拾音就会记住这个人。")
-                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                        .selectionDisabled()
-                }
+            } header: {
+                SidebarSectionHeader(title: String(localized: "人物"), key: "people")
             }
         }
+        // 选到一个人时按 Return 重命名、Delete 移除（R85.7、R100）
+        .onKeyPress(.return) { model.sidebarReturn() ? .handled : .ignored }
+        .onDeleteCommand { model.sidebarDelete() }
     }
 
     private var meetingList: some View {
@@ -380,33 +393,47 @@ struct SidebarView: View {
             } else {
                 scopeSections
             }
-            Section(model.showTrash ? "" : (model.folderFilter ?? String(localized: "所有会议"))) {
-                ForEach(model.filteredMeetings) { row in
-                    MeetingRowView(row: row, status: model.status(row))
-                        .tag(row.id)
+            if model.showTrash {
+                Section {
+                    ForEach(model.filteredMeetings) { row in meetingRow(row) }
                 }
-            }
-        }
-        .contextMenu(forSelectionType: Int64.self) { selected in
-            let ids = model.filteredMeetings.map(\.id).filter { selected.contains($0) }
-            if !ids.isEmpty {
-                if model.showTrash {
-                    Button("还原") { model.restore(ids) }
-                    Button("永久删除…", role: .destructive) { model.confirmPurge = ids }
-                } else {
-                    FolderMenu(meetingIds: ids, current: model.commonFolder(ids))
-                    Divider()
-                    if ids.count == 1 {
-                        Button("移到垃圾桶", role: .destructive) { model.moveToTrash(ids) }
-                    } else {
-                        Button("把 \(ids.count) 场会议移到垃圾桶…", role: .destructive) {
-                            model.deleteTargets = ids
-                            model.confirmDelete = true
+            } else {
+                // 排序、分组、筛选（R97、design §71）：标题那一列有「显示方式」，分组时每组一段
+                // 会议列表、分组的每一组都可以收起（R101、design §75）
+                let groups = model.meetingGroups
+                let grouped = model.effectiveGrouping != .none
+                let expanded = model.isSectionExpanded("meetings")
+                Section {
+                    if expanded {
+                        if model.meetingFilter.isActive { MeetingFilterBar() }
+                        if model.meetingFilter.isActive && model.filteredMeetings.isEmpty { MeetingFilterEmpty() }
+                        if model.listShowsOthersOnly && model.filteredMeetings.isEmpty {
+                            Text("不在文件夹里的会议会列在这里").font(.callout).foregroundStyle(.secondary).selectionDisabled()
+                        }
+                        if !grouped, let rows = groups.first?.rows {
+                            ForEach(rows) { row in meetingRow(row) }
+                        }
+                    }
+                } header: {
+                    MeetingListHeader()
+                }
+                if grouped && expanded {
+                    ForEach(groups) { group in
+                        let key = AppModel.groupKey(group)
+                        Section {
+                            if model.isSectionExpanded(key) {
+                                ForEach(group.rows) { row in meetingRow(row) }
+                            }
+                        } header: {
+                            SidebarSectionHeader(title: group.title, key: key)
                         }
                     }
                 }
             }
         }
+        // 键盘（R100）：Return 重命名、Delete 移到垃圾桶（垃圾桶里是永久删除），都照现在选到的
+        .onKeyPress(.return) { model.sidebarReturn() ? .handled : .ignored }
+        .onDeleteCommand { model.sidebarDelete() }
         .overlay {
             if model.filteredMeetings.isEmpty && model.showTrash {
                 Text("垃圾桶是空的").foregroundStyle(.secondary)
@@ -415,27 +442,141 @@ struct SidebarView: View {
     }
 }
 
-/// 侧栏的文件夹列（R9.2）：点了就只看这个文件夹
+/// 侧栏的文件夹列（R9.2）：所有会议、人物点了换下面的列表；文件夹点了在原地展开（R101）。有菜单时（文件夹，R100）滑过或选到时
+/// 数量的位置换成「⋯」。整列用点击手势，不用 Button：List 里的按钮会把右键当成点击，右键菜单出不来
+/// （2026-11-16 自己验收时发现）
 struct FolderRow: View {
+    @Environment(AppModel.self) private var model
     let name: String
     let count: Int
     let symbol: String
     let selected: Bool
+    /// 文件夹（R101）：点了在原地展开、收起，图标换成打开或关着的文件夹（nil 是所有会议、人物这种一般的列）
+    var folder: FolderState? = nil
+    /// 拖动排序用的键（R103.2）；nil 不能拖
+    var dragKey: String? = nil
+    /// 收拖过来的会议、文件夹（排序）、文件（R103）
+    var drop: SidebarRowDrop? = nil
+    var menu: (() -> [MenuEntry])? = nil
     let action: () -> Void
+    @State private var hovering = false
+    @State private var dropState: SidebarDropState?
+    @State private var height: CGFloat = 28
+
+    /// 辅助功能的值：展开了没、几场（右边不显示场数）
+    private var accessibilityState: String {
+        let meetings = String(localized: "\(count) 场")
+        guard let folder else { return meetings }
+        return String(localized: "\(folder.expanded ? String(localized: "已展开") : String(localized: "已收起"))、\(meetings)")
+    }
+
+    struct FolderState {
+        var expanded: Bool
+        /// 右上角的标记：齿轮（有自动加入条件）
+        var badge: String?
+    }
 
     var body: some View {
-        Button(action: action) {
+        let showMenu = menu != nil && (hovering || selected)
+        let state = dropState
+        let into = state == .into
+        HStack {
             HStack {
-                Label(name, systemImage: symbol)
-                    .foregroundStyle(selected ? Color.celadon : .primary)
-                    .fontWeight(selected ? .semibold : .regular)
+                Label {
+                    Text(name)
+                } icon: {
+                    // 拖东西进来时也是打开的文件夹
+                    if let folder { FolderGlyph(open: folder.expanded || into, badge: folder.badge) } else { Image(systemName: symbol) }
+                }
+                // 图标跟字同色（不用侧栏默认的主色）；选到时一块灰底，拖东西进来时青瓷绿
+                .labelStyle(SidebarLabelStyle())
+                .foregroundStyle(into ? Color.celadon : .primary)
+                // 辅助功能照旧是一颗按钮（「⋯」另外一颗）；文件夹的值是展开了没，可以往上、往下移（R103.2）
+                .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+                // 右边不显示场数，辅助功能照样念得到
+                .accessibilityValue(Text(accessibilityState))
+                .accessibilityAction(.default, action)
+                .accessibilityActions {
+                    if let dragKey {
+                        Button("往上移") { model.moveSidebarItem(dragKey, by: -1) }
+                        Button("往下移") { model.moveSidebarItem(dragKey, by: 1) }
+                    }
+                }
                 Spacer()
-                Text("\(count)").monospacedDigit().foregroundStyle(.secondary)
             }
             .contentShape(Rectangle())
+            // 可以拖的列（文件夹）盖拖动把手：拖了排序，没拖就是点一下（R103.2、design §77）；其他列（所有会议、人物）
+            // 盖只接点一下的 view，不用 onTapGesture（会让整个表格的点击卡住，见 sidebarClick）
+            .modifier(FolderRowHandle(name: name, dragKey: dragKey, action: action))
+            // 右边不放场数，滑过或选到时「⋯」
+            if let menu {
+                FloatingMenuButton(entries: menu)
+                    .opacity(showMenu ? 1 : 0)
+                    .allowsHitTesting(showMenu)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        .contentShape(Rectangle())
+        .modifier(FolderRowContextMenu(menu: menu))
+        .onHover { hovering = $0 }
+        .sidebarHover(selected: selected)
+        // 拖进来：整列一块青瓷绿的底；排序：上缘或下缘一条线（design §77）
+        .background {
+            RoundedRectangle(cornerRadius: SidebarHoverModifier.radius, style: .continuous)
+                .fill(Color.celadon.opacity(into ? 0.18 : 0))
+                .padding(.horizontal, -SidebarHoverModifier.inset.width)
+                .padding(.vertical, -SidebarHoverModifier.inset.height)
+        }
+        .overlay(alignment: state == .after ? .bottom : .top) {
+            if state == .before || state == .after {
+                Capsule().fill(Color.celadon).frame(height: 2)
+                    .padding(.horizontal, -SidebarHoverModifier.inset.width)
+                    .offset(y: (state == .before ? -1 : 1) * (SidebarHoverModifier.inset.height + 1))
+                    .allowsHitTesting(false)
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+        .modifier(FolderRowDragModifier(drop: drop, height: height, state: $dropState))
+    }
+}
+
+/// 有菜单的列：右键打开自己画的菜单（R105）
+private struct FolderRowContextMenu: ViewModifier {
+    let menu: (() -> [MenuEntry])?
+
+    func body(content: Content) -> some View {
+        if let menu { content.floatingContextMenu(menu) } else { content }
+    }
+}
+
+/// 有键的列盖拖动把手
+private struct FolderRowHandle: ViewModifier {
+    let name: String
+    let dragKey: String?
+    let action: () -> Void
+
+    func body(content: Content) -> some View {
+        if let dragKey {
+            content.sidebarDragHandle(type: .shiyinSidebarItem, label: name, data: { Data(dragKey.utf8) }, onClick: action)
+        } else {
+            content.sidebarClick(action)
+        }
+    }
+}
+
+/// 有 drop 的列收拖过来的会议、文件夹（排序）、文件
+private struct FolderRowDragModifier: ViewModifier {
+    let drop: SidebarRowDrop?
+    let height: CGFloat
+    @Binding var state: SidebarDropState?
+
+    func body(content: Content) -> some View {
+        if let drop {
+            let types = [drop.meetings != nil ? UTType.shiyinMeetingIDs : nil, drop.item != nil ? .shiyinSidebarItem : nil,
+                         drop.files != nil ? .fileURL : nil].compactMap { $0 }
+            content.onDrop(of: types, delegate: SidebarRowDropDelegate(drop: drop, height: height, state: $state))
+        } else {
+            content
+        }
     }
 }
 
@@ -458,59 +599,19 @@ struct FolderMenu: View {
                     Button(item.name) { model.moveToFolder(targets, folder: item.name) }
                 }
                 if !model.folders.isEmpty { Divider() }
-                Button("新文件夹…") { if !targets.isEmpty { model.folderPrompt = .create(targets) } }
-                Button("移出文件夹") { model.moveToFolder(targets, folder: "") }
+                Button("新文件夹…", systemImage: "folder.badge.plus") { if !targets.isEmpty { model.renameTarget = .newFolder(targets) } }
+                Button("移出文件夹", systemImage: "minus.circle") { model.moveToFolder(targets, folder: "") }
             } else if let folder = current {
                 ForEach(model.folders.filter { $0.name != folder }, id: \.name) { item in
                     Button(item.name) { model.moveToFolder(targets, folder: item.name) }
                 }
                 if !model.folders.filter({ $0.name != folder }).isEmpty { Divider() }
-                Button("新文件夹…") { if !targets.isEmpty { model.folderPrompt = .create(targets) } }
+                Button("新文件夹…", systemImage: "folder.badge.plus") { if !targets.isEmpty { model.renameTarget = .newFolder(targets) } }
                 if !folder.isEmpty {
-                    Button("移出「\(folder)」") { model.moveToFolder(targets, folder: "") }
+                    Button("移出「\(folder)」", systemImage: "minus.circle") { model.moveToFolder(targets, folder: "") }
                 }
             }
         }
-    }
-}
-
-/// 新文件夹、文件夹改名的输入框
-struct FolderPromptModifier: ViewModifier {
-    @Environment(AppModel.self) private var model
-    @State private var name = ""
-
-    func body(content: Content) -> some View {
-        content.alert(title, isPresented: Binding(get: { model.folderPrompt != nil }, set: { if !$0 { model.folderPrompt = nil } })) {
-            TextField("文件夹名称", text: $name)
-            Button("取消", role: .cancel) { model.folderPrompt = nil }
-            Button(confirmTitle) {
-                let value = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                switch model.folderPrompt {
-                case .create(let ids)?: if !value.isEmpty { model.moveToFolder(ids, folder: value) }
-                case .rename(let old)?: model.renameFolder(old, to: value)
-                case nil: break
-                }
-                model.folderPrompt = nil
-            }
-        } message: {
-            Text(message)
-        }
-        .onChange(of: model.folderPrompt) { _, prompt in
-            if case .rename(let old)? = prompt { name = old } else { name = "" }
-        }
-    }
-
-    private var title: String {
-        if case .rename? = model.folderPrompt { return String(localized: "重命名文件夹") }
-        return String(localized: "新文件夹")
-    }
-    private var confirmTitle: String {
-        if case .rename? = model.folderPrompt { return String(localized: "重命名") }
-        return String(localized: "创建并移入")
-    }
-    private var message: String {
-        if case .rename? = model.folderPrompt { return String(localized: "文件夹里的会议都会跟着改。") }
-        return String(localized: "例如项目名称或客户名称。这场会议会移进新文件夹。")
     }
 }
 
@@ -725,55 +826,74 @@ struct ImportSheet: View {
     @State private var speakerCount = 0
 
     var body: some View {
+        // 同其他弹窗的样子（R106、design §80）
         VStack(alignment: .leading, spacing: 16) {
-            Text(urls.count == 1 ? "导入录音" : "导入 \(urls.count) 个录音档").font(.title3.weight(.semibold))
+            SheetHeader(title: urls.count == 1 ? String(localized: "导入录音") : String(localized: "导入 \(urls.count) 个录音档"),
+                        onClose: { model.pendingImport = []; dismiss() })
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(urls, id: \.self) { url in
                     Label(url.lastPathComponent, systemImage: "waveform").lineLimit(1).truncationMode(.middle)
                 }
             }
             .foregroundStyle(.secondary)
-            Form {
-                if urls.count == 1 {
-                    TextField("标题", text: $title, prompt: Text("选填，没填就由整理时命名"))
-                    DatePicker("会议日期", selection: $date, displayedComponents: .date)
-                } else {
-                    LabeledContent(String(localized: "会议日期"), value: String(localized: "依各文件的文件名或修改日期"))
+            if urls.count == 1 {
+                VStack(alignment: .leading, spacing: 6) {
+                    SheetFieldLabel(String(localized: "标题"))
+                    SheetTextField(placeholder: String(localized: "选填，没填就由整理时命名"), text: $title)
                 }
-                TextField("与会者", text: $participants, prompt: Text("选填，用逗号分隔"))
-                Picker("模板", selection: $templateId) {
-                    ForEach(model.templates) { Text($0.displayName).tag($0.id) }
-                }
-                Picker("会议语言", selection: $language) {
-                    ForEach(MeetingLanguage.allCases) { Text($0.name).tag($0) }
-                }
-                .help("决定转录和会议记录用的语言")
-                // 先填人数（design §26.2）
-                Picker("大约几个人", selection: $speakerCount) {
-                    Text("自动判断").tag(0)
-                    ForEach(2...12, id: \.self) { n in Text("\(n) 人").tag(n) }
-                }
-                .help("人多、吵杂或手机放在桌上录音时，先告诉拾音大约几个人，说话者会分得比较准")
             }
-            .formStyle(.columns)
-            HStack {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    SheetFieldLabel(String(localized: "会议日期"))
+                    if urls.count == 1 {
+                        SheetDateField(label: String(localized: "会议日期"), date: $date)
+                    } else {
+                        Text("依各文件的文件名或修改日期").font(.system(size: 15)).foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .sheetFieldBox()
+                    }
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    SheetFieldLabel(String(localized: "大约几个人"))
+                    // 先填人数（design §26.2）
+                    SheetMenuField(options: [(0, String(localized: "自动判断"))] + (2...12).map { ($0, String(localized: "\($0) 人")) },
+                                   selection: $speakerCount)
+                        .help("人多、吵杂或手机放在桌上录音时，先告诉拾音大约几个人，说话者会分得比较准")
+                }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                SheetFieldLabel(String(localized: "与会者"))
+                SheetTextField(placeholder: String(localized: "选填，用逗号分隔"), text: $participants)
+            }
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    SheetFieldLabel(String(localized: "模板"))
+                    SheetMenuField(options: model.templates.map { ($0.id, $0.displayName) }, selection: $templateId)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    SheetFieldLabel(String(localized: "会议语言"))
+                    SheetMenuField(options: MeetingLanguage.allCases.map { ($0, $0.name) }, selection: $language)
+                        .help("决定转录和会议记录用的语言")
+                }
+            }
+            HStack(spacing: 10) {
                 Spacer()
-                Button("取消", role: .cancel) {
+                Button("取消") {
                     model.pendingImport = []
                     dismiss()
                 }
+                .buttonStyle(SheetPillButtonStyle(.secondary))
                 .keyboardShortcut(.cancelAction)
                 Button("导入并开始转录") {
                     model.confirmImport(ImportOptions(title: title, date: urls.count == 1 ? DateText.string(date) : nil,
                                                       participants: participants, templateId: templateId, language: language,
                                                       minSpeakers: speakerCount == 0 ? nil : speakerCount))
                 }
+                .buttonStyle(SheetPillButtonStyle(.primary))
                 .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
             }
         }
-        .padding(20)
-        .frame(width: 460)
+        .sheetChrome(width: 480)
         .onAppear {
             if let first = urls.first,
                let inferred = DateText.date(Importer.inferDate(filename: first.lastPathComponent, modified: Importer.modificationDate(first))) {
@@ -781,4 +901,10 @@ struct ImportSheet: View {
             }
         }
     }
+}
+
+/// 正在编辑条件的文件夹（sheet(item:) 要 Identifiable）
+struct EditingFolder: Identifiable {
+    let name: String
+    var id: String { name }
 }

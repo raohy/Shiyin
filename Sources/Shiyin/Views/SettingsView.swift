@@ -492,6 +492,19 @@ struct TemplateSettings: View {
                             if template.id == defaultTemplate { Text("默认").font(.caption).foregroundStyle(.secondary) }
                         }
                         .tag(template.id)
+                        // 右键（R100）：复制、设为默认、删除（自订的才有）
+                        .contextMenu {
+                            Button("复制") { create(from: template) }
+                            Button("设为默认模板") { defaultTemplate = template.id }.disabled(defaultTemplate == template.id)
+                            if !template.builtin {
+                                Divider()
+                                Button("删除", role: .destructive) {
+                                    if defaultTemplate == template.id { defaultTemplate = "general" }
+                                    model.deleteTemplate(template.id)
+                                    if selection == template.id { selection = model.templates.first?.id }
+                                }
+                            }
+                        }
                     }
                 }
                 HStack {
@@ -596,7 +609,12 @@ struct TemplateSettings: View {
 
     private func create(from source: TemplateRecord?, definition edited: TemplateDefinition? = nil) {
         let id = "custom-\(UUID().uuidString.prefix(8))"
-        let definition = edited ?? source.map { $0.definition(for: .interface) }
+        // 没给编辑中的内容（右键的「复制」）时，复制画面上看到的：简体界面的内置模板转成简体（同 select，Windows 巡检时发现）
+        let shown = source.map { template -> TemplateDefinition in
+            let definition = template.definition(for: .interface)
+            return template.builtin && MeetingLanguage.simplifiedInterface ? definition.mappingText(ChineseScript.toSimplifiedUI) : definition
+        }
+        let definition = edited ?? shown
             ?? TemplateDefinition(description: "", sections: ["summary", "decisions", "actionItems"], custom: [], instruction: "")
         model.saveTemplate(TemplateRecord(id: id, name: source.map { String(localized: "\($0.displayName)（副本）") } ?? String(localized: "新模板"), builtin: false,
                                           definition: definition.jsonString()))
@@ -625,6 +643,8 @@ struct SpeakerSettings: View {
     @State private var renaming: Int64?
     @State private var renameText = ""
     @State private var confirmDeleteAll = false
+    /// 移除一个人的确认（R100：会丢声音特征，要确认；同人物页）
+    @State private var removing: PersonSummary?
 
     var body: some View {
         Toggle("记住说话者的声音，之后的会议自动带入名字", isOn: $voiceprints)
@@ -655,11 +675,22 @@ struct SpeakerSettings: View {
                         Text(detailLine(person)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     Spacer()
-                    Button("改名") { renameText = person.name; renaming = person.id }.buttonStyle(.link)
-                    Button { model.deletePerson(person.id) } label: { Image(systemName: "trash") }
-                        .buttonStyle(.borderless).help("删除「\(person.name)」的声音特征（已经带入的名字留着）")
+                    Button("重命名") { renameText = person.name; renaming = person.id }.buttonStyle(.link)
+                    Button { removing = person } label: { Image(systemName: "trash") }
+                        .buttonStyle(.borderless).help("移除「\(person.name)」（会议里的名字留着）")
                 }
             }
+            .contextMenu {
+                Button("重命名…") { renameText = person.name; renaming = person.id }
+                Divider()
+                Button("移除这个人…", role: .destructive) { removing = person }
+            }
+        }
+        .confirmationDialog(String(localized: "移除「\(removing?.name ?? "")」？"),
+                            isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } })) {
+            Button("移除", role: .destructive) { if let id = removing?.id { model.deletePerson(id) } }
+        } message: {
+            Text("会从「人物」拿掉，也会删掉他的声音特征。会议里已经带入的名字会留着，之后的会议不会再自动认出他。")
         }
         .onAppear { model.reloadPeople() }
         .confirmationDialog("删除所有认识的人的声音特征？", isPresented: $confirmDeleteAll) {
@@ -807,6 +838,10 @@ struct GlossarySettings: View {
     @State private var query = ""
     @State private var selected: Set<Int64> = []
     @State private var confirmDelete = false
+    /// 就地改一个词（R100）：双击、右键「重命名…」
+    @State private var editingTerm: Int64?
+    @State private var termText = ""
+    @FocusState private var termFocused: Bool
 
     /// 勾选里还在词汇表的（勾了之后被单独删掉的不算）
     private var checked: Set<Int64> { selected.intersection(model.glossary.compactMap(\.id)) }
@@ -870,12 +905,33 @@ struct GlossarySettings: View {
         }
         ForEach(shown) { term in
             HStack {
-                Toggle(term.term, isOn: Binding(get: { selected.contains(term.id ?? -1) },
-                                                set: { if let id = term.id { if $0 { selected.insert(id) } else { selected.remove(id) } } }))
+                if editingTerm == term.id {
+                    TextField("词汇", text: $termText)
+                        .textFieldStyle(.roundedBorder)
+                        .focused($termFocused)
+                        .onSubmit { saveTerm(term) }
+                        .onExitCommand { editingTerm = nil }
+                    Button("取消") { editingTerm = nil }.buttonStyle(.link)
+                    Button("保存") { saveTerm(term) }.buttonStyle(.link)
+                } else {
+                    Toggle(isOn: Binding(get: { selected.contains(term.id ?? -1) },
+                                         set: { if let id = term.id { if $0 { selected.insert(id) } else { selected.remove(id) } } })) {
+                        Text(term.term)
+                            .onTapGesture(count: 2) { startEditing(term) }
+                            .help("双击可以修改")
+                    }
                     .toggleStyle(.checkbox)
-                Spacer()
-                Button { model.deleteTerm(term.id!) } label: { Image(systemName: "trash") }
-                    .buttonStyle(.borderless).help("删除「\(term.term)」")
+                    Spacer()
+                    Button { startEditing(term) } label: { Image(systemName: "pencil") }
+                        .buttonStyle(.borderless).help("修改「\(term.term)」")
+                    Button { model.deleteTerm(term.id!) } label: { Image(systemName: "trash") }
+                        .buttonStyle(.borderless).help("删除「\(term.term)」")
+                }
+            }
+            .contextMenu {
+                Button("重命名…") { startEditing(term) }
+                Divider()
+                DestructiveMenuButton(String(localized: "删除")) { model.deleteTerm(term.id!) }
             }
         }
         if shown.isEmpty && !model.glossary.isEmpty {
@@ -909,6 +965,20 @@ struct GlossarySettings: View {
     private func add() {
         model.addTerms(newTerm)
         newTerm = ""
+    }
+
+    private func startEditing(_ term: GlossaryTerm) {
+        termText = term.term
+        editingTerm = term.id
+        termFocused = true
+    }
+
+    /// 改成已经有的词时合并（R100）
+    private func saveTerm(_ term: GlossaryTerm) {
+        let text = termText.trimmingCharacters(in: .whitespacesAndNewlines)
+        editingTerm = nil
+        guard let id = term.id, !text.isEmpty, text != term.term else { return }
+        model.renameTerm(id, to: text)
     }
 }
 

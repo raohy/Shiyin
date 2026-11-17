@@ -36,7 +36,8 @@ public sealed class ReviewTab
         detail = value;
         var speakerItems = SpeakerItems;
         var column = new StackPanel { Spacing = 22, Margin = new Thickness(0, 6, 0, 6) };
-        var submit = Ui.Button("", () => { draft.Submit(); window.Refresh(); }, accent: true);
+        // 同彈窗的按鈕、小一號（R106.4）
+        var submit = Sheet.Pill("", Sheet.Kind.Primary, compact: true, click: () => { draft.Submit(); window.Refresh(); });
         void UpdateSubmit()
         {
             submit.Content = draft.SubmitTitle();
@@ -46,8 +47,8 @@ public sealed class ReviewTab
             ? L.T("以下是整理時不確定的地方。按「是」「不是」或直接回答就好；看不懂或不重要的可以略過。")
             : L.T("以下是整理時不確定的地方。直接回答就好；看不懂或不重要的可以略過。"), color: Ui.Secondary);
         // 全部略過（R41.5）：還沒回答的都標成略過，已經有回答的不動
-        var skipAll = Ui.Button(L.T("全部略過"), () => { draft.SkipAllUnanswered(value); draft.Flush(); window.Refresh(); },
-            tooltip: L.T("還沒回答的題目都標成略過，送出後直接移除"));
+        var skipAll = Sheet.Pill(Ui.Button(L.T("全部略過"), () => { draft.SkipAllUnanswered(value); draft.Flush(); window.Refresh(); },
+            tooltip: L.T("還沒回答的題目都標成略過，送出後直接移除")), compact: true);
         skipAll.IsEnabled = draft.HasUnanswered(value);
         skipAll.VerticalAlignment = VerticalAlignment.Top;
         column.Children.Add(Ui.Bar(null, intro, skipAll, 12));
@@ -88,7 +89,7 @@ public sealed class ReviewTab
         parts.Children.Add(row);
         if (choice.IsYes == false)
         {
-            var name = new TextBox { PlaceholderText = L.T("是誰？（可以不填）"), Text = choice.Correction };
+            var name = Sheet.Field(new TextBox { PlaceholderText = L.T("是誰？（可以不填）"), Text = choice.Correction }, compact: true);
             name.TextChanged += (_, _) => { draft.SpeakerAnswers[idx] = new YesNoAnswer(false, name.Text).Text(Language); updateSubmit(); draft.ScheduleSave(); };
             var others = (value.SpeakerCandidates.GetValueOrDefault(idx) ?? []).Where(n => !string.Equals(n, suggestion.Name, StringComparison.OrdinalIgnoreCase)).ToList();
             FrameworkElement? pick = null;
@@ -142,13 +143,13 @@ public static class ReviewRows
             var parts = Ui.Column(8, head, row);
             if (choice.IsYes == false)
             {
-                var correction = new TextBox { PlaceholderText = L.T("正確的是…（可以不填）"), Text = choice.Correction, Margin = new Thickness(22, 0, 0, 0) };
+                var correction = Sheet.Field(new TextBox { PlaceholderText = L.T("正確的是…（可以不填）"), Text = choice.Correction, Margin = new Thickness(22, 0, 0, 0) }, compact: true);
                 correction.TextChanged += (_, _) => { draft.Answers[index] = new YesNoAnswer(false, correction.Text).Text(language); changed(); draft.ScheduleSave(); };
                 parts.Children.Add(correction);
             }
             return parts;
         }
-        var answer = new TextBox { PlaceholderText = L.T("你的回答"), Text = draft.Answers.GetValueOrDefault(index) ?? "" };
+        var answer = Sheet.Field(new TextBox { PlaceholderText = L.T("你的回答"), Text = draft.Answers.GetValueOrDefault(index) ?? "" }, compact: true);
         answer.TextChanged += (_, _) => { draft.Answers[index] = answer.Text; changed(); draft.ScheduleSave(); };
         var answerRow = Ui.Bar(null, answer, skip, 12);
         answerRow.Margin = new Thickness(22, 0, 0, 0);
@@ -183,7 +184,7 @@ public static class ReviewRows
         var shown = indexes.Where(i => i >= 0 && i < items.Count).ToHashSet();
         var column = Ui.Column(12);
         // 只送這一條對到的題目（R41.2），題數也只算這幾題
-        var submit = Ui.Button("", () => { draft.Submit(shown); window.Refresh(); }, accent: true);
+        var submit = Sheet.Pill("", Sheet.Kind.Primary, compact: true, click: () => { draft.Submit(shown); window.Refresh(); });
         void UpdateSubmit()
         {
             submit.Content = draft.SubmitTitle(shown);
@@ -193,10 +194,11 @@ public static class ReviewRows
             column.Children.Add(Question(index, items[index], detail.Meeting.MeetingLanguage, draft, host.Player.IsLoaded ? s => host.Player.Seek(s) : null, window.Refresh, UpdateSubmit));
         UpdateSubmit();
         var footer = Ui.Bar(null, Ui.Text(L.T("只送這一條的題目；有回答的交給整理工具依答案修正，略過的直接移除。"), 12, color: Ui.Secondary),
-            Ui.Row(8, Ui.Button(L.T("收合"), () => { draft.Expanded = null; window.Refresh(); }), submit), 12);
+            Ui.Row(8, Sheet.Pill(L.T("收合"), compact: true, click: () => { draft.Expanded = null; window.Refresh(); }), submit), 12);
         column.Children.Add(footer);
-        var tint = new Microsoft.UI.Xaml.Media.SolidColorBrush(Ui.Signal.Color) { Opacity = 0.07 };
-        return new Border { Child = column, Padding = new Thickness(14), CornerRadius = new CornerRadius(8), Background = tint, Margin = new Thickness(14, 0, 0, 0) };
+        // 對比主題時沒有底色、一圈細框（Ui.Tinted）
+        return Ui.Tinted(new Border { Child = column, Padding = new Thickness(14), CornerRadius = new CornerRadius(8), Margin = new Thickness(14, 0, 0, 0) },
+            Ui.Tint(Ui.SignalColor, 0.07));
     }
 
     /// <summary>待確認的標記（R41.1、M§31.2）：這一條紀錄有幾題整理時不確定的地方，琥珀色跟側欄的「待確認 N 題」一樣；點了展開（同時一條），再點一次收合</summary>
@@ -208,10 +210,16 @@ public static class ReviewRows
         var button = new Button
         {
             Content = count > 1 ? $"{mark}{count}" : mark, FontSize = 11, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            Foreground = Ui.Signal, Padding = new Thickness(count > 1 ? 6 : 0, 0, count > 1 ? 6 : 0, 0), MinWidth = 18, MinHeight = 18, Height = 18,
-            CornerRadius = new CornerRadius(9), BorderThickness = new Thickness(0),
-            Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Ui.Signal.Color) { Opacity = 0.16 }, VerticalAlignment = VerticalAlignment.Center,
+            Padding = new Thickness(count > 1 ? 6 : 0, 0, count > 1 ? 6 : 0, 0), MinWidth = 18, MinHeight = 18, Height = 18,
+            CornerRadius = new CornerRadius(9), VerticalAlignment = VerticalAlignment.Center,
         };
+        // 對比主題：照平台的按鈕（按鈕的底色、字、框，滑過去反白）；琥珀的字和底不是系統色
+        if (!Ui.HighContrast)
+        {
+            button.Foreground = Ui.Signal;
+            button.BorderThickness = new Thickness(0);
+            button.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Ui.Signal.Color) { Opacity = 0.16 };
+        }
         ToolTipService.SetToolTip(button, count > 1 ? L.F("整理時有 %lld 題不確定的地方，點了就能回答", count) : L.T("整理時有一題不確定的地方，點了就能回答"));
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, L.F("待確認 %lld 題", count));
         button.Click += (_, _) => { draft.Expanded = draft.Expanded == r ? null : r; window.Refresh(); };

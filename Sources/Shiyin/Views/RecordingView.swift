@@ -348,9 +348,15 @@ struct UserNotesDisclosure: View {
                 }
                 .buttonStyle(.plain)
                 if !detail.bookmarks.isEmpty {
+                    // 每个标记：跳过去、重命名、删除（R100）
                     Menu("重点标记 \(detail.bookmarks.count)") {
                         ForEach(detail.bookmarks) { bookmark in
-                            Button("\(TimeFormat.string(bookmark.time)) \(bookmark.label)") { model.player.seek(to: bookmark.time) }
+                            Menu("\(TimeFormat.string(bookmark.time)) \(bookmark.label)") {
+                                Button("跳到这里") { model.player.seek(to: bookmark.time) }
+                                Button("重命名…") { if let id = bookmark.id { model.renameTarget = .bookmark(id) } }
+                                Divider()
+                                DestructiveMenuButton(String(localized: "删除")) { if let id = bookmark.id { model.deleteBookmark(id) } }
+                            }
                         }
                     }
                     .fixedSize()

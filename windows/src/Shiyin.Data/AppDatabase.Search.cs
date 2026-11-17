@@ -271,6 +271,37 @@ public sealed partial class AppDatabase
 
     public void DeleteTerm(long id) => Write(db => db.Execute("DELETE FROM glossary WHERE id = ?", id));
 
+    /// <summary>改一個詞（R100、M§74，同 Mac 的 renameTerm）：改成已經有的詞時合併（刪掉這一個）；空的不改</summary>
+    public void RenameTerm(long id, string term)
+    {
+        var trimmed = term.Trim();
+        if (trimmed.Length == 0) return;
+        Write(db =>
+        {
+            if (db.Scalar("SELECT id FROM glossary WHERE term = ? AND id != ?", trimmed, id) is not null) db.Execute("DELETE FROM glossary WHERE id = ?", id);
+            else db.Execute("UPDATE glossary SET term = ? WHERE id = ?", trimmed, id);
+        });
+    }
+
+    /// <summary>一次加好幾個（R94.1、M§68，同 Mac 的 addTerms）：回傳實際加進去的個數；已經有的跳過（INSERT OR IGNORE，term 是 UNIQUE）</summary>
+    public int AddTerms(IEnumerable<string> terms) => Write(db =>
+    {
+        var added = 0;
+        foreach (var term in terms)
+        {
+            var trimmed = term.Trim();
+            if (trimmed.Length == 0) continue;
+            added += db.Execute("INSERT OR IGNORE INTO glossary (term, created_at) VALUES (?, ?)", trimmed, Clock.Now());
+        }
+        return added;
+    });
+
+    /// <summary>批次刪除（R94.3）</summary>
+    public void DeleteTerms(IEnumerable<long> ids) => Write(db =>
+    {
+        foreach (var id in ids) db.Execute("DELETE FROM glossary WHERE id = ?", id);
+    });
+
     static readonly Regex TitleWord = new("[A-Za-z][A-Za-z0-9.+\\-]{2,}");
 
     /// <summary>詞彙表建議（M§17.5、R14.5）：從參加者、改過名字的說話者、接受過的校正、中文會議標題裡的英文詞找</summary>

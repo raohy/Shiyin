@@ -50,7 +50,7 @@ public static class OtherWindows
             progress.Children.Clear();
             for (var i = 0; i < titles.Length; i++)
             {
-                var bar = new Microsoft.UI.Xaml.Shapes.Rectangle { Height = 4, RadiusX = 2, RadiusY = 2, Fill = i <= step ? Ui.Celadon : Ui.Subtle };
+                var bar = new Microsoft.UI.Xaml.Shapes.Rectangle { Height = 4, RadiusX = 2, RadiusY = 2, Fill = i <= step ? Ui.Celadon : Ui.Track };
                 Grid.SetColumn(bar, i);
                 progress.Children.Add(bar);
             }
@@ -364,7 +364,7 @@ public static class OtherWindows
             var number = new Border
             {
                 Width = 24, Height = 24, CornerRadius = new CornerRadius(12), Background = Ui.Celadon, VerticalAlignment = VerticalAlignment.Top,
-                Child = new TextBlock { Text = $"{i + 1}", HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White) },
+                Child = new TextBlock { Text = $"{i + 1}", HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = Ui.HighContrast ? Ui.OnCeladon : new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White) },
             };
             column.Children.Add(Ui.Split(number, Ui.Column(6, Ui.Heading(steps[i].Title, MeetingLanguage.Zh), Ui.Text(steps[i].Body, select: true)), 14));
         }
@@ -379,10 +379,15 @@ public static class OtherWindows
             L.T("側欄上方的「搜尋所有會議」會同時搜標題、逐字稿、會議紀錄和你的筆記，點結果就跳到那一段。"),
             L.T("點任何時間點或視窗底部的時間軸就從那裡播放，空白鍵播放或暫停；播放列右邊可以選 0.75×～2× 的速度。"),
             L.T("逐字稿裡琥珀色的段落辨識信心比較低，值得回頭聽；時間軸上的三角形是待確認題目、圓點是你標的重點；時間軸上面的色塊是議題，點了從那個議題開始聽。"),
-            L.T("會議可以分資料夾：在會議上按右鍵（或「更多」）選「移到資料夾」→「新資料夾…」。正在看某個資料夾時，新錄的和匯入的會議都會放進去。"),
+            L.T("會議可以分資料夾：在會議上按右鍵（或「更多」）選「移到資料夾」→「新資料夾…」。側欄的資料夾點一下就在原地展開最近 5 場，下面的「其他會議」只列不在資料夾裡的會議。展開後點「顯示全部」，下面的列表就只看這個資料夾，這時新錄的和匯入的會議都會放進去。資料夾按右鍵可以重新命名或刪除（會議會保留）。"),
             L.T("刪除的會議會先放進側欄最下面的「垃圾桶」，30 天內都可以還原。"),
+            // 排序、分組、篩選，資料夾自動歸類，直接改刪（R97、R98、R100、design-windows §11.30、§11.31、§11.33；定期會議 D177 拿掉）
+            L.T("會議多了可以整理：會議列表上方那一行右邊的漏斗按鈕可以照日期、標題、長度排序，依月份或資料夾分組，只看有待確認、有你的待辦、某個人參加或某個範本的會議。資料夾按右鍵選「自動加入的條件…」，例如標題有「週會」、某幾個人都參加，新的會議整理完就自動放進去。"),
+            // 側欄的收合（R101、design-windows §11.34）
+            L.T("側欄太長時可以收起來：點「資料夾」「其他會議」這些標題就收起或展開；展開的會議點一下直接打開。"),
+            L.T("每一種東西都可以直接改：側欄的會議、資料夾、人物按右鍵，或滑鼠移上去時右邊的「⋯」；選到時按 Enter 或 F2 重新命名、按 Delete 刪除。會議紀錄的每一條按兩下就能改，按右鍵可以刪掉那一條（改錯了按紀錄分頁「編輯」旁的「復原上一版」）。會議頁上方的說話者點名字就能重新命名。"),
             // 人物頁（R85、design-windows §11.22）
-            L.T("側欄上方切到「人物」，可以看拾音認識的每個人：一起開過的會議（每場他說了多久）、所有會議紀錄裡他負責的待辦，點了打開那場會議、從那個時間點播放。同一個人被記成兩個名字時按「合併到…」，也可以在這裡「改名」「刪除聲音特徵…」。"),
+            L.T("側欄上方切到「人物」，可以看拾音認識的每個人：一起開過的會議（每場他說了多久）、所有會議紀錄裡他負責的待辦，點了打開那場會議、從那個時間點播放。人物頁的名字下面可以重新命名、把被記成兩個名字的同一個人合併，或移除這個人；側欄的人按右鍵或滑過時右邊的「⋯」也一樣。"),
             L.T("說話者分得太少（人多、吵雜、手機放在桌上遠距收音）時，從「更多 → 重新處理」選「重新辨識說話者…」，告訴拾音大約幾個人。"),
             L.T("說話者分錯了：同一個人被分成兩位，點說話者的名字選「合併到…」；某幾句分錯人，在逐字稿按右鍵選「這句是誰說的」。改錯了，點說話者的名字或按右鍵選「復原」。"),
             // 我的聲音（R80.6、design-windows §11.20）
@@ -588,9 +593,10 @@ public sealed class MeetingPromptWindow : Window
         }
         else
         {
-            message = L.T("會議好像結束了，要停止錄音嗎？");
-            buttons.Children.Add(Ui.Button(L.T("繼續錄"), () => Do(() => { })));
-            buttons.Children.Add(Ui.Button(L.T("停止並轉錄"), () => Do(host.Recorder.Stop), accent: true));
+            // 會議結束在倒數時（R95、M§69）寫同一句、不倒數（同 Mac 的浮動視窗）；兩個按鈕都取消倒數
+            message = host.MeetingEnd.Active ? L.F("會議好像結束了，%lld 秒後自動停止錄音", (long)host.MeetingEnd.Seconds) : L.T("會議好像結束了，要停止錄音嗎？");
+            buttons.Children.Add(Ui.Button(L.T("繼續錄"), () => Do(host.MeetingEnd.Cancel)));
+            buttons.Children.Add(Ui.Button(L.T("停止並轉錄"), () => Do(() => { host.MeetingEnd.Cancel(); host.Recorder.Stop(); }), accent: true));
         }
         buttons.HorizontalAlignment = HorizontalAlignment.Right;
         Content = Ui.WindowBackground(new Border { Padding = new Thickness(16), Child = Ui.Column(12, Ui.Text(message, 14), buttons) });

@@ -35,6 +35,11 @@ enum AppSettings {
     static let recordingIslandKey = "recordingIsland"   // 在屏幕上方显示录音岛，默认开（design §57.2）
     static let autoStopOnMeetingEndKey = "autoStopOnMeetingEnd"   // 会议结束时倒数后自动停止录音，默认开（design §69）
     static let transcriptViewKey = "transcriptView"   // 逐字稿：original（原文）／clean（精简，design §70）
+    static let meetingSortKey = "meetingSort"   // 会议列表的排序（design §71）
+    static let meetingGroupingKey = "meetingGrouping"   // 会议列表的分组（design §71）
+    static let sidebarCollapsedKey = "sidebarCollapsed"   // 侧栏收起来的段落（design §75）
+    static let sidebarExpandedKey = "sidebarExpanded"   // 侧栏在原地展开的文件夹（design §75）
+    static let sidebarOrderKey = "sidebarOrder"   // 侧栏文件夹拖动排好的顺序（design §77）
 
     private static var d: UserDefaults { .standard }
 
@@ -205,6 +210,8 @@ final class JobRunner {
     @ObservationIgnored var onFinished: ((Job, Error?) -> Void)?
     /// Qwen 实时录音优先使用 GPU；录音停止后，尾句全部写入再开始正式转录。
     @ObservationIgnored var canStartTranscription: () -> Bool = { true }
+    /// 自动放进文件夹了（design §72）：会议 id、文件夹
+    @ObservationIgnored var onOrganized: ((Int64, String?) -> Void)?
     @ObservationIgnored var onAudioReplaced: ((Int64) -> Void)?
     /// 正式版取代了用户改过的草稿（design §21.3）
     @ObservationIgnored var onEditedDraftReplaced: ((Int64) -> Void)?
@@ -450,6 +457,8 @@ final class JobRunner {
             let matched = try db.matchVoiceprints(job.meetingId)
             if matched > 0 { log.info("voiceprints matched \(matched) speakers") }
         }
+        // 说话者对到人物之后：照文件夹的条件放（design §72）
+        if let filed = try db.autoFile(job.meetingId) { onOrganized?(job.meetingId, filed) }
         if AppSettings.compressAudio && meeting.audioURL.pathExtension.lowercased() == "wav" {
             try db.enqueue(job.meetingId, kind: .compress)
         }
@@ -767,6 +776,8 @@ final class JobRunner {
                                               reason: answers == nil ? String(localized: "刷新") : String(localized: "校稿"),
                                               source: answers == nil ? .generated : .revised)
         if replacedEdited { onEditedDraftReplaced?(job.meetingId) }
+        // 整理完有标题了，照文件夹的条件放（design §72）
+        if let folder = try db.autoFile(job.meetingId) { onOrganized?(job.meetingId, folder) }
         return answers != nil || hadDraft == 0
     }
 }

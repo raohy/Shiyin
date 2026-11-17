@@ -143,6 +143,40 @@
         }
       }
     },
+    "%@ 有参加": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 有参加"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ attended"
+          }
+        }
+      }
+    },
+    "%@ 有參加": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 有参加"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ attended"
+          }
+        }
+      }
+    },
     "%@ 正在开会": {
       "extractionState": "manual",
       "localizations": {
@@ -211,6 +245,40 @@
         }
       }
     },
+    "%@ 的标记": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 的标记"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bookmark at %@"
+          }
+        }
+      }
+    },
+    "%@ 的標記": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 的标记"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bookmark at %@"
+          }
+        }
+      }
+    },
     "%@ 还没登录，登录之后才会用它整理。": {
       "extractionState": "manual",
       "localizations": {
@@ -245,6 +313,40 @@
         }
       }
     },
+    "%@ 都参加": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 都参加"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ attended"
+          }
+        }
+      }
+    },
+    "%@ 都參加": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 都参加"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ attended"
+          }
+        }
+      }
+    },
     "%@ 附的 codex": {
       "extractionState": "manual",
       "localizations": {
@@ -258,6 +360,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ 附的 codex"
+          }
+        }
+      }
+    },
+    "%@、%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@、%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
           }
         }
       }
@@ -1233,6 +1352,64 @@
         }
       }
     },
+    "%lld 场": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 场"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld meeting"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld meetings"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld 場": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 场"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld meeting"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld meetings"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld 場會議・最近 %@": {
       "extractionState": "manual",
       "localizations": {
@@ -1321,6 +1498,35 @@
       }
     },
     "%lld 秒后自动停止录音并转录": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 秒后自动停止录音并转录"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Recording stops and is transcribed in %lld second"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Recording stops and is transcribed in %lld seconds"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld 秒後自動停止錄音並轉錄": {
       "extractionState": "manual",
       "localizations": {
         "zh-Hans": {
@@ -2879,6 +3085,23 @@
         }
       }
     },
+    "Return 保存、Esc 取消": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Return 保存、Esc 取消"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Return to save, Esc to cancel"
+          }
+        }
+      }
+    },
     "Word（docx）": {
       "extractionState": "manual",
       "localizations": {
@@ -2913,19 +3136,19 @@
         }
       }
     },
-    "Zoom、Teams、Webex、Google Meet（瀏覽器）等開始用麥克風、拾音沒在錄音時提醒你；會議結束時提醒停止。只提醒，不會自動錄音。": {
+    "Zoom、Teams、Webex、Google Meet（瀏覽器）等開始用麥克風、拾音沒在錄音時提醒你，不會自動開始錄音。會議 app 停止用麥克風時倒數 60 秒，沒按「繼續錄」就停止並轉錄；關掉「自動停止」時只問要不要停止。": {
       "extractionState": "manual",
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "When Zoom, Teams, Webex, Google Meet (in a browser) or a similar app starts using the microphone and Shiyin isn't recording, Shiyin asks whether to record, and asks again when the meeting seems to end. It only asks; it never records on its own."
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zoom、Teams、Webex、Google Meet（浏览器）等开始用麦克风、拾音没在录音时提醒你；会议结束时提醒停止。只提醒，不会自动录音。"
+            "value": "Zoom、Teams、Webex、Google Meet（浏览器）等开始用麦克风、拾音没在录音时提醒你，不会自动开始录音。会议 app 停止用麦克风时倒数 60 秒，没按“继续录”就停止并转录；关掉“自动停止”时只问要不要停止。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When Zoom, Teams, Webex, Google Meet (in a browser) or another meeting app starts using the microphone and Shiyin isn't recording, Shiyin asks whether to record; it never starts recording on its own. When the meeting app stops using the microphone, a 60-second countdown starts and the recording stops and is transcribed unless you click Keep Recording. With automatic stop turned off, Shiyin only asks whether to stop."
           }
         }
       }
@@ -3296,6 +3519,40 @@
         }
       }
     },
+    "「%@」已放进「%@」": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」已放进「%@」"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” was moved to “%2$@”"
+          }
+        }
+      }
+    },
+    "「%@」已放進「%@」": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”已放进“%@”"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” was moved to “%2$@”"
+          }
+        }
+      }
+    },
     "「%@」已經加過了": {
       "extractionState": "manual",
       "localizations": {
@@ -3309,6 +3566,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "“%@”已经加过了"
+          }
+        }
+      }
+    },
+    "「%@」已經在詞彙表裡了": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”已经在词汇表里了"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” is already in the glossary"
           }
         }
       }
@@ -3377,6 +3651,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "“%@”有密码保护，拾音读不了。请先移除密码再加入。"
+          }
+        }
+      }
+    },
+    "「%@」自动加入的条件": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」自动加入的条件"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-add rules for “%@”"
+          }
+        }
+      }
+    },
+    "「%@」自動加入的條件": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”自动加入的条件"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-add rules for “%@”"
           }
         }
       }
@@ -3830,6 +4138,40 @@
         }
       }
     },
+    "上次產生精簡版失敗。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次产生精简版失败。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The last attempt to create the clean version failed."
+          }
+        }
+      }
+    },
+    "上次產生精簡版失敗：%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次产生精简版失败：%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The last attempt to create the clean version failed: %@"
+          }
+        }
+      }
+    },
     "下一步": {
       "extractionState": "manual",
       "localizations": {
@@ -4153,6 +4495,108 @@
         }
       }
     },
+    "不分組": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不分组"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Grouping"
+          }
+        }
+      }
+    },
+    "不分组": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不分组"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Grouping"
+          }
+        }
+      }
+    },
+    "不在文件夹": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不在文件夹"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not in a Folder"
+          }
+        }
+      }
+    },
+    "不在文件夹里的会议会列在这里": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不在文件夹里的会议会列在这里"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meetings that aren't in a folder appear here"
+          }
+        }
+      }
+    },
+    "不在資料夾": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不在文件夹"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not in a Folder"
+          }
+        }
+      }
+    },
+    "不在資料夾裡的會議會列在這裡": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不在文件夹里的会议会列在这里"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meetings that aren't in a folder appear here"
+          }
+        }
+      }
+    },
     "不提醒：%@": {
       "extractionState": "manual",
       "localizations": {
@@ -4421,6 +4865,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "不要再提醒这个 app"
+          }
+        }
+      }
+    },
+    "不限": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不限"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Any"
           }
         }
       }
@@ -5496,6 +5957,23 @@
         }
       }
     },
+    "企業伺服器連不上，已改在這台電腦轉錄": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "企业服务器连不上，已改在这台电脑转录"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t reach the company server, so this meeting is being transcribed on this computer"
+          }
+        }
+      }
+    },
     "企業伺服器（%@）": {
       "extractionState": "manual",
       "localizations": {
@@ -5560,6 +6038,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "会中提问助手"
+          }
+        }
+      }
+    },
+    "会从「人物」拿掉，也会删掉他的声音特征。会议里已经带入的名字会留着，之后的会议不会再自动认出他。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会从“人物”中移除，并删除其声音特征。会议中已经填入的名字会保留，之后的会议不会再自动识别此人。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "They’ll be removed from People and their voice profile will be deleted. Names already filled in your meetings stay, but future meetings won’t recognize them automatically."
           }
         }
       }
@@ -5768,19 +6263,36 @@
         }
       }
     },
-    "会议可以分文件夹：在会议上按右键（或「更多」）选「移到文件夹」→「新文件夹…」。侧栏上方的「文件夹」可以切换只看某个文件夹；正在看某个文件夹时，新录的和导入的会议都会放进去。文件夹按右键可以重命名或删除（会议会保留）。": {
+    "会议可以分文件夹：在会议上按右键（或「更多」）选「移到文件夹」→「新文件夹…」。侧栏的文件夹点一下就在原地展开最近 5 场，下面的「其他会议」只列不在文件夹里的会议。展开后点「显示全部」，下面的列表就只看这个文件夹，这时新录的和导入的会议都会放进去。文件夹按右键可以重命名或删除（会议会保留）。": {
       "extractionState": "manual",
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Organize meetings in folders: right-click a meeting (or use “More”) and choose “Move to Folder” → “New Folder…”. Use “Folders” at the top of the sidebar to show one folder; while you're in a folder, new recordings and imports go into it. Right-click a folder to rename or delete it (its meetings are kept)."
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "会议可以分文件夹：在会议上按右键（或「更多」）选「移到文件夹」→「新文件夹…」。侧栏上方的「文件夹」可以切换只看某个文件夹；正在看某个文件夹时，新录的和导入的会议都会放进去。文件夹按右键可以重命名或删除（会议会保留）。"
+            "value": "会议可以分文件夹：在会议上按右键（或「更多」）选「移到文件夹」→「新文件夹…」。侧栏的文件夹点一下就在原地展开最近 5 场，下面的「其他会议」只列不在文件夹里的会议。展开后点「显示全部」，下面的列表就只看这个文件夹，这时新录的和导入的会议都会放进去。文件夹按右键可以重命名或删除（会议会保留）。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can sort meetings into folders: right-click a meeting (or use More) and choose Move to Folder → New Folder…. Click a folder in the sidebar to show its 5 most recent meetings right there; Other Meetings below lists only meetings that aren't in a folder. Click Show All under a folder to show just that folder in the list; new recordings and imports then go into it. Right-click a folder to rename or delete it (the meetings are kept)."
+          }
+        }
+      }
+    },
+    "会议多了可以整理：列表上方那一行右边的「显示方式」（菜单列的「显示方式」也有）可以照日期、标题、长度排序，依月份或文件夹分组，只看有待确认、有你的待办、某个人参加或某个模板的会议。文件夹按右键选「自动加入的条件…」，例如标题有「周会」、某几个人都参加，新的会议整理完就自动放进去。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会议多了可以整理：列表上方那一行右边的「显示方式」（菜单列的「显示方式」也有）可以照日期、标题、长度排序，依月份或文件夹分组，只看有待确认、有你的待办、某个人参加或某个模板的会议。文件夹按右键选「自动加入的条件…」，例如标题有「周会」、某几个人都参加，新的会议整理完就自动放进去。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To organize lots of meetings, use the view options button at the right of the list heading (also in the View menu): sort by date, title or length, group by month or folder, and show only meetings that need review, have your action items, include a certain person or use a certain template. Right-click a folder and choose Auto-Add Rules… (for example, the title contains “weekly” or certain people all attend), and new meetings are moved there once their notes are ready."
           }
         }
       }
@@ -5980,23 +6492,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "会议记录"
-          }
-        }
-      }
-    },
-    "会议记录、逐字稿和录音档都会删除，没办法复原。": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The meeting notes, transcript and recording will be deleted. This can't be undone."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "会议记录、逐字稿和录音档都会删除，没办法复原。"
           }
         }
       }
@@ -6375,6 +6870,52 @@
         }
       }
     },
+    "例如專案名稱或客戶名稱。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "例如项目名称或客户名称。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For example, a project or client name."
+          }
+        }
+      }
+    },
+    "例如專案名稱或客戶名稱。這 %lld 場會議會移進新資料夾。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "例如项目名称或客户名称。这 %lld 场会议会移进新文件夹。"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "For example, a project or client name. This meeting will be moved into the new folder."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "For example, a project or client name. These %lld meetings will be moved into the new folder."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "例如專案名稱或客戶名稱。這場會議會移進新資料夾。": {
       "extractionState": "manual",
       "localizations": {
@@ -6388,6 +6929,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "例如项目名称或客户名称。这场会议会移进新文件夹。"
+          }
+        }
+      }
+    },
+    "例如项目名称或客户名称。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "例如项目名称或客户名称。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For example, a project or client name."
+          }
+        }
+      }
+    },
+    "例如项目名称或客户名称。这 %lld 场会议会移进新文件夹。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "例如项目名称或客户名称。这 %lld 场会议会移进新文件夹。"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "For example, a project or client name. This meeting will be moved into the new folder."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "For example, a project or client name. These %lld meetings will be moved into the new folder."
+                }
+              }
+            }
           }
         }
       }
@@ -6477,6 +7064,23 @@
         }
       }
     },
+    "例如：周会、sync（任一个词）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "例如：周会、sync（任一个词）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "e.g. weekly, sync (any of the words)"
+          }
+        }
+      }
+    },
     "例如：小明": {
       "extractionState": "manual",
       "localizations": {
@@ -6490,6 +7094,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "例如：小明"
+          }
+        }
+      }
+    },
+    "例如：週會、sync（任一個詞）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "例如：周会、sync（任一个词）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "e.g. weekly, sync (any of the words)"
           }
         }
       }
@@ -6512,6 +7133,23 @@
       }
     },
     "依各文件的文件名或修改日期": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From each file's name or modification date"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依各文件的文件名或修改日期"
+          }
+        }
+      }
+    },
+    "依各檔案的檔名或修改日期": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -6562,6 +7200,23 @@
         }
       }
     },
+    "依文件夹": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按文件夹"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "By Folder"
+          }
+        }
+      }
+    },
     "依會議紀錄畫成心智圖。PNG 適合貼到聊天軟體、簡報；SVG 可以再用其他軟體編輯。": {
       "extractionState": "manual",
       "localizations": {
@@ -6575,6 +7230,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "依会议记录画成心智图。PNG 适合贴到聊天软件、演示文稿；SVG 可以再用其他软件编辑。"
+          }
+        }
+      }
+    },
+    "依月份": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按月份"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "By Month"
           }
         }
       }
@@ -6671,19 +7343,36 @@
         }
       }
     },
-    "侧栏上方切到「人物」，可以看拾音认识的每个人：一起开过哪些会议、每场说了多久、负责哪些待办（点了就打开那场会议、从那里播放）。在人物页也可以改名、把被记成两个名字的同一个人合并，或删除声音特征。": {
+    "依資料夾": {
       "extractionState": "manual",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "侧栏上方切到「人物」，可以看拾音认识的每个人：一起开过哪些会议、每场说了多久、负责哪些待办（点了就打开那场会议、从那里播放）。在人物页也可以改名、把被记成两个名字的同一个人合并，或删除声音特征。"
+            "value": "按文件夹"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Switch to People at the top of the sidebar to see everyone Shiyin knows: the meetings you had together, how long they spoke in each, and the action items they own (click one to open that meeting and play from there). On a person's page you can also rename them, merge two names that are really the same person, or delete their voice profile."
+            "value": "By Folder"
+          }
+        }
+      }
+    },
+    "侧栏上方切到「人物」，可以看拾音认识的每个人：一起开过哪些会议、每场说了多久、负责哪些待办（点了就打开那场会议、从那里播放）。人物页的名字下面可以重命名、把被记成两个名字的同一个人合并，或移除这个人；侧栏的人按右键或滑过时右边的「⋯」也一样。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "侧栏上方切到「人物」，可以看拾音认识的每个人：一起开过哪些会议、每场说了多久、负责哪些待办（点了就打开那场会议、从那里播放）。人物页的名字下面可以重命名、把被记成两个名字的同一个人合并，或移除这个人；侧栏的人按右键或滑过时右边的「⋯」也一样。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch to People at the top of the sidebar to see everyone Shiyin knows: the meetings you had together, how long they spoke in each, and the action items they own (click one to open that meeting and play from there). Below a person’s name you can rename them, merge two names that are the same person, or remove them; right-click a person in the sidebar, or use the “⋯” that appears when you hover, to do the same."
           }
         }
       }
@@ -6701,6 +7390,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "侧栏上方的「搜索所有会议」会同时搜标题、逐字稿、会议记录和你的笔记，点结果就跳到那一段。"
+          }
+        }
+      }
+    },
+    "侧栏太长时可以收起来：点「文件夹」「其他会议」这些标题就收起或展开；展开的会议点一下直接打开。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "侧栏太长时可以收起来：点「文件夹」「其他会议」这些标题就收起或展开；展开的会议点一下直接打开。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When the sidebar gets long, collapse it: click a heading such as Folders or Other Meetings to hide or show that section; click a meeting to open it."
           }
         }
       }
@@ -6786,6 +7492,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "保存空间"
+          }
+        }
+      }
+    },
+    "保持简短、容易识别。日期和与会者在会议页的「编辑」改。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保持简短、容易识别。日期和与会者在会议页的「编辑」改。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep it short and easy to recognize. Change the date and participants with Edit on the meeting page."
+          }
+        }
+      }
+    },
+    "保持簡短、容易辨識。日期和與會者在會議頁的「編輯」改。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保持简短、容易识别。日期和与会者在会议页的“编辑”改。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep it short and easy to recognize. Change the date and participants with Edit on the meeting page."
+          }
+        }
+      }
+    },
+    "修改「%@」": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修改「%@」"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit “%@”"
           }
         }
       }
@@ -6939,6 +7696,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "侧边栏上方的“搜索所有会议”会同时搜标题、逐字稿、会议记录和你的笔记，点结果就跳到那一段。"
+          }
+        }
+      }
+    },
+    "側欄太長時可以收起來：點「資料夾」「其他會議」這些標題就收起或展開；展開的會議點一下直接打開。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "侧边栏太长时可以收起来：点“文件夹”“其他会议”这些标题就收起或展开；展开的会议点一下直接打开。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When the sidebar gets long, collapse it: click a heading such as Folders or Other Meetings to hide or show that section; click a meeting to open it."
           }
         }
       }
@@ -7250,6 +8024,52 @@
       }
     },
     "全选搜到的 %lld 个": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全选搜到的 %lld 个"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Select the %lld Match"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Select All %lld Matches"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "全選": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全选"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select All"
+          }
+        }
+      }
+    },
+    "全選搜到的 %lld 個": {
       "extractionState": "manual",
       "localizations": {
         "zh-Hans": {
@@ -7982,6 +8802,40 @@
         }
       }
     },
+    "其他会议": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他会议"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other Meetings"
+          }
+        }
+      }
+    },
+    "其他會議": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他会议"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other Meetings"
+          }
+        }
+      }
+    },
     "其他與會者": {
       "extractionState": "manual",
       "localizations": {
@@ -8063,6 +8917,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Keep reading a little longer: Shiyin needs at least 10 seconds of speech."
+          }
+        }
+      }
+    },
+    "再試一次": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再试一次"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try Again"
           }
         }
       }
@@ -8492,6 +9363,40 @@
         }
       }
     },
+    "分組方式": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分组方式"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group By"
+          }
+        }
+      }
+    },
+    "分组方式": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分组方式"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group By"
+          }
+        }
+      }
+    },
     "切换记录、逐字稿、提问": {
       "extractionState": "manual",
       "localizations": {
@@ -8522,23 +9427,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "切换记录、逐字稿、提问"
-          }
-        }
-      }
-    },
-    "创建并移入": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Create and Move"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "创建并移入"
           }
         }
       }
@@ -8645,40 +9533,6 @@
         }
       }
     },
-    "删除「%@」的声音特征（已经带入的名字留着）": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Delete the voice samples for “%@” (names already filled in stay)"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "删除「%@」的声音特征（已经带入的名字留着）"
-          }
-        }
-      }
-    },
-    "删除「%@」的声音特征？": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "删除「%@」的声音特征？"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Delete the voice profile of “%@”?"
-          }
-        }
-      }
-    },
     "删除「%@」？": {
       "extractionState": "manual",
       "localizations": {
@@ -8771,23 +9625,6 @@
         }
       }
     },
-    "删除声音特征…": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "删除声音特征…"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Delete Voice Profile…"
-          }
-        }
-      }
-    },
     "删除所有认识的人的声音特征？": {
       "extractionState": "manual",
       "localizations": {
@@ -8805,19 +9642,53 @@
         }
       }
     },
-    "删除文件夹（会议会保留）": {
+    "删除文件夹": {
       "extractionState": "manual",
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Delete Folder (keeps its meetings)"
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "删除文件夹（会议会保留）"
+            "value": "删除文件夹"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Folder"
+          }
+        }
+      }
+    },
+    "删除文件夹…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除文件夹…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Folder…"
+          }
+        }
+      }
+    },
+    "删除文件夹「%@」？": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除文件夹「%@」？"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the folder “%@”?"
           }
         }
       }
@@ -8852,6 +9723,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "删除第二版的 Python 环境和旧模型"
+          }
+        }
+      }
+    },
+    "删除这一条": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除这一条"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete This Item"
           }
         }
       }
@@ -8975,40 +9863,6 @@
         }
       }
     },
-    "刪除「%@」的聲音特徵（已經帶入的名字留著）": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Delete the voice samples for “%@” (names already filled in stay)"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "删除“%@”的声音特征（已经带入的名字留着）"
-          }
-        }
-      }
-    },
-    "刪除「%@」的聲音特徵？": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "删除“%@”的声音特征？"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Delete the voice profile of “%@”?"
-          }
-        }
-      }
-    },
     "刪除「%@」？": {
       "extractionState": "manual",
       "localizations": {
@@ -9039,6 +9893,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "Delete line “%@”"
+          }
+        }
+      }
+    },
+    "刪除勾選的 %lld 個…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除勾选的 %lld 个…"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete %lld Selected…"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete %lld Selected…"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "刪除勾選的 %lld 個詞彙？": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除勾选的 %lld 个词汇？"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete %lld selected term?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete %lld selected terms?"
+                }
+              }
+            }
           }
         }
       }
@@ -9077,36 +9989,70 @@
         }
       }
     },
-    "刪除聲音特徵…": {
+    "刪除資料夾": {
       "extractionState": "manual",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "删除声音特征…"
+            "value": "删除文件夹"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Delete Voice Profile…"
+            "value": "Delete Folder"
           }
         }
       }
     },
-    "刪除資料夾（會議會保留）": {
+    "刪除資料夾…": {
       "extractionState": "manual",
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Delete Folder (keeps its meetings)"
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "删除文件夹（会议会保留）"
+            "value": "删除文件夹…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Folder…"
+          }
+        }
+      }
+    },
+    "刪除資料夾「%@」？": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除文件夹“%@”？"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the folder “%@”?"
+          }
+        }
+      }
+    },
+    "刪除這一條": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除这一条"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete This Item"
           }
         }
       }
@@ -10094,6 +11040,23 @@
         }
       }
     },
+    "参考文件请拖到会议页，会加进那场会议": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参考文件请拖到会议页，会加进那场会议"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag documents onto a meeting page to add them to that meeting"
+          }
+        }
+      }
+    },
     "參加者": {
       "extractionState": "manual",
       "localizations": {
@@ -10136,6 +11099,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "参考了 %lld 场会议"
+          }
+        }
+      }
+    },
+    "參考文件請拖到會議頁，會加進那場會議": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参考文档请拖到会议页，会加进那场会议"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag documents onto a meeting page to add them to that meeting"
+          }
+        }
+      }
+    },
+    "双击可以修改": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "双击可以修改"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Double-click to edit"
           }
         }
       }
@@ -10277,6 +11274,23 @@
       }
     },
     "取消勾选": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消勾选"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deselect All"
+          }
+        }
+      }
+    },
+    "取消勾選": {
       "extractionState": "manual",
       "localizations": {
         "zh-Hans": {
@@ -10803,6 +11817,23 @@
         }
       }
     },
+    "同一个人被记成两个名字时，合并成一个": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同一个人被记成两个名字时，合并成一个"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When the same person was saved under two names, merge them into one"
+          }
+        }
+      }
+    },
     "同一个词的每一处一起接受或忽略": {
       "extractionState": "manual",
       "localizations": {
@@ -10833,6 +11864,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "同一个人被分成两位时，把这位说的话全部算到另一位"
+          }
+        }
+      }
+    },
+    "同一個人被記成兩個名字時，合併成一個": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同一个人被记成两个名字时，合并成一个"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When the same person was saved under two names, merge them into one"
           }
         }
       }
@@ -12918,6 +13966,40 @@
         }
       }
     },
+    "展开这一段": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展开这一段"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expand section"
+          }
+        }
+      }
+    },
+    "展開這一段": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展开这一段"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expand section"
+          }
+        }
+      }
+    },
     "已下載": {
       "extractionState": "manual",
       "localizations": {
@@ -13190,6 +14272,23 @@
         }
       }
     },
+    "已删除一条记录，按「编辑」旁的「复原上一版」可以还原": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已删除一条记录，按「编辑」旁的「复原上一版」可以还原"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleted the item. To bring it back, click Restore previous version next to Edit."
+          }
+        }
+      }
+    },
     "已删除第二版的 Python 环境和旧模型": {
       "extractionState": "manual",
       "localizations": {
@@ -13341,6 +14440,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "已加入 %lld 份文档"
+          }
+        }
+      }
+    },
+    "已加入 %lld 個詞彙": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已加入 %lld 个词汇"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Added %lld term"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Added %lld terms"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "已加入 %lld 個詞彙，%lld 個已經有了": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已加入 %lld 个词汇，%lld 个已经有了"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added %1$lld terms; %2$lld were already in the glossary"
           }
         }
       }
@@ -13833,6 +14978,74 @@
         }
       }
     },
+    "已展开": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已展开"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expanded"
+          }
+        }
+      }
+    },
+    "已展開": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已展开"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expanded"
+          }
+        }
+      }
+    },
+    "已建立文件夹「%@」": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已建立文件夹「%@」"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Created folder “%@”"
+          }
+        }
+      }
+    },
+    "已建立資料夾「%@」": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已建立文件夹“%@”"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Created folder “%@”"
+          }
+        }
+      }
+    },
     "已復原：%@": {
       "extractionState": "manual",
       "localizations": {
@@ -13863,6 +15076,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "已忽略"
+          }
+        }
+      }
+    },
+    "已把 %lld 场会议放进「%@」": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已把 %lld 场会议放进「%@」"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Moved %lld meeting to “%@”"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Moved %lld meetings to “%@”"
+                }
+              }
+            }
           }
         }
       }
@@ -13947,6 +15189,35 @@
                 "stringUnit": {
                   "state": "translated",
                   "value": "Moved %lld meetings to Trash. You can restore them within 30 days."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "已把 %lld 場會議放進「%@」": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已把 %lld 场会议放进“%@”"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Moved %lld meeting to “%@”"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Moved %lld meetings to “%@”"
                 }
               }
             }
@@ -14105,6 +15376,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "已拆成两句。要撤销的话，在逐字稿按右键选“撤销”。"
+          }
+        }
+      }
+    },
+    "已收起": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已收起"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapsed"
           }
         }
       }
@@ -14687,6 +15975,57 @@
         }
       }
     },
+    "已經有「%@」。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已经有“%@”。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” already exists."
+          }
+        }
+      }
+    },
+    "已經有「%@」，儲存後會合併成一個。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已经有“%@”，保存后会合并成一个。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” already exists. Saving will merge them into one."
+          }
+        }
+      }
+    },
+    "已經有「%@」，會議會移進那個資料夾。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已经有“%@”，会议会移进那个文件夹。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” already exists. The meetings will be moved into that folder."
+          }
+        }
+      }
+    },
     "已经加入「%@」了": {
       "extractionState": "manual",
       "localizations": {
@@ -14734,6 +16073,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "已经带入的名字会留着，之后的会议不会再自动带入。"
+          }
+        }
+      }
+    },
+    "已经有「%@」。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已经有「%@」。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” already exists."
+          }
+        }
+      }
+    },
+    "已经有「%@」，会议会移进那个文件夹。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已经有「%@」，会议会移进那个文件夹。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” already exists. The meetings will be moved into that folder."
+          }
+        }
+      }
+    },
+    "已经有「%@」，保存后会合并成一个。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已经有「%@」，保存后会合并成一个。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” already exists. Saving will merge them into one."
           }
         }
       }
@@ -15075,7 +16465,41 @@
         }
       }
     },
+    "建立": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create"
+          }
+        }
+      }
+    },
     "建立並移入": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create and Move"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建立并移入"
+          }
+        }
+      }
+    },
+    "建立并移入": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -16840,6 +18264,23 @@
         }
       }
     },
+    "所有会议里的这个人都会跟着改。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有会议里的这个人都会跟着改。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This person will be renamed in every meeting."
+          }
+        }
+      }
+    },
     "所有會議": {
       "extractionState": "manual",
       "localizations": {
@@ -16853,6 +18294,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "所有会议"
+          }
+        }
+      }
+    },
+    "所有會議裡的這個人都會跟著改。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有会议里的这个人都会跟着改。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This person will be renamed in every meeting."
           }
         }
       }
@@ -18879,6 +20337,40 @@
         }
       }
     },
+    "按 + 新增資料夾": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按 + 添加文件夹"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click + to add a folder"
+          }
+        }
+      }
+    },
+    "按 + 添加文件夹": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按 + 添加文件夹"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click + to add a folder"
+          }
+        }
+      }
+    },
     "按「停止并转录」后，拾音会在这台 Mac 上重新转录（中文、英文用 Breeze ASR 25，%@用 Whisper large-v3-turbo，%@用 Qwen3-ASR），并分辨不同的说话者。等待的时候，会议记录会先用实时逐字稿整理一份草稿，正式版好了会自动换掉。逐字稿上点「说话者 1」可以改成人名，整场都会跟着改；拾音会记住这个人的声音，之后的会议自动带入名字（标「自动」，认错了点一下就能改）。": {
       "extractionState": "manual",
       "localizations": {
@@ -19113,6 +20605,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "换回上一版会议记录（再按一次换回更早的）"
+          }
+        }
+      }
+    },
+    "排序、分組、篩選會議": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "排序、分组、筛选会议"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sort, group and filter meetings"
+          }
+        }
+      }
+    },
+    "排序、分组、筛选会议": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "排序、分组、筛选会议"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sort, group and filter meetings"
+          }
+        }
+      }
+    },
+    "排序方式": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "排序方式"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sort By"
           }
         }
       }
@@ -19459,6 +21002,23 @@
         }
       }
     },
+    "搜尋詞彙": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索词汇"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search terms"
+          }
+        }
+      }
+    },
     "搜尋逐字稿": {
       "extractionState": "manual",
       "localizations": {
@@ -19782,6 +21342,40 @@
         }
       }
     },
+    "收起这一段": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收起这一段"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapse section"
+          }
+        }
+      }
+    },
+    "收起這一段": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收起这一段"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapse section"
+          }
+        }
+      }
+    },
     "收音提醒": {
       "extractionState": "manual",
       "localizations": {
@@ -19795,74 +21389,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "收音提醒"
-          }
-        }
-      }
-    },
-    "改名": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rename"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "改名"
-          }
-        }
-      }
-    },
-    "改名…": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "改名…"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rename…"
-          }
-        }
-      }
-    },
-    "改名、跟另一个名字合并（同一个人被记成两个名字时）、删除声音特征": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "改名、跟另一个名字合并（同一个人被记成两个名字时）、删除声音特征"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rename, merge with another name (when one person was saved under two names), or delete the voice profile"
-          }
-        }
-      }
-    },
-    "改名、跟另一個名字合併（同一個人被記成兩個名字時）、刪除聲音特徵": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "改名、跟另一个名字合并（同一个人被记成两个名字时）、删除声音特征"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rename, merge with another name (when one person was saved under two names), or delete the voice profile"
           }
         }
       }
@@ -19982,6 +21508,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "放大文字"
+          }
+        }
+      }
+    },
+    "放进去": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "放进去"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move"
+          }
+        }
+      }
+    },
+    "放進去": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "放进去"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move"
           }
         }
       }
@@ -21244,19 +22804,19 @@
         }
       }
     },
-    "新增詞彙，例如產品名或人名": {
+    "新增詞彙": {
       "extractionState": "manual",
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Add a term, such as a product or person's name"
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "添加词汇，例如产品名或人名"
+            "value": "添加词汇"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add term"
           }
         }
       }
@@ -21652,6 +23212,74 @@
         }
       }
     },
+    "日期（新到旧）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日期（新到旧）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date (Newest First)"
+          }
+        }
+      }
+    },
+    "日期（新到舊）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日期（新到旧）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date (Newest First)"
+          }
+        }
+      }
+    },
+    "日期（旧到新）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日期（旧到新）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date (Oldest First)"
+          }
+        }
+      }
+    },
+    "日期（舊到新）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日期（旧到新）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date (Oldest First)"
+          }
+        }
+      }
+    },
     "时间": {
       "extractionState": "manual",
       "localizations": {
@@ -21784,6 +23412,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "显示"
+          }
+        }
+      }
+    },
+    "显示全部 %lld 场": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示全部 %lld 场"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Show all %lld meeting"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Show all %lld meetings"
+                }
+              }
+            }
           }
         }
       }
@@ -22383,6 +24040,23 @@
         }
       }
     },
+    "會從「人物」拿掉，也會刪掉他的聲音特徵。會議裡已經帶入的名字會留著，之後的會議不會再自動認出他。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会从“人物”中移除，并删除其声音特征。会议中已经填入的名字会保留，之后的会议不会再自动识别此人。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "They’ll be removed from People and their voice profile will be deleted. Names already filled in your meetings stay, but future meetings won’t recognize them automatically."
+          }
+        }
+      }
+    },
     "會打開 %@ 的登入頁，用公司帳號登入。登入後錄音交給公司的伺服器轉錄，整理也用公司設定的模型。": {
       "extractionState": "manual",
       "localizations": {
@@ -22396,6 +24070,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "会打开 %@ 的登录页，用公司账号登录。登录后录音交给公司的服务器转录，整理也用公司设置的模型。"
+          }
+        }
+      }
+    },
+    "會用整理工具的額度；長的會議要幾分鐘": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会用整理工具的额度；长的会议要几分钟"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uses your summarizer's quota; long meetings take a few minutes"
           }
         }
       }
@@ -22485,6 +24176,23 @@
         }
       }
     },
+    "會議可以分資料夾：在會議上按右鍵（或「更多」）選「移到資料夾」→「新資料夾…」。側欄的資料夾點一下就在原地展開最近 5 場，下面的「其他會議」只列不在資料夾裡的會議。展開後點「顯示全部」，下面的列表就只看這個資料夾，這時新錄的和匯入的會議都會放進去。資料夾按右鍵可以重新命名或刪除（會議會保留）。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会议可以分文件夹：在会议上按右键（或“更多”）选“移到文件夹”→“新文件夹…”。侧边栏的文件夹点一下就在原地展开最近 5 场，下面的“其他会议”只列不在文件夹里的会议。展开后点“显示全部”，下面的列表就只看这个文件夹，这时新录的和导入的会议都会放进去。文件夹按右键可以重新命名或删除（会议会保留）。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can sort meetings into folders: right-click a meeting (or use More) and choose Move to Folder → New Folder…. Click a folder in the sidebar to show its 5 most recent meetings right there; Other Meetings below lists only meetings that aren't in a folder. Click Show All under a folder to show just that folder in the list; new recordings and imports then go into it. Right-click a folder to rename or delete it (the meetings are kept)."
+          }
+        }
+      }
+    },
     "會議好像結束了": {
       "extractionState": "manual",
       "localizations": {
@@ -22498,6 +24206,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "会议好像结束了"
+          }
+        }
+      }
+    },
+    "會議好像結束了，%lld 秒後自動停止錄音": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会议好像结束了，%lld 秒后自动停止录音"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "The meeting seems to have ended. Recording stops in %lld second"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "The meeting seems to have ended. Recording stops in %lld seconds"
+                }
+              }
+            }
           }
         }
       }
@@ -22685,6 +24422,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "会议记录要用哪个 AI 整理？之后可以在设置里更改。"
+          }
+        }
+      }
+    },
+    "會議結束時自動停止錄音": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会议结束时自动停止录音"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop recording automatically when the meeting ends"
+          }
+        }
+      }
+    },
+    "會議結束，已自動停止錄音": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会议结束，已自动停止录音"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The meeting ended, so recording stopped"
           }
         }
       }
@@ -22900,6 +24671,142 @@
         }
       }
     },
+    "有待确认": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有待确认"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "needs review"
+          }
+        }
+      }
+    },
+    "有待确认的": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有待确认的"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs Review"
+          }
+        }
+      }
+    },
+    "有待確認": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有待确认"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "needs review"
+          }
+        }
+      }
+    },
+    "有待確認的": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有待确认的"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs Review"
+          }
+        }
+      }
+    },
+    "有我的待办": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有我的待办"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "my action items"
+          }
+        }
+      }
+    },
+    "有我的待办的": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有我的待办的"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Has My Action Items"
+          }
+        }
+      }
+    },
+    "有我的待辦": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有我的待办"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "my action items"
+          }
+        }
+      }
+    },
+    "有我的待辦的": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有我的待办的"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Has My Action Items"
+          }
+        }
+      }
+    },
     "有新版本 %@": {
       "extractionState": "manual",
       "localizations": {
@@ -22913,6 +24820,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "有新版本 %@"
+          }
+        }
+      }
+    },
+    "有誰參加": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有谁参加"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attended By"
+          }
+        }
+      }
+    },
+    "有谁参加": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有谁参加"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attended By"
           }
         }
       }
@@ -23206,6 +25147,57 @@
         }
       }
     },
+    "标题、日期、与会者。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标题、日期、与会者。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title, date, and participants."
+          }
+        }
+      }
+    },
+    "标题包含": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标题包含"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title contains"
+          }
+        }
+      }
+    },
+    "标题包含 %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标题包含 %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "title contains %@"
+          }
+        }
+      }
+    },
     "校正过的字": {
       "extractionState": "manual",
       "localizations": {
@@ -23444,6 +25436,57 @@
         }
       }
     },
+    "標題、日期、與會者。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标题、日期、与会者。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title, date, and participants."
+          }
+        }
+      }
+    },
+    "標題包含": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标题包含"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title contains"
+          }
+        }
+      }
+    },
+    "標題包含 %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标题包含 %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "title contains %@"
+          }
+        }
+      }
+    },
     "模型": {
       "extractionState": "manual",
       "localizations": {
@@ -23593,6 +25636,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "模板："
+          }
+        }
+      }
+    },
+    "模板：%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模板：%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "template: %@"
           }
         }
       }
@@ -24297,6 +26357,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "Understanding the question and identifying search keywords…"
+          }
+        }
+      }
+    },
+    "正在產生精簡版 %lld%%": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在产生精简版 %lld%%"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Creating the clean version… %lld%%"
+          }
+        }
+      }
+    },
+    "正在產生精簡版…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在产生精简版…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Creating the clean version…"
           }
         }
       }
@@ -25083,6 +27177,23 @@
         }
       }
     },
+    "每一种东西都可以直接改：侧栏的会议、文件夹、人物按右键，或鼠标移上去时右边的「⋯」；选到时按 Return 重命名、按 Delete 删除。会议记录的每一条双击就能改，按右键可以删掉那一条（改错了用「会议 → 复原上一版会议记录」）。会议页上方的说话者点名字就能重命名。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每一种东西都可以直接改：侧栏的会议、文件夹、人物按右键，或鼠标移上去时右边的「⋯」；选到时按 Return 重命名、按 Delete 删除。会议记录的每一条双击就能改，按右键可以删掉那一条（改错了用「会议 → 复原上一版会议记录」）。会议页上方的说话者点名字就能重命名。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can change anything in place: right-click a meeting, folder or person in the sidebar, or use the “⋯” that appears when you hover; with one selected, press Return to rename it or Delete to delete it. Double-click any item in the meeting notes to edit it, or right-click to delete it (if you make a mistake, choose Meeting → Revert to Previous Notes). Click a speaker’s name at the top of a meeting to rename them."
+          }
+        }
+      }
+    },
     "每个人的重点": {
       "extractionState": "manual",
       "localizations": {
@@ -25556,6 +27667,23 @@
         }
       }
     },
+    "沒有含「%@」的詞彙": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有含“%@”的词汇"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No terms contain “%@”"
+          }
+        }
+      }
+    },
     "沒有找到「%@」。": {
       "extractionState": "manual",
       "localizations": {
@@ -25590,6 +27718,23 @@
         }
       }
     },
+    "沒有會議": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有会议"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No meetings"
+          }
+        }
+      }
+    },
     "沒有登入": {
       "extractionState": "manual",
       "localizations": {
@@ -25603,6 +27748,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "没有登录"
+          }
+        }
+      }
+    },
+    "沒有符合篩選的會議": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有符合筛选的会议"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No meetings match the filter"
           }
         }
       }
@@ -25913,6 +28075,23 @@
         }
       }
     },
+    "没有会议": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有会议"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No meetings"
+          }
+        }
+      }
+    },
     "没有加到 Claude Code：%@": {
       "extractionState": "manual",
       "localizations": {
@@ -26130,6 +28309,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "没有登录"
+          }
+        }
+      }
+    },
+    "没有符合筛选的会议": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有符合筛选的会议"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No meetings match the filter"
           }
         }
       }
@@ -26385,6 +28581,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "清除问答记录"
+          }
+        }
+      }
+    },
+    "清除筛选": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除筛选"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Filter"
+          }
+        }
+      }
+    },
+    "清除篩選": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除筛选"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Filter"
           }
         }
       }
@@ -26736,6 +28966,64 @@
         }
       }
     },
+    "现在不在文件夹里的会议也套用（%lld 场）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "现在不在文件夹里的会议也套用（%lld 场）"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Also apply to meetings not in a folder now (%lld meeting)"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Also apply to meetings not in a folder now (%lld meetings)"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "現在不在資料夾裡的會議也套用（%lld 場）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "现在不在文件夹里的会议也套用（%lld 场）"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Also apply to meetings not in a folder now (%lld meeting)"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Also apply to meetings not in a folder now (%lld meetings)"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "琥珀色是识别信心低的段落": {
       "extractionState": "manual",
       "localizations": {
@@ -26770,6 +29058,23 @@
         }
       }
     },
+    "產品名、人名；可以一次貼上好幾個": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "产品名、人名；可以一次粘贴好几个"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Product or person’s name; you can paste several"
+          }
+        }
+      }
+    },
     "產生每個人的重點": {
       "extractionState": "manual",
       "localizations": {
@@ -26783,6 +29088,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Create Key Points by Person"
+          }
+        }
+      }
+    },
+    "產生精簡版": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "产生精简版"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create Clean Version"
           }
         }
       }
@@ -26991,6 +29313,23 @@
         }
       }
     },
+    "用这个模板": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用这个模板"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uses template"
+          }
+        }
+      }
+    },
     "用途說明": {
       "extractionState": "manual",
       "localizations": {
@@ -27055,6 +29394,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "用逗号分隔"
+          }
+        }
+      }
+    },
+    "用這個範本": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用这个模板"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uses template"
           }
         }
       }
@@ -28178,6 +30534,125 @@
         }
       }
     },
+    "移除「%@」（会议里的名字留着）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除「%@」（会议里的名字留着）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove “%@” (names in meetings are kept)"
+          }
+        }
+      }
+    },
+    "移除「%@」（會議裡的名字留著）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除“%@”（会议里的名字留着）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove “%@” (names in meetings are kept)"
+          }
+        }
+      }
+    },
+    "移除「%@」？": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除「%@」？"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove “%@”?"
+          }
+        }
+      }
+    },
+    "移除条件": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除条件"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Rules"
+          }
+        }
+      }
+    },
+    "移除條件": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除条件"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Rules"
+          }
+        }
+      }
+    },
+    "移除这个人…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除这个人…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove This Person…"
+          }
+        }
+      }
+    },
+    "移除這個人…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除这个人…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove This Person…"
+          }
+        }
+      }
+    },
     "稍后": {
       "extractionState": "manual",
       "localizations": {
@@ -28259,6 +30734,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "立即分析"
+          }
+        }
+      }
+    },
+    "符合任一个条件的新会议，会自动放进这个文件夹。已经在别的文件夹的会议不会移动。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "符合任一个条件的新会议，会自动放进这个文件夹。已经在别的文件夹的会议不会移动。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New meetings that match any rule are moved to this folder automatically. Meetings already in another folder stay where they are."
+          }
+        }
+      }
+    },
+    "符合任一個條件的新會議，會自動放進這個資料夾。已經在別的資料夾的會議不會移動。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "符合任一个条件的新会议，会自动放进这个文件夹。已经在别的文件夹的会议不会移动。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New meetings that match any rule are moved to this folder automatically. Meetings already in another folder stay where they are."
           }
         }
       }
@@ -28535,6 +31044,40 @@
         }
       }
     },
+    "筛选": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筛选"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter"
+          }
+        }
+      }
+    },
+    "筛选：%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筛选：%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter: %@"
+          }
+        }
+      }
+    },
     "範本": {
       "extractionState": "manual",
       "localizations": {
@@ -28599,6 +31142,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "模板："
+          }
+        }
+      }
+    },
+    "範本：%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模板：%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "template: %@"
+          }
+        }
+      }
+    },
+    "篩選": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筛选"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter"
+          }
+        }
+      }
+    },
+    "篩選：%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筛选：%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter: %@"
           }
         }
       }
@@ -28689,6 +31283,57 @@
       }
     },
     "精简：用整理工具去掉赘字、重复和改口的版本；播放、搜索、导出照旧用原文": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "精简：用整理工具去掉赘字、重复和改口的版本；播放、搜索、导出照旧用原文"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clean: a version without filler words, repetitions and false starts, made by your summarizer. Playback, search and export still use the original"
+          }
+        }
+      }
+    },
+    "精簡": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "精简"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clean"
+          }
+        }
+      }
+    },
+    "精簡版用整理工具去掉「嗯、呃、那個」這類贅字、重複的字詞和說到一半改口的部分，不改意思、不摘要。每一句的時間和說話者不變。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "精简版用整理工具去掉“嗯、呃、那个”这类赘字、重复的字词和说到一半改口的部分，不改意思、不摘要。每一句的时间和说话者不变。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The clean version uses your summarizer to remove filler words like “um” and “uh”, repeated words and false starts, without changing the meaning or summarizing. Each line keeps its time and speaker."
+          }
+        }
+      }
+    },
+    "精簡：用整理工具去掉贅字、重複和改口的版本；播放、搜尋、匯出照舊用原文": {
       "extractionState": "manual",
       "localizations": {
         "zh-Hans": {
@@ -29028,6 +31673,23 @@
         }
       }
     },
+    "編輯會議資訊": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑会议信息"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit Meeting Info"
+          }
+        }
+      }
+    },
     "編輯期間會議紀錄有更新，已用你改的版本存檔；按「編輯」旁的「復原上一版」可以找回更新的內容": {
       "extractionState": "manual",
       "localizations": {
@@ -29041,6 +31703,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "编辑期间会议记录有更新，已用你改的版本保存；按“编辑”旁的“恢复上一版”可以找回更新的内容"
+          }
+        }
+      }
+    },
+    "編輯自動加入的條件…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑自动加入的条件…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit Auto-Add Rules…"
+          }
+        }
+      }
+    },
+    "編輯這一條": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑这一条"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit This Item"
           }
         }
       }
@@ -29334,6 +32030,23 @@
         }
       }
     },
+    "编辑会议信息": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑会议信息"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit Meeting Info"
+          }
+        }
+      }
+    },
     "编辑会议记录": {
       "extractionState": "manual",
       "localizations": {
@@ -29364,6 +32077,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "编辑期间会议记录有更新，已用你改的版本存档；按「编辑」旁的「复原上一版」可以找回更新的内容"
+          }
+        }
+      }
+    },
+    "编辑自动加入的条件…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑自动加入的条件…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit Auto-Add Rules…"
+          }
+        }
+      }
+    },
+    "编辑这一条": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑这一条"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit This Item"
           }
         }
       }
@@ -29640,6 +32387,57 @@
         }
       }
     },
+    "自动加入的条件…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动加入的条件…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-Add Rules…"
+          }
+        }
+      }
+    },
+    "自动加入的条件也会删掉。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动加入的条件也会删掉。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its auto-add rules are deleted too."
+          }
+        }
+      }
+    },
+    "自动加入：%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动加入：%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-add: %@"
+          }
+        }
+      }
+    },
     "自动检测会议语言": {
       "extractionState": "manual",
       "localizations": {
@@ -29738,6 +32536,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "自动判断"
+          }
+        }
+      }
+    },
+    "自動加入的條件…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动加入的条件…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-Add Rules…"
+          }
+        }
+      }
+    },
+    "自動加入的條件也會刪掉。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动加入的条件也会删掉。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its auto-add rules are deleted too."
+          }
+        }
+      }
+    },
+    "自動加入：%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动加入：%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-add: %@"
           }
         }
       }
@@ -29993,6 +32842,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "装好之后在终端运行 claude 登录，再按“重新检查”。"
+          }
+        }
+      }
+    },
+    "裡面的 %lld 場會議會留著，移到「不在資料夾」。自動加入的條件也會刪掉。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "里面的 %lld 场会议会留着，移到“不在文件夹”。自动加入的条件也会删掉。"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "The %lld meeting in it is kept and moves to Not in a Folder. Its auto-add rules are deleted too."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "The %lld meetings in it are kept and move to Not in a Folder. Its auto-add rules are deleted too."
+                }
+              }
+            }
           }
         }
       }
@@ -30452,6 +33330,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "设为默认模板"
+          }
+        }
+      }
+    },
+    "詞彙": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "词汇"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Term"
           }
         }
       }
@@ -31059,6 +33954,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "识别说话者"
+          }
+        }
+      }
+    },
+    "词汇": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "词汇"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Term"
           }
         }
       }
@@ -32006,6 +34918,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "跳到第一处"
+          }
+        }
+      }
+    },
+    "跳到这里": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳到这里"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go Here"
+          }
+        }
+      }
+    },
+    "跳到這裡": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳到这里"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go Here"
+          }
+        }
+      }
+    },
+    "輸入要找的字": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输入要找的字"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type to search"
           }
         }
       }
@@ -33467,6 +36430,23 @@
         }
       }
     },
+    "这些人都参加": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这些人都参加"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All of these people attend"
+          }
+        }
+      }
+    },
     "这些会议都已经在「%@」": {
       "extractionState": "manual",
       "localizations": {
@@ -34079,6 +37059,40 @@
         }
       }
     },
+    "这场很像「%@」里的会议：%@ 都参加（%lld 场）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这场很像「%@」里的会议：%@ 都参加（%lld 场）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This looks like the meetings in “%1$@”: %2$@ attended (%3$lld meetings)"
+          }
+        }
+      }
+    },
+    "这场很像「%@」里的会议：标题都有「%@」（%lld 场）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这场很像「%@」里的会议：标题都有「%@」（%lld 场）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This looks like the meetings in “%1$@”: the titles include “%2$@” (%3$lld meetings)"
+          }
+        }
+      }
+    },
     "这场的会议记录还没有每个人的重点。": {
       "extractionState": "manual",
       "localizations": {
@@ -34472,6 +37486,23 @@
         }
       }
     },
+    "选日期": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选日期"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose date"
+          }
+        }
+      }
+    },
     "逐字稿": {
       "extractionState": "manual",
       "localizations": {
@@ -34637,6 +37668,23 @@
         }
       }
     },
+    "這些人都參加": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这些人都参加"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All of these people attend"
+          }
+        }
+      }
+    },
     "這些會議都已經在「%@」": {
       "extractionState": "manual",
       "localizations": {
@@ -34786,6 +37834,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "这台服务器自称“%@”。"
+          }
+        }
+      }
+    },
+    "這場很像「%@」裡的會議：%@ 都參加（%lld 場）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这场很像“%@”里的会议：%@ 都参加（%lld 场）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This looks like the meetings in “%1$@”: %2$@ attended (%3$lld meetings)"
+          }
+        }
+      }
+    },
+    "這場很像「%@」裡的會議：標題都有「%@」（%lld 場）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这场很像“%@”里的会议：标题都有“%@”（%lld 场）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This looks like the meetings in “%1$@”: the titles include “%2$@” (%3$lld meetings)"
           }
         }
       }
@@ -35919,6 +39001,35 @@
         }
       }
     },
+    "里面的 %lld 场会议会留着，移到「不在文件夹」。自动加入的条件也会删掉。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "里面的 %lld 场会议会留着，移到「不在文件夹」。自动加入的条件也会删掉。"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "The %lld meeting in it is kept and moves to Not in a Folder. Its auto-add rules are deleted too."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "The %lld meetings in it are kept and move to Not in a Folder. Its auto-add rules are deleted too."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "重命名": {
       "extractionState": "manual",
       "localizations": {
@@ -35953,6 +39064,57 @@
         }
       }
     },
+    "重命名、跟另一个名字合并（同一个人被记成两个名字时）、移除这个人": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重命名、跟另一个名字合并（同一个人被记成两个名字时）、移除这个人"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename, merge with another name (when the same person was saved under two names), or remove this person"
+          }
+        }
+      }
+    },
+    "重命名「%@」，整场的逐字稿和会议记录都会跟着改": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重命名「%@」，整场的逐字稿和会议记录都会跟着改"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename “%@” throughout the transcript and notes"
+          }
+        }
+      }
+    },
+    "重命名会议": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重命名会议"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Meeting"
+          }
+        }
+      }
+    },
     "重命名文件夹": {
       "extractionState": "manual",
       "localizations": {
@@ -35966,6 +39128,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "重命名文件夹"
+          }
+        }
+      }
+    },
+    "重命名标记": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重命名标记"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Bookmark"
+          }
+        }
+      }
+    },
+    "重命名这个人": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重命名这个人"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Person"
           }
         }
       }
@@ -36055,6 +39251,74 @@
         }
       }
     },
+    "重新命名、跟另一個名字合併（同一個人被記成兩個名字時）、移除這個人": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新命名、跟另一个名字合并（同一个人被记成两个名字时）、移除这个人"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename, merge with another name (when the same person was saved under two names), or remove this person"
+          }
+        }
+      }
+    },
+    "重新命名「%@」，整場的逐字稿和會議紀錄都會跟著改": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新命名“%@”，整场的逐字稿和会议记录都会跟着改"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename “%@” throughout the transcript and notes"
+          }
+        }
+      }
+    },
+    "重新命名會議": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新命名会议"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Meeting"
+          }
+        }
+      }
+    },
+    "重新命名標記": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新命名标记"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Bookmark"
+          }
+        }
+      }
+    },
     "重新命名資料夾": {
       "extractionState": "manual",
       "localizations": {
@@ -36068,6 +39332,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "重新命名文件夹"
+          }
+        }
+      }
+    },
+    "重新命名這個人": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新命名这个人"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Person"
           }
         }
       }
@@ -37177,6 +40458,40 @@
         }
       }
     },
+    "長度（長的在前）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "长度（长的在前）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Length (Longest First)"
+          }
+        }
+      }
+    },
+    "长度（长的在前）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "长度（长的在前）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Length (Longest First)"
+          }
+        }
+      }
+    },
     "開": {
       "extractionState": "manual",
       "localizations": {
@@ -37449,6 +40764,23 @@
         }
       }
     },
+    "雙擊可以修改": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "双击可以修改"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Double-click to edit"
+          }
+        }
+      }
+    },
     "電腦聲音的擷取一直在重新連接，錄音可能斷斷續續。": {
       "extractionState": "manual",
       "localizations": {
@@ -37649,6 +40981,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "显示"
+          }
+        }
+      }
+    },
+    "顯示全部 %lld 場": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示全部 %lld 场"
+          }
+        },
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Show all %lld meeting"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Show all %lld meetings"
+                }
+              }
+            }
           }
         }
       }

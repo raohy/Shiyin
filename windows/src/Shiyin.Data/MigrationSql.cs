@@ -194,4 +194,71 @@ static class MigrationSql
         );
         CREATE INDEX documents_meeting ON documents(meeting_id, id);
         """;
+
+    /// <summary>
+    /// 精簡逐字稿（R96、M§70）：一句一列；句子刪掉（重新轉錄、刪除一句）時跟著刪，
+    /// 句子的文字改了（編輯、校正、用詞修正、拆句）時觸發器刪掉那一句的精簡版，畫面上回到原文
+    /// </summary>
+    public const string V11 = """
+        CREATE TABLE clean_lines (
+          segment_id INTEGER PRIMARY KEY REFERENCES segments(id) ON DELETE CASCADE,
+          text       TEXT NOT NULL
+        );
+        CREATE TRIGGER clean_lines_text AFTER UPDATE OF text ON segments
+        BEGIN
+          DELETE FROM clean_lines WHERE segment_id = NEW.id;
+        END;
+        """;
+
+    /// <summary>
+    /// 資料夾自動歸類、定期會議（R98、R99、M§72、§73；定期會議 v14 拿掉）：series（定期會議）、series_rejected（按了「不是定期會議」的那一組）、
+    /// folder_rules（資料夾的自動加入條件，keywords、people 是 JSON 陣列）；meetings 加 folder_decided、series_id
+    /// </summary>
+    public const string V12 = """
+        CREATE TABLE series (
+          id             INTEGER PRIMARY KEY AUTOINCREMENT,
+          name           TEXT NOT NULL,
+          weekday        INTEGER NOT NULL,
+          minute         INTEGER,
+          interval_weeks INTEGER NOT NULL DEFAULT 1,
+          people         TEXT NOT NULL DEFAULT '[]',
+          created_at     TEXT NOT NULL
+        );
+        CREATE TABLE series_rejected (
+          key        TEXT PRIMARY KEY,
+          created_at TEXT NOT NULL
+        );
+        CREATE TABLE folder_rules (
+          folder      TEXT PRIMARY KEY,
+          keywords    TEXT NOT NULL DEFAULT '[]',
+          people      TEXT NOT NULL DEFAULT '[]',
+          template_id TEXT,
+          series_id   INTEGER REFERENCES series(id) ON DELETE SET NULL,
+          created_at  TEXT NOT NULL
+        );
+        ALTER TABLE meetings ADD COLUMN folder_decided INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE meetings ADD COLUMN series_id INTEGER REFERENCES series(id) ON DELETE SET NULL;
+        CREATE INDEX meetings_series ON meetings(series_id);
+        """;
+
+    /// <summary>資料夾自己存在，可以是空的（R104、M§78）；建立時把現有會議的資料夾、有條件的資料夾放進去</summary>
+    public const string V13 = """
+        CREATE TABLE folders (
+          name       TEXT PRIMARY KEY,
+          created_at TEXT NOT NULL
+        );
+        """;
+
+    /// <summary>
+    /// 拿掉定期會議（R99、M§73、D177）的後半：每個定期會議換成同名資料夾（AppDatabase.RunMigration 先一個一個做）之後，
+    /// 資料夾條件的定期會議拿掉（條件都空了就刪掉那一筆）、會議的 series_id 清掉、清空 series 和 series_rejected。
+    /// 表、欄位留著不用（拿掉有外鍵的欄位要重建整張 meetings），同 Mac 的 v14
+    /// </summary>
+    public const string V14 = """
+        UPDATE folder_rules SET series_id = NULL;
+        DELETE FROM folder_rules WHERE keywords = '[]' AND people = '[]' AND template_id IS NULL;
+        UPDATE meetings SET series_id = NULL WHERE series_id IS NOT NULL;
+        DELETE FROM series;
+        DELETE FROM series_rejected;
+        """;
 }

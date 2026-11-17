@@ -10,7 +10,9 @@ extension SnakeCaseRecord {
 }
 
 enum Clock {
-    static func now() -> String { ISO8601DateFormatter().string(from: Date()) }
+    /// 格式同 ISO8601DateFormatter 的默认（2026-11-17T01:02:03Z）。不要每次新建 ISO8601DateFormatter：
+    /// 资料表的默认值（createdAt = Clock.now()）读每一笔都会跑一次，长会议的校正建议光建格式器就要 0.1 秒（2026-11-17 量到）
+    static func now() -> String { Date().ISO8601Format() }
 }
 
 struct Meeting: SnakeCaseRecord, Identifiable, Hashable {
@@ -44,6 +46,8 @@ struct Meeting: SnakeCaseRecord, Identifiable, Hashable {
     // v9（design §24.1）：说话者识别的自我检查分数（越大越可能把不同的人并在一起），nil 是没算过；用户按了「不用了」
     var speakerCheck: Double?
     var speakerHintDismissed: Bool = false
+    // v12（design §72）：文件夹已经决定了（自动放过、自己移过、建议按了不用）。定期会议的 series_id 字段留着不用（D177）
+    var folderDecided: Bool = false
 
     var meetingLanguage: MeetingLanguage { MeetingLanguage(rawValue: language) ?? .zh }
 

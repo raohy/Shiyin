@@ -82,6 +82,9 @@ struct AppCommands: Commands {
             // 主窗口关着时先打开，不然对话框要等到下次打开主窗口才会跳出来
             Button("导入…") { model.openMainWindow?(); model.showFileImporter = true }
                 .keyboardShortcut("o")
+            // 建一个空的文件夹（R104、design §78）
+            Button("新文件夹…") { model.openMainWindow?(); model.renameTarget = .newFolder([]) }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
             Button(model.recorder.isRecording ? "停止录音" : "开始录音") { model.toggleRecording() }
                 .keyboardShortcut("r")
             Button(model.recorder.isPaused ? "继续录音" : "暂停录音") {
@@ -102,6 +105,10 @@ struct AppCommands: Commands {
         }
         // 会议内容的文字大小（design §38.5、R59）：「显示」菜单；⌘= 不用按 Shift 也算放大（AppDelegate 拦下来）
         CommandGroup(after: .toolbar) {
+            Divider()
+            // 会议列表的排序、分组、筛选（R97、design §71）；人物模式时用不到
+            MeetingListMenu(model: model, submenus: true)
+                .disabled(model.sidebarMode == .people && !model.showTrash)
             Divider()
             Button("放大文字") { TextSize.change(1) }
                 .keyboardShortcut("+")

@@ -68,6 +68,9 @@ struct MeetingHeader: View {
     @Environment(AppModel.self) private var model
     let detail: MeetingDetail
     @State private var editing = false
+    /// 会议页上方的说话者：点名字重命名（R100，同逐字稿点说话者）
+    @State private var renamingSpeaker: Int?
+    @State private var speakerName = ""
 
     var body: some View {
         let meeting = detail.meeting
@@ -81,7 +84,8 @@ struct MeetingHeader: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.celadon)
                     .font(.callout)
-                    .popover(isPresented: $editing, arrowEdge: .bottom) {
+                    // 同其他弹窗的样子（R106、design §80）
+                    .sheet(isPresented: $editing) {
                         EditInfoForm(meeting: meeting) { editing = false }
                     }
                 Spacer(minLength: 0)
@@ -145,7 +149,7 @@ struct MeetingHeader: View {
     /// 会议页上方最多显示几位与会者（design §59）
     private static let visibleSpeakers = 4
 
-    /// 一位与会者：头像加名字。菜单按钮只画得出文字，头像放在菜单外面（CLAUDE.md）
+    /// 一位与会者：头像加名字。菜单按钮只画得出文字，头像放在菜单外面
     @ViewBuilder
     private func speakerChip(_ idx: Int) -> some View {
         let name = detail.speakers[idx] ?? ""
@@ -154,9 +158,58 @@ struct MeetingHeader: View {
             if detail.speakerSources[idx] == "voiceprint" {
                 AutoSpeakerName(idx: idx, name: name, others: detail.speakerCandidates[idx] ?? [])
             } else {
-                Text(name).foregroundStyle(Color.speaker(idx))
+                Button { startRenaming(idx) } label: { Text(name).foregroundStyle(Color.speaker(idx)) }
+                    .buttonStyle(.plain)
+                    .help("重命名「\(name)」，整场的逐字稿和会议记录都会跟着改")
+                    .contextMenu { speakerMenu(idx) }   // 按钮会吃掉右键，要挂在按钮本身
             }
         }
+        .contextMenu { speakerMenu(idx) }
+        .popover(isPresented: Binding(get: { renamingSpeaker == idx }, set: { if !$0 { renamingSpeaker = nil } }), arrowEdge: .bottom) {
+            // 同弹窗的组件（R106、design §80）
+            VStack(alignment: .leading, spacing: 12) {
+                Text("说话者名字").font(.title3).fontWeight(.bold)
+                SheetTextField(placeholder: String(localized: "名字"), text: $speakerName, focusOnAppear: true) { saveSpeakerName(idx) }
+                    .frame(width: 260)
+                HStack(spacing: 8) {
+                    Spacer()
+                    Button("取消") { renamingSpeaker = nil }
+                        .buttonStyle(SheetPillButtonStyle(.secondary))
+                        .keyboardShortcut(.cancelAction)
+                    Button("保存") { saveSpeakerName(idx) }
+                        .buttonStyle(SheetPillButtonStyle(.primary))
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(speakerName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    /// 说话者的右键（R100）：重命名、合并到别的说话者（同逐字稿）
+    @ViewBuilder
+    private func speakerMenu(_ idx: Int) -> some View {
+        Button("重命名…") { startRenaming(idx) }
+        let others = detail.speakers.keys.sorted().filter { $0 != idx }
+        if !others.isEmpty {
+            Menu("合并到") {
+                ForEach(others, id: \.self) { other in
+                    Button(detail.speakers[other] ?? "") { model.mergeSpeaker(idx, into: other) }
+                }
+            }
+        }
+    }
+
+    private func startRenaming(_ idx: Int) {
+        speakerName = detail.speakers[idx] ?? ""
+        renamingSpeaker = idx
+    }
+
+    private func saveSpeakerName(_ idx: Int) {
+        let name = speakerName.trimmingCharacters(in: .whitespaces)
+        renamingSpeaker = nil
+        guard !name.isEmpty, name != detail.speakers[idx] else { return }
+        model.renameSpeaker(idx, to: name)
     }
 
     /// 「会议设置」：模板、会议语言、大约几个人放在一起（design §59、R84.2）；文件菜单照旧
@@ -230,16 +283,24 @@ struct EditInfoForm: View {
     @State private var participants = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Form {
-                TextField("标题", text: $title)
-                DatePicker("会议日期", selection: $date, displayedComponents: .date)
-                TextField("与会者", text: $participants, prompt: Text("用逗号分隔"))
+        VStack(alignment: .leading, spacing: 18) {
+            SheetHeader(title: String(localized: "编辑会议信息"), subtitle: String(localized: "标题、日期、与会者。"), onClose: onDone)
+            VStack(alignment: .leading, spacing: 6) {
+                SheetFieldLabel(String(localized: "标题"))
+                SheetTextField(placeholder: String(localized: "标题"), text: $title, focusOnAppear: true)
             }
-            .formStyle(.columns)
-            HStack {
+            VStack(alignment: .leading, spacing: 6) {
+                SheetFieldLabel(String(localized: "会议日期"))
+                SheetDateField(label: String(localized: "会议日期"), date: $date)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                SheetFieldLabel(String(localized: "与会者"))
+                SheetTextField(placeholder: String(localized: "用逗号分隔"), text: $participants)
+            }
+            HStack(spacing: 10) {
                 Spacer()
-                Button("取消", role: .cancel, action: onDone)
+                Button("取消", action: onDone)
+                    .buttonStyle(SheetPillButtonStyle(.secondary))
                     .keyboardShortcut(.cancelAction)
                 Button("保存") {
                     // 标题栏预先填的是显示用的标题（还没命名时是文件名）；没动过就照原样存，不然会被当成自订标题锁住，整理时不会再取名
@@ -248,12 +309,11 @@ struct EditInfoForm: View {
                                      date: DateText.string(date), participants: participants)
                     onDone()
                 }
+                .buttonStyle(SheetPillButtonStyle(.primary))
                 .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
             }
         }
-        .padding(16)
-        .frame(width: 380)
+        .sheetChrome()
         .onAppear {
             title = meeting.displayTitle
             date = DateText.date(meeting.meetingDate) ?? Date()
@@ -265,24 +325,18 @@ struct EditInfoForm: View {
 struct TrashBanner: View {
     @Environment(AppModel.self) private var model
     let meetingId: Int64
-    @State private var confirm = false
 
     var body: some View {
         HStack(spacing: 12) {
             Label("这场会议在垃圾桶里，30 天后会永久删除", systemImage: "trash")
             Spacer()
             Button("还原") { model.restore(meetingId) }
-            Button("永久删除", role: .destructive) { confirm = true }
+            Button("永久删除", role: .destructive) { model.confirmPurge = [meetingId] }
         }
         .font(.callout)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-        .confirmationDialog("永久删除这场会议？", isPresented: $confirm) {
-            Button("永久删除", role: .destructive) { model.deletePermanently(meetingId) }
-        } message: {
-            Text("会议记录、逐字稿和录音档都会删除，没办法复原。")
-        }
     }
 }
 
@@ -467,7 +521,7 @@ struct MoreMenu: View {
             Divider()
             // 工具列的菜单创建一次就不会更新（禁用状态、按钮记住的会议），动作一律在按下时才看目前选中的会议
             FolderMenu()
-            Button("移到垃圾桶", systemImage: "trash", role: .destructive) {
+            DestructiveMenuButton(String(localized: "移到垃圾桶")) {
                 if let id = model.selection { model.moveToTrash(id) }
             }
         } label: {
@@ -568,7 +622,7 @@ private struct SpeakerSuggestionsBanner: View {
             Button("查看") { showing = true }
                 .popover(isPresented: $showing, arrowEdge: .bottom) {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("猜到的说话者名字").font(.headline)
+                        Text("猜到的说话者名字").font(.title3).fontWeight(.bold)
                         ForEach(suggestions, id: \.key) { idx, suggestion in
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 8) {
@@ -591,10 +645,10 @@ private struct SpeakerSuggestionsBanner: View {
                             Text("套用后，逐字稿和会议记录都会换成名字。").font(.caption).foregroundStyle(.secondary)
                             Spacer()
                             Button("全部套用") { model.applyAllSpeakerSuggestions(); showing = false }
-                                .buttonStyle(.borderedProminent)
+                                .buttonStyle(SheetPillButtonStyle(.primary, compact: true))
                         }
                     }
-                    .padding(16)
+                    .padding(18)
                     .frame(width: 420)
                 }
         }

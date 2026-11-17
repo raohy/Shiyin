@@ -86,7 +86,7 @@ shared/golden/                  Mac 產生的標準答案（§4）
 scripts/windows/                build-whisper.ps1、pack.ps1、update-key.cs、make-third-party-licenses.py；vm/ 驗證用虛擬機的工具（§15.2）
 ```
 
-建置輸出不能放在專案裡（桌面有 iCloud 同步，同 CLAUDE.md）。
+建置輸出不能放在專案裡（桌面有 iCloud 同步）。
 
 **資料**（`%LOCALAPPDATA%\Shiyin`，環境變數 `SHIYIN_HOME` 可以改；預設的 ACL 只有這個使用者讀得到）：
 
@@ -144,7 +144,7 @@ Mac 的 DEBUG 控制通道加 `shiyinctl dump-golden <fixtures.json> <輸出資�
 
 ### 4.3 以後 Mac 改了提示詞或匯出
 
-Mac 改完重跑 `dump-golden`、commit 新的 `shared/golden/`，Windows 的測試就會失敗，照著改 C#。CI 每次推送都跑，所以不會漏掉。這條規則寫進 CLAUDE.md。
+Mac 改完重跑 `dump-golden`、commit 新的 `shared/golden/`，Windows 的測試就會失敗，照著改 C#。CI 每次推送都跑，所以不會漏掉。
 
 ## 5. 資料庫
 
@@ -277,7 +277,7 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
   - npm 的全域資料夾：官方安裝檔是 `%APPDATA%\npm`；zip 版的 Node、nvm、scoop、Volta 在別的地方，所以也找 PATH 裡有 `claude.cmd`、`codex.cmd` 的資料夾（只拿來定位套件，不執行 .cmd）。
   - 套件的樣子（2026-10-21，claude-code 2.1.306、codex 最新版）：claude-code 的 npm 套件直接帶 `bin\claude.exe`（已經沒有 `cli.js`，舊版才用 node 跑 cli.js）；codex 的執行檔在平台子套件 `@openai/codex-win32-<arm64|x64>/vendor/<平台>/bin/codex.exe`，旁邊的 `codex-path`（有 rg.exe）加進子程序的 PATH（同 codex.js）。
   - 長度：逐字稿和提示詞走標準輸入（claude 的 `-p`、codex 的 `exec -`），命令列只放系統提示詞和 JSON schema（標準答案裡最長的約 2,400 字和 1,800 字），遠低於 Windows 命令列 32,767 字元的上限。
-- 參數一律用 `ProcessStartInfo.ArgumentList`（同 CLAUDE.md 的規則）；子程序的 PATH 用 `;` 接上找到的資料夾；工作目錄是 `tmp` 下的空資料夾。
+- 參數一律用 `ProcessStartInfo.ArgumentList`（同 Mac 的規則）；子程序的 PATH 用 `;` 接上找到的資料夾；工作目錄是 `tmp` 下的空資料夾。
 - 子程序放進 Job Object（`KILL_ON_JOB_CLOSE`）：拾音當掉時子程序一起結束；逾時時整棵程序樹一起結束。
 - 登入：用固定參數開 Windows Terminal（沒有就用 `cmd.exe /k`）執行 `claude` 或 `codex login`，參數裡不放任何使用者內容。
 - **還沒設定整理工具**（R35、M§19.6、D95）：同 Mac。`AppSettings.DetectCli` 由 App 用 `WindowsToolLocator` 找 claude、codex（要掃過 PATH 的每個資料夾，快取 30 秒）；Services、測試裡沒給就是找不到。DEBUG 加 `--set debugNoCli=YES` 當成找不到。
@@ -350,7 +350,16 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 ### 11.3 外觀、字型
 
 - 顏色（celadon、signal、說話者 8 色）在 `Ui/Ui.cs`，每個顏色有淺色、深色兩個值，跟著視窗的主題換（Mac 是 `Views/Theme.swift`）。
-- 視窗的底色：淺色白、深色 #202020（Windows 11 的 SolidBackgroundFillColorBase），每個視窗的最外層用 `Ui.WindowBackground` 設、跟著深淺色換。沒設時深色模式是純黑。主視窗的側欄淺色 #F7F7F7、深色 #2B2B2B（跟內容區分得出來，同 Mac 的側欄）。對比主題（高對比）開著時兩種都換成系統的視窗底色（`UISettings.UIElementColor(Window)`）：不然平台的控制項是對比主題的顏色、底色還是淺色，每段文字都被加上底板；開、關對比主題時聽 `UISettings.ColorValuesChanged` 重畫（`AccessibilitySettings.HighContrastChanged` 在沒打包的桌面 app 訂閱時丟 0x80070490，2026-11-15 虛擬機啟動就當掉）。
+- 視窗的底色：淺色白、深色 #202020（Windows 11 的 SolidBackgroundFillColorBase），每個視窗的最外層用 `Ui.WindowBackground` 設、跟著深淺色換。沒設時深色模式是純黑。主視窗的側欄淺色 #F7F7F7、深色 #2B2B2B（跟內容區分得出來，同 Mac 的側欄）。對比主題（高對比）開著時兩種都換成系統的視窗底色（`UISettings.UIElementColor(Window)`）。
+- 對比主題（高對比，設定 → 協助工具 → 對比佈景主題；2026-11-16 在虛擬機用「夜空」「沙漠」巡檢）：畫面只用系統色（視窗底、文字、反白／反白的字、超連結、停用的字、按鈕），做法如下。
+  - `Application.HighContrastAdjustment = None`（`App` 的建構式）：預設 Auto 時 WinUI 把不是系統色的字換成文字的顏色、後面墊一塊視窗底色的底板，選到的列（反白的底）、強調色的按鈕上每段字都是一塊黑底（「夜空」）。關掉之後顏色由拾音自己負責。
+  - `Ui` 的顏色在對比主題時直接給系統色（`Ui.SystemColor`／`SystemBrush`，`UISettings.UIElementColor`）：`Celadon`、`AccentText`、`AccentFill` 是反白的顏色（同 WinUI 的強調色在對比主題的做法）；`Signal`、`Danger`、說話者 8 色、`Primary`／`Secondary`／`Tertiary`、`Divider` 是文字的顏色（琥珀、紅靠圖形和文字分辨）；`CardBackground` 是視窗底色；`Subtle`（淡淡的底）透明，畫圖形沒亮的部分改用 `Ui.Track`（停用的字的顏色；音量條、引導的步驟、播放列的底線）；青瓷綠實心上面的打勾、數字用 `Ui.OnCeladon`（反白的字）。
+  - 淡淡上色的一塊（建議條、狀態條、待確認展開的那一塊、提問的回答、錄自己聲音的那段文字）：`Ui.Tint` 在對比主題時透明，`Ui.Tinted(border, 底色)` 改成沒有底色、一圈文字顏色的細框（同 Windows 設定的卡片在對比主題的樣子）。逐字稿目前播放、跳過來的段落改成一圈框（播放的是反白的顏色），標起來的字（搜尋、校正建議）是反白的底配反白的字。
+  - 清單的列、超連結按鈕、整列是按鈕的會議列裡的字和圖示不自己給顏色：`Ui.FollowForeground(內容)` 在對比主題時把 `TextBlock`、圖示的 `Foreground` 清掉，跟著列或按鈕的前景色（平常是按鈕的字或文字的顏色，選到、滑過去是反白的字，超連結是超連結的顏色）；跳過控制項（「⋯」這些按鈕自己處理）和有自己底色的一小塊（頭像、資料夾齒輪的小圓）。會議列的狀態文字（失敗、待確認）每秒更新時也不上色。用在側欄的導覽、會議、人物、搜尋結果的列，會議頁上方和逐字稿的說話者，人物頁的會議列和待辦表的會議連結、常參加的人。
+  - 頭像：視窗底色的圓、文字顏色的字和外圈（「我」的外圈 2）；底色不透明，放在選到的列上也看得清楚。
+  - `Ui.Borderless`（沒有框的按鈕：會議設定、文件、鉛筆、合併到、移除這個人、篩選的漏斗和 ✕、「⋯」）在對比主題時照平台的按鈕（按鈕色的字和框，滑過去反白）：沒有框的按鈕看起來跟一般的字一樣，原本覆寫的滑過底色（`Subtle`）和字（反白的顏色）也不是成對的系統色。紅字的按鈕（移除這個人…）也是按鈕色。待確認的標記「？」同樣不上琥珀色。時間點（`Ui.Time`）、提問的出處連結不給青瓷綠，照平台的超連結顏色。
+  - 開著 app 開關對比主題、換一個對比主題（`ActualTheme` 不變）：`Ui.OnContrastChanged(元件, 動作)` 聽 `UISettings.ColorValuesChanged`（不在 UI 執行緒，排回元件的 `DispatcherQueue`），`Ui.ContrastKey`（沒開時空字串，開著時是用到的系統色；每次重讀對比主題開了沒，`Ui.HighContrast` 平常用記住的值，建一頁要問上千次）變了才做：主視窗重新給顏色（`restyle`）、重建列表、重畫；列表、人物頁「內容一樣時不重建」的比對加上 `Ui.ThemeKey`（深淺色＋`ContrastKey`）。`AccessibilitySettings.HighContrastChanged` 在沒打包的桌面 app 訂閱時丟 0x80070490（2026-11-15 虛擬機啟動就當掉），不用。已知：從一個對比主題直接換成另一個時，平台的 `SelectorBar`（紀錄／逐字稿／提問、條列／心智圖）選取的那一條底線留著前一個主題的反白顏色，重開拾音才換（一般→對比、對比→一般會換）；設定、引導這些另外開的視窗開著時換主題，自己的顏色要重開視窗才換（底色會換）。
+  - 驗證：虛擬機用 `Start-Process` 開 `C:\Windows\Resources\Ease of Access Themes\hc2.theme`（夜空）、`hcwhite.theme`（沙漠）套用（`hc1` 黃昏、`hcblack` 水生），等 `CurrentTheme` 換好再關掉跳出來的設定視窗；改回原本的主題是同樣開 `%LOCALAPPDATA%\Microsoft\Windows\Themes\Custom.theme`，`HKCU\Control Panel\Accessibility\HighContrast` 的「High Contrast Scheme」、`Themes` 的 `LastHighContrastTheme` 會記成剛剛用過的對比主題，測前 `reg export`、測完改回（原本是「High Contrast Black」、`hcblack.theme`）；剛開機時第一次開 `.theme` 可能等不到套用（設定 app 還在啟動），再開一次。停虛擬機見 §15.2（不要強制斷電）。
 - 介面字型用系統預設（Segoe UI Variable、微軟正黑體）。會議標題的明體：Mac 用宋體，Windows 中文、英文用新細明體（`PMingLiU`，沒有時退回 `Microsoft JhengHei UI`），日文用 `Yu Mincho`，都是粗體（`Ui.TitleFont`、`Ui.Heading`）。
 - 會議內容依會議語言設定 `Language`（ja-JP 時日文字形，對應 D20）。
 - 匯出（PDF、docx）的字型：中文 Microsoft JhengHei／PMingLiU、日文 Yu Gothic／Yu Mincho、英文 Segoe UI／Georgia（Mac 是 New York）。
@@ -504,10 +513,12 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 ### 11.22 人有臉、會議頁上方、人物頁（R83～R85，M§58～§60）
 
 - 頭像：`Ui.Avatar(name, color, size, isMe)`（`Border` 圓角＝直徑的一半、釉色 18% 的底、粗體的字；取字的規則、顏色同 M§58，在 Core 的 `Avatars`：`Initials`、`PersonIndex`（同樣的 FNV-1a）、`Palette`，`Ui.Speaker`、`Ui.Person` 都用它）。尺寸照 Mac 的程式：逐字稿、待辦 18（跟著文字大小 `Ui.C`）、會議頁上方 20（M§58.2 寫 22，Mac 的程式是 20）、側欄 26、人物頁 56。用在會議頁上方、逐字稿、待辦的負責人、人物頁、側欄。標準答案 `util/avatars.json`（Mac 的 `PersonAvatar.initials`、`Color.person`、`Color.speaker` 在淺色、深色外觀下解出的 sRGB）。
-- 會議頁上方：同 M§59，`MeetingSettingsMenu` 是一個 `DropDownButton`＋`MenuFlyout`（三段用 `MenuFlyoutSeparator` 和停用的標題項目隔開）。「會議設定」和文件選單沒有框（2026-11-15 照 Mac 改）：平台的 `DropDownButton` 加輕量的樣式覆寫 `Ui.Borderless`（不換 ControlTemplate，範本讀的 `Button*` 主題資源換成 subtle 那一組：平常透明、滑過去 `SubtleFillColorSecondaryBrush`，文字 `AccentTextFillColorPrimaryBrush`）。第二列是 `LeadingTrailing`（`Ui.cs`，同 Mac 的 `ViewThatFits`）：放得下時選單靠右同一列，放不下時換到下一行。
+- 會議頁上方：同 M§59，`MeetingSettingsMenu` 是一個 `DropDownButton`＋`MenuFlyout`（三段用 `MenuFlyoutSeparator` 和停用的標題項目隔開）。「會議設定」和文件選單沒有框（2026-11-15 照 Mac 改）：平台的 `DropDownButton` 加輕量的樣式覆寫 `Ui.Borderless`（不換 ControlTemplate，範本讀的 `Button*` 主題資源換成 subtle 那一組：平常透明、滑過去 `SubtleFillColorSecondaryBrush`，文字 `AccentTextFillColorPrimaryBrush`）。第二列是 `LeadingTrailing`（`Ui.cs`，同 Mac 的 `ViewThatFits`）：放得下時選單靠右同一列，放不下時換到下一行。資訊列本身是 `FlowPanel`（同一行裡上下置中）：資料夾、日期、長度、與會者整串太長時換行（跟 Mac 不同：Mac 的 HStack 把字縮成省略號，Windows 的橫排 `StackPanel` 會直接切掉最後一位；2026-11-16 英文巡檢，當時的定期會議＋四位英文名字和「自動」在一般的視窗寬度就超出）。
 - 側欄（2026-11-15 照 M§60.2 改，拿掉 `SelectorBar`）：搜尋框下面一個平台的 `ListView`（`scopes`，同 Outlook、檔案總管的資料夾窗格；不自訂 ControlTemplate）：「所有會議（數量）」「人物（數量）」，有資料夾時一個不能選的「資料夾」標題項目、每個資料夾（數量、右鍵選單）。選到的那一列是平台的選取樣子（強調色＝青瓷綠）。下面一行是下面那一段的標題（所有會議、資料夾名稱或人物），再下面是會議或人物的 `ListView`。點所有會議、資料夾：`MainState.ShowMeetings(folder)`（回到會議模式）；點人物：`SetSidebar(People)`。垃圾桶裡、搜尋中整組不顯示。名字、數量沒變時只換選取、不重建。微軟的對照表裡 2～3 種模式是 `SelectorBar`，但這裡的三種項目（所有會議、人物、資料夾）是同一層的導覽目的地、數量不固定，照資料夾窗格的做法比較對。
 - 人物頁：資料用 `AppDatabase.PeopleOverview`、`PersonMeetings`、`PersonActionItems`（同 M§60.1 的 SQL，標準答案 `db/43～48`；同一天的人照名字排用介面語言的排序，兩邊的語系不一定一樣，標準答案避開同一天）；右邊的 `PersonPage` 同 M§60.2（沒有「加到提醒事項」）。上面是不跟著捲動的標題列（同會議頁：左邊頭像 52、名字、摘要，右上角「更多」）；「我」只留細的外圈（最多 2，`AccentFillColorDefaultBrush`）和名字旁的灰字「我」。「更多」是 `DropDownButton`＋`MenuFlyout`（同會議頁，無障礙名稱「更多」）：「改名…」（`Flyout` 接在「更多」下面，名字選好）、「合併到」（子選單）、分隔線、「刪除聲音特徵…」（`ContentDialog`：主要按鈕「刪除」、預設按鈕是取消、標題和內文都寫出是哪個人）。內容跟標題列同樣的左右邊距、整欄寬，負責的待辦那張表（事項那一欄撐滿）右邊跟「更多」對齊（Windows 沒有「加到提醒事項」，對齊的是「更多」）。主視窗每次資料改了都重畫，人物頁內容一樣時留著原本的元件（轉錄的進度一直更新時捲動位置才不會跳回最上面）。「會議」那一段的英文用 Meetings（「會議」這個鍵的英文是單數的 Meeting）。視窗標題照舊是「拾音」（會議頁也是），人名在頁面的標題列。設定「說話者與詞彙」的認識的人下面加一行「也可以在側欄的「人物」管理」（R85.5）。
+- 名字旁的鉛筆（R85.6、M§60.2 最後一條，2026-11-16）：名字右邊一顆平台的 `Button`＋`Ui.Borderless`（平常透明、滑過去才有底色，字和圖示是強調色的文字＝青瓷綠，同 Mac 的 borderless、celadon），內容是 `SymbolIcon(Symbol.Edit)`；`ToolTip` 和無障礙名稱都是「改名」。按了打開同一個改名的 `Flyout`（「更多 → 改名…」那一個），`ShowAt` 給位置：鉛筆是 `BottomEdgeAlignedLeft`（接在鉛筆下面），「更多」照舊 `BottomEdgeAlignedRight`；取消、儲存、Enter、改成已經有的名字時合併過去，都同「更多 → 改名…」。
 - DEBUG：控制通道 `sidebar people|meetings`、`person <id>`，state 的 `sidebarMode`、`selectedPerson`、`peopleOverview`（同 Mac）。
+- 移除一個人（R85.7、M§60.2，2026-11-16）：人物頁「更多」和側欄人物列的右鍵選單（`MenuFlyout`，打開時才建）用同一份 `PersonPage.MenuItems`：「改名…」（`SelectPerson` 後 `RequestRename`：那個人的頁面畫好、鉛筆 `Loaded` 之後打開鉛筆下面的改名 `Flyout`；原本「更多 → 改名…」接在「更多」下面，跟著 Mac 改成都打開鉛筆的那一個）、「合併到 ▸」、分隔線、「移除這個人…」（`Symbol.Delete`）。「更多」的 `ToolTip` 改成「改名、跟另一個名字合併（同一個人被記成兩個名字時）、移除這個人」。人物列表選到一個人時按 Delete 也是移除（`list.KeyDown`）：選的人換了只換列表的選取、不重建（原本 `ListSignature` 含「選了誰」，換人時整個重建，焦點離開列表，Delete 收不到；2026-11-16 虛擬機）。確認在主視窗（`MainWindow.ConfirmRemovePerson`，`ContentDialog`，同時只開一個）：標題「移除「X」？」、說明「會從「人物」拿掉，也會刪掉他的聲音特徵。會議裡已經帶入的名字會留著，之後的會議不會再自動認出他。」、主要按鈕「移除」、預設按鈕是取消；`DeletePerson`（同原本的刪除聲音特徵：`speakers.person_id` 變 null，會議裡的名字留著），移除的是正在看的人時回到沒選人。設定頁「認識的人」照舊叫刪除聲音特徵。四個新的鍵 Mac 的翻譯表（9c713dc）已經有，這個分支從那之前開的，英文照 Mac 的寫進 `Windows.xcstrings`（合併後兩邊相同）。DEBUG：`personremove <id>`（打開確認）、`personrenameui <id>`（同 Mac）；state 加 `confirmRemovePerson`（同 Mac）、`personRenameOpen`（改名的輸入框開著沒；Mac 沒有）。
 
 ### 11.23 會議多選、清空垃圾桶、刪除一句、分割會議（R88～R90，M§62～§64）
 
@@ -555,6 +566,226 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 - 只補上（R92.4）：`AppController.GeneratePeopleNotes`：擋下來的條件和訊息同「重新整理」（`ReadyForAction`、整理工具是「不整理」、整理工具還沒準備好）；排 `Summarize`，payload `JobRunner.Encode(new SummarizePayload(People: true))` = `{"draft":false,"people":true}`。`people` 是 false 時不寫：草稿的 `{"draft":true}`、自動排的 `{"draft":false}` 跟以前一字不差。`JobRunner.Summarize(peopleOnly)`：沒有紀錄時不做；範本的說明、額外指示照舊，段落只有 `people`、沒有自訂段落；簡體照舊整理完才轉；結果讀現在的紀錄（整理期間被改過也不會蓋掉）只換掉 `People`，`SaveNotes(by: null, 「補上每個人的重點」, NotesSource.Edit)`（整理工具、標題不變，舊的那一版可以「復原上一版」），不發通知。
 - 編輯器（`NotesEditor`）：打開時紀錄有 people 才顯示「每個人的重點」（`showsPeople`，刪光了也留著，可以再新增），放在自訂段落後面（同 Mac；原本的編輯器不變）：同議題的編輯器，每個人一列名字欄（`TextBox`，標題字型、14，提示文字「名字」）＋右邊「刪除這個人的重點」（`Ui.IconButton(Symbol.Delete)`），下面是重點的 `ItemsEditor`；最後「新增一個人」（`Ui.Link`，同「新增議題」）。名字欄的字級照議題標題欄的 14（Mac 是 16）。
 - DEBUG：`notesview list|mindmap|people`；`peoplenotes <會議 id>`（等於按「產生每個人的重點」，同 Mac）；`state` 加 `peopleCards`（選取中的會議每一張的 `index`、`name`、`speaker`、`seconds`、`percent`、`points`（幾條）、`owned`（負責的待辦原本的位置）；Mac 沒有）。`reviewexpand`、`reviewsubmit` 的段落 `person <第幾個人> <第幾條>`（同 Mac）；`editnotes <會議 id> <會議紀錄 JSON 或 JSON 檔的路徑>`（同 Mac 的 `editnotes`，存成新的一版，同按「完成」；Windows 從 SSH 傳中文的 JSON 不方便，所以也收檔案路徑）。
+
+### 11.26 企業伺服器連不上時自動改在這台電腦轉錄（R93，M§67）
+
+- `ServerTranscriber.Transcribe` 記「連續連不上」的開始時間（同 M§67）：`EnterpriseFailure.Unreachable`（連線被拒、逾時）、`Server` 的 `server_error`（5xx）記下第一次的時間；查狀態成功（`Status`，建工作、上傳成功後的下一圈都會查）就清掉；伺服器忙（`busy`）、登入失效（`IsSetupProblem`）也清掉（照舊等）。連續 `AutoLocalAfter`（預設 `DefaultAutoLocalAfter`，10 分鐘）就刪掉伺服器上的工作、清掉 payload 的 `remoteId`，丟 `SwitchToLocalException(automatic: true)`。快到時 `WaitForServer` 只等到那時候（無條件進位到秒、至少 1 秒，同 Mac）。
+- `JobRunner.Transcribe` 照「改在這台電腦轉錄」的路（R50.5）改本機；`Automatic` 時發 `ServerFallback(meetingId)`，`AppHost` 交給 `Notifier.ServerFallback`：標題「企業伺服器連不上，已改在這台電腦轉錄」、內文是會議標題，點了打開那場（`NotificationLinks.OpenMeeting`）。轉完照常有「轉錄完成」。
+- 等多久：`JobRunner.ServerAutoLocalAfter`（init）；`AppHost` 在 DEBUG 讀 `--set serverAutoLocalSeconds=20`（同 Mac 的 `-serverAutoLocalSeconds`），正式版固定 10 分鐘（R93 不做「等多久可以改」）。
+- DEBUG 模擬「登入了但連不上」：`--set debugEnterpriseUnreachable=YES`（`EnterpriseServer.DebugUnreachable`，同 Mac 的 `-debugEnterpriseUnreachable`）：`Account` 是假的帳號（`debug@example.invalid`）、`IsSignedIn`、`SavedUrl` 是 `http://127.0.0.1:9`、`AccessToken` 回 `debug`；只在記憶體，不寫 settings.json、不讀認證管理員。轉錄要交給伺服器再加 `--set transcriptionEngine=server`（`--set` 都只在這次執行有效）。
+- 測試：`EnterpriseTests.UnreachableTooLongSwitchesToThisComputerAutomatically`（500 `server_error`、連線被拒都會自動改，`Automatic`；使用者按的不是）、`BusyServerKeepsWaiting`（伺服器忙不算，好了照樣在伺服器轉完）、`JobRunnerReportsAutomaticFallback`。
+
+### 11.27 詞彙表：一次加好幾個、搜尋、批次刪除（R94，M§68）
+
+- Core 的 `GlossaryInput.Split`（同 Mac，標準答案 `util/glossary-split.json`）：換行（`\n`、`\r`；WinUI 的 `TextBox` 把換行存成 `\r`）、逗號（半形、全形）、頓號、分號（半形、全形）分開，去頭尾空白、拿掉空的和重複的（小寫後比，留第一個）。
+- `AppDatabase.AddTerms`（`INSERT OR IGNORE`，回傳實際加了幾個；`term` 是 UNIQUE，一字不差的才算已經有，同 Mac）、`DeleteTerms`。`AppController.AddTerms(text)`：說明同 Mac（一個詞而且已經有時「「X」已經在詞彙表裡了」；好幾個時「已加入 N 個詞彙」或「已加入 N 個詞彙，M 個已經有了」；一個新詞不說），走 `Notice`（主視窗下方的提示），也回傳同一句。
+- 設定「說話者與詞彙」（`SettingsWindow.Glossary`）：
+  - 新增：`TextBox`（`Header`「新增詞彙」、提示字「產品名、人名；可以一次貼上好幾個」、`AcceptsReturn`、自動換行、最高 140（約 4 行，再多就捲動））＋「新增」（空的時候停用，對齊輸入框底部）。`AcceptsReturn` 是為了貼上好幾行（單行的 `TextBox` 貼上時只留第一行）；Enter 送出、Shift+Enter 換行（`PreviewKeyDown`，同 Mac 的 Return 送出）；按 Enter 加完焦點回到輸入框，可以接著打。跟 Mac 不同：加完的說明也寫在輸入框下面（12、次要文字，顯示一次）：設定視窗常蓋在主視窗上，看不到主視窗的提示。
+  - 超過 10 個詞時「搜尋詞彙」（`TextBox`，`Header`「搜尋詞彙」、提示字「輸入要找的字」；`Contains(…, OrdinalIgnoreCase)`，同 Mac 的 caseInsensitive）。打字只重畫列表那一塊（整頁重畫時焦點會跑掉）；詞彙減到 10 個以下時清掉搜尋字（Mac 會留著看不到的搜尋字，列表還是篩過的）。
+  - 列表上面一列：左邊 `HyperlinkButton`「全選」（搜尋時「全選搜到的 N 個」；列出來的都勾了變「取消勾選」），右邊「刪除勾選的 N 個…」（平台的 `Button`，有勾才出現）。每個詞一列：`CheckBox`（內容是那個詞，同 Mac 的 checkbox 樣式的 Toggle）＋右邊刪除這一個（`Ui.IconButton(Symbol.Delete)`，照舊）。勾選只換上面那一列的字，勾選框不重建（焦點不會跑掉）；勾了之後被單獨刪掉的詞不算在 N 裡（同 Mac）。搜不到時「沒有含「X」的詞彙」。勾選、搜尋字在整頁重畫（新增、刪除一個）時留著，存在 `SettingsWindow` 的欄位。
+  - 確認：`ContentDialog`（設定視窗的 `XamlRoot`），標題「刪除勾選的 N 個詞彙？」（Mac 的確認也只有標題）、主要按鈕「刪除」、預設按鈕是「取消」（沒辦法還原，WinUI 準則，同 §11.23）；開著時不會再開第二個（`confirmingTerms`）。刪完清掉勾選。
+- DEBUG：控制通道 `addterm <文字>`（同 Mac：`\n` 當換行，走 `AddTerms`，回傳 `message`）；state 加 `glossary`（自己的詞，照加入的順序）。
+
+### 11.28 會議結束時倒數自動停止錄音（R95，M§69）
+
+- 設定 `autoStopOnMeetingEnd`（settings.json，預設 true）：「錄音與轉錄 → 提醒與快捷鍵」的 `ToggleSwitch`「會議結束時自動停止錄音」，放在「偵測到線上會議時提醒錄音」下面，偵測會議關掉時停用（`IsEnabled`，切偵測的開關時跟著變）。偵測會議的說明換成 Mac 的新句子，從「很久沒人說話」那一組後面搬到這兩個開關下面（「不提醒：X」接在說明後面）。
+- `MeetingEndCountdown`（Services，同 Mac 的 `startMeetingEndCountdown`；`AppHost.MeetingEnd`）：`Start()` 記錄音中的那場和期限（`Seconds`，預設 60），`System.Threading.Timer` 每秒 `Tick`：錄音停了或換了一場就收起（`Ended`）；到期限時收起，還在錄同一場、`MeetingDetector.MeetingAppActive`（有會議 app 在用麥克風，同 Mac 的 `meetingAppActive`）是 false 就停止。停止的動作 `AppHost` 給：先拿會議標題、`Recorder.Stop()`（同自動停止的錄音，從計時器的執行緒呼叫）、`Notifier.MeetingEndStopped`（「會議結束，已自動停止錄音」，內文是會議標題，點了打開那場）。`Cancel()` 給「繼續錄」「停止並轉錄」。`Remaining(now)` 無條件進位（同 Mac 的 `TimelineView`）。單元測試 `ServicesTests.MeetingEndCountdownStopsOnlyTheSameRecording` 直接呼叫 `Tick`。
+- `App.ShowMeetingPrompt`：`Stop` 的提醒、設定開著時先 `MeetingEnd.Start()`，再交給島、通知或小視窗（同 §11.21 的分流）：
+  - 錄音島：`PromptState` 多 `Deadline`；訊息跟著島的 0.5 秒計時器換成「會議好像結束了，N 秒後自動停止錄音」，只改那個 `TextBlock` 的字、不重建（重建時按到一半的「繼續錄」會按不到，同即時逐字稿那一句）；期限後 2 秒才過期（倒數收起時 `Ended` 會先收）。「繼續錄」「停止並轉錄」都 `Cancel()`。
+  - 通知（島關掉）：內文「60 秒後自動停止錄音並轉錄」；通知按鈕的 `shiyin:` 網址 `continue`、`stop` 都 `Cancel()`。
+  - 小視窗 `MeetingPromptWindow`（島關掉、通知也關掉）：寫同一句、不倒數，30 秒後照舊收起（同 Mac 的浮動視窗）；兩個按鈕都 `Cancel()`。
+  - `Ended`：島上、小視窗開著的「會議好像結束了」收起來。
+  - 設定關掉時照舊只問、30 秒後收起來（R95.2）。
+- DEBUG：`--set meetingEndCountdownSeconds=8`（同 Mac 的 `-meetingEndCountdownSeconds`）；state 加 `meetingEndCountdown`（剩幾秒，沒在倒數是 -1；同 Mac 的 `meetingprompts` 的 `countdown`）、`island.promptText`（島上現在寫的字）。模擬：`record-sim` 錄音中 `meetingapp zoom.exe on`、過幾秒 `meetingapp zoom.exe off`（停 10 秒才算結束），`meetingaction continue|stop` 等於按島上的按鈕。
+
+### 11.29 去掉贅字的逐字稿（R96，M§70）
+
+- 資料：migration v11（`MigrationSql.V11`，SQL 同 Mac，標準答案 `db/schema.sql`）：`clean_lines`、觸發器 `clean_lines_text`。`AppDatabase.CleanLines`、`SaveCleanLines`（這場原本的整份換掉、段落已經不在的跳過）、`LastJob(id, kind)`（輔助工作也算）。Windows 的連線一直開著外鍵（`ForeignKeys = true`），重新轉錄（`SaveTranscript` 刪段落）、刪除一句的 `ON DELETE CASCADE` 會跟著刪；拆句、編輯、接受或還原校正、用詞修正改了 `text` 時觸發器刪掉那一句（只改 `seq` 的 UPDATE 不會觸發）。
+- 工作：`JobKind.Clean`（`clean`；輔助線、`UsesSummarizer`、`IsAuxiliary`：不發通知、不改會議的狀態、列表照舊是完成）。Core 的 `TranscriptCleanup`（提示詞中英日、粵語接 `transcriptNote.correction`、schema、`Format`、每次 120 句、`Validate`，同 Mac；字數用 `SwiftText.Count`（字形叢集）；標準答案 `prompts/<語言>/clean-system.txt`、`clean-prompt.txt`、`schemas/clean.json`、`formats.json` 的 clean、`util/validate-clean.json`）。`JobRunner.Clean`：沒選整理工具時失敗（「還沒設定整理工具，請到設定選擇 Claude、Codex 或 API」），每一句都存（改過的用改過的、中文會議用簡體時轉簡體；沒改的存原文；整句贅字存空字串）；失敗照一般的工作記原因。系統匣的工作寫「整理中：…」（同 Mac 選單列的 default）。
+- `AppController.GenerateCleanTranscript(id)`：擋法和訊息同「產生每個人的重點」（`ReadyForAction`、整理工具是「不整理」、還沒準備好），已經在排或在跑的不重複排；`CleaningProgress(id)`（在不在產生、進度）。`MeetingDetail.CleanLines`、`CleanFailure`（最後一次 clean 失敗的原因，可能是空字串）。
+- 畫面（`TranscriptTab`）：搜尋列在說話者篩選後面加平台的 `SelectorBar`「原文｜精簡」（同紀錄分頁的「條列｜心智圖｜人物」；無障礙名稱「逐字稿」、`ToolTip` 同 Mac 的 help；沒有逐字稿時停用；存在 settings.json 的 `transcriptView`）。
+  - 精簡、有精簡版：每一句顯示 `CleanLines[id] ?? 原文`，不標校正建議、不畫搜尋的底色（都對原文）；空字串的句子不列（說話者篩選照舊）。播放跟隨、點時間點、搜尋（找原文、捲到那一句）、用詞修正、右鍵的「拷貝」（原文，同 Mac）、匯出照舊用原文；列的無障礙名稱用畫面上的字。
+  - 精簡、還沒有精簡版：列表的 `Header` 放說明（次要文字、跟著文字大小，最寬 760）、上次失敗時「上次產生精簡版失敗：原因」（琥珀色、`L.Ui`、可以選取）、按鈕「產生精簡版」（失敗過是「再試一次」；`SymbolIcon(Symbol.Filter)`＋字，Mac 是 text.badge.minus；`ToolTip`「會用整理工具的額度；長的會議要幾分鐘」；這場在處理時停用；按鈕不跟文字大小，R59.2）。產生中是 `ProgressRing`＋「正在產生精簡版 N%」（排隊、第一批還沒回來是「正在產生精簡版…」）：主視窗每秒的 `DetailView.UpdateStatus` 呼叫 `TranscriptTab.UpdateClean`，樣子變了才重建那一塊；做完、失敗時 `JobRunner.Changed` 整份重讀。
+  - 編輯一句之後：主視窗本來就整份重讀，觸發器刪掉的那一句回到原文（M§70 的「只重讀幾句」是 Mac 才有的）。
+- DEBUG：`cleantranscript <會議 id>`（等於按「產生精簡版」）、`transcriptview original|clean`（同 Mac）；state 加 `transcriptView`、`cleanLines`（選取的會議有幾句精簡版，0 是還沒產生）、`cleanEmpty`（幾句是空字串）、`cleanFailure`、`cleaning`（產生中的進度；Mac 沒有）。
+
+### 11.30 會議列表的排序、分組、篩選（R97，M§71）
+
+- 規則放在 Services 的 `MeetingList`（同 Mac 的 `MeetingListOptions.swift`，單元測試 `OrganizeTests.MeetingListSortsGroupsAndFilters`）：`MeetingSort`（dateDesc、dateAsc、title、duration）、`MeetingGrouping`（none、month、folder；以前存的 series 讀成不分組，§11.32）存在 settings.json 的 `meetingSort`、`meetingGrouping`；`MeetingFilter`（needsReview、myActionItems、personId、templateId）只在 `MainState`（記憶體），換篩選時取消多選。標題照 `NaturalComparer`（Core，原本在 Services 的資料夾排序：數字照大小、不分大小寫、照目前的語系，同 Mac 的 `localizedStandardCompare`）；長度一樣的、沒有長度的照原本的順序（穩定排序）。月份的標題「2026年11月」「November 2026」（介面語言，簡體經過 `L.Ui`）。`AppDatabase.MeetingPeople()`（`speakers.person_id`）在 `MainState.LoadLists` 跟列表一起讀。
+- 列表（`MainWindow`）：側欄導覽下面原本的「所有會議」那一行換成標題列 `sectionHeader`（`Ui.Bar`）：左邊「所有會議」（或資料夾的名稱），分組時接「・依月份」，放不下時省略號；右邊「顯示方式」按鈕（平台的 `Button`＋`Flyout`，漏斗 `E71C`；無障礙名稱「顯示方式」、`ToolTip`「排序、分組、篩選會議」）。沒篩選時沒有框、灰色（`Ui.Borderless(…, Secondary)`），篩選中換成 `AccentButtonStyle`（實心青瓷綠、白色的圖示，同 Mac 的 fill、celadon）。人物模式沒有這個按鈕。標題列、篩選列、垃圾桶那一行在建構時就做好、不重建：換深淺色時（和啟動時 `Ui.SetTheme` 之後）重新給顏色（`MainWindow.restyle`）；灰色是 app 主題資源當時的那一份、青瓷綠看 `Ui.SetTheme`，不重給的話深色開 app 時漏斗是淺色的深綠、開著換成淺色時標題和 ✕ 是看不見的淺灰（2026-11-16 深色巡檢）。
+- 選單（`MenuFlyout`，打開時才建，`BottomEdgeAlignedRight`）：三段用 `MenuFlyoutSeparator` 和停用的標題項目隔開（同會議頁的「會議設定」，§11.22）：「排序方式」四個 `RadioMenuFlyoutItem`（`GroupName` sort）；「分組方式」`RadioMenuFlyoutItem`（看某個資料夾時沒有「依資料夾」，打勾的是實際用的）；「篩選」：`ToggleMenuFlyoutItem`「有待確認的」「有我的待辦的」（沒有「我」時不出現），`MenuFlyoutSubItem`「有誰參加 ▸」「範本 ▸」（裡面是「不限」、分隔線、人物（我的話「名字（我）」）或範本的 `RadioMenuFlyoutItem`）；篩選中最後「清除篩選」。
+- 篩選中：標題列下面一列 `filterBar`（漏斗、「篩選：有待確認、王小明 有參加」最多兩行、✕ 按鈕「清除篩選」）；篩選後沒有會議時再下面「沒有符合篩選的會議」和 `HyperlinkButton`「清除篩選」。跟 Mac 不同：都放在 `ListView` 外面（停用的 `ListViewItem` 裡的按鈕按不了，§11.23 的垃圾桶說明也是這樣）。
+- 分組：每組一段，標題是不能選的 `ListViewItem`（12、粗體、次要文字，同搜尋結果的會議標題），下面是那一組的會議。多選（§11.23）照舊，Shift 點選一次選一段時跨過標題。列表的樣子（`ListSignature`）加上分組、排序：換了才整個重建。
+- 垃圾桶：只能排序（R97.4）。Windows 沒有選單列（Mac 在選單列的「顯示方式」），垃圾桶上方「垃圾桶裡的會議 30 天後會永久刪除」那一行，「清空垃圾桶…」左邊多一個同樣的「顯示方式」按鈕，選單只有「排序方式」那一段（`ToolTip`「排序方式」）。
+- DEBUG：`listsort <dateDesc|dateAsc|title|duration>`、`listgroup <none|month|folder>`、`listfilter <review|mine|person <id>|template <id>|clear>`（同 Mac，review、mine 是切換）、`reload`（直接改資料庫之後重讀）；state 加 `list`（`sort`、`group`、`filter`、`filterSummary`、`myName`、`ids`、`groups`，同 Mac）。
+
+### 11.31 資料夾自動歸類（R98，M§72）
+
+- 資料：migration v12（`MigrationSql.V12`，跟 §11.32 一起，SQL 同 Mac，標準答案 `db/schema.sql`、`db/*.json` 的 `folder_decided`、`series_id`）。`meetings` 整列寫入多了 `folder_decided`（`MeetingColumns`；`series_id` v14 起不寫，§11.32）。`folder_rules` 的 `keywords`、`people` 是 JSON 陣列，寫法同 GRDB 的 `JSONEncoder`（緊湊、斜線跳脫 `\/`），讀的時候兩種都收。`AppDatabase.FolderRules.cs`（原本叫 `AppDatabase.Series.cs`）：`FolderRules`、`SaveFolderRule`（`ON CONFLICT(folder) DO UPDATE`，條件都空時刪掉）、`MeetingsMatching`、`SetFolderDecided`、`AutoFile`（符合好幾個時照 `NaturalComparer` 排第一的）；`SetFolder` 一起設 `folder_decided = 1`；`RenameFolder` 時條件跟著改名，刪除資料夾（或新名稱已經有條件）時條件一起刪（同 Mac）。
+- 規則在 Core 的 `Model/FolderRules.cs`（同 Mac 的 `Store/FolderRules.swift`）：`FolderRule.Matches`（標題包含任一個詞用 `OrdinalIgnoreCase`）、`FolderSuggester.Best`（資料夾的順序由呼叫的人給：`NaturalComparer`）；標準答案 `util/folder-rule-match.json`、`util/folder-suggest.json`。共同的詞（`MeetingSimilarity.CommonWord`，標準答案 `util/common-word.json`）照 Swift 的 Character 算字數（`SwiftText.Characters`），頭尾去掉的字元用 `Rune` 的空白、標點、符號，字母是 L、M 類（同 `CharacterSet.letters`）；完整單字的檢查（`IsWholeWord`）只看 ASCII 的字母、數字。
+- 側欄：有條件的資料夾一直列著（沒有會議時 0，`Organizing.Folders`），圖示是資料夾的 `SymbolIcon` 右下角疊一個小的青瓷綠齒輪（`E713` 11 號，放在側欄底色的 13×13 小圓上，不跟資料夾的線疊在一起；Mac 是 folder.badge.gearshape，Segoe Fluent 沒有現成的），`ToolTip` 是條件（`Organizing.RuleSummary`：「自動加入：標題包含 週會、sync；陳家豪、王小明 都參加；範本：一對一」）。資料夾的右鍵：「自動加入的條件…」（有條件時「編輯自動加入的條件…」）、分隔線、重新命名…、刪除資料夾。「移到資料夾」的選單（右鍵、多選）也列出只有條件的空資料夾（同 Mac 的 `folders`）。
+- 條件的編輯（`Dialogs.FolderRule`，`ContentDialog`，同 Mac 的 `FolderRuleSheet`）：標題「「X」自動加入的條件」；說明；`TextBox`「標題包含」（提示字「例如：週會、sync（任一個詞）」，用 `GlossaryInput.Split` 分）；「這些人都參加」：人物的 `CheckBox`（我的話「名字（我）」，`ScrollViewer` 最高 160）；`ComboBox`「用這個範本」（不限＋…）；`CheckBox`「現在不在資料夾裡的會議也套用（N 場）」：每改一個條件就重算 N（`MeetingsMatching`），0 場時停用。按鈕：主要「儲存」（條件都空時等於移除）、次要「移除條件」（已經有條件時；Mac 的 destructive 按鈕在左邊，`ContentDialog` 的次要按鈕在中間）、關閉「取消」。套用的會議設 `folder_decided = 1`，提示「已把 N 場會議放進「X」」。
+- 自動放：`JobRunner.Transcribe` 在聲紋比對之後 `AutoFile`，`Summarize` 存好正式的紀錄後再 `AutoFile` 一次（草稿、只補每個人的重點不放）；放了就發 `JobRunner.Organized(會議, 資料夾)`，`AppController.Organized` 提示「「標題」已放進「資料夾」」（主視窗下方的提示，同 Mac 的 noticeMessage）。
+- 建議（R98.3）：`Organizing.Suggestion`（不在資料夾、沒決定過、有紀錄、不在錄音中、不在垃圾桶），紀錄分頁頂端、待確認條的上面（文件有變動的提示下面）一條：資料夾加號的圖示（`E8F4`）、「這場很像「客戶」裡的會議：陳家豪、Bob 都參加（2 場）」（最多兩行）、「不用」「放進去」（強調色）；底色是淡淡的青瓷綠（淺色 8%、深色 14%，同 Mac 的 celadon 0.08）；提示列不跟著文字大小（R59.2）。
+- DEBUG：`folderrule <資料夾> <JSON|JSON 檔的路徑|-> [apply]`（同 Mac；從 SSH 傳中文不方便時給檔案路徑，同 §11.25 的 `editnotes`）、`editfolderrule <資料夾>`（打開條件的編輯）、`autofile <會議 id>`（回傳 `folder`）、`foldersuggest <會議 id>`（Mac 寫到檔案，Windows 直接回傳 `folder`、`count`、`reason`、`text`）、`foldersuggestion accept|dismiss <會議 id>`；state 的 `folderRules`、`folderRuleDialog`（編輯開著時是哪個資料夾；Mac 沒有）。
+
+### 11.32 定期會議（R99，M§73；2026-11-17 拿掉，D177）
+
+- 使用者：「不需要定期會議這概念了」「做成一般資料夾概念即可」。同 Mac（df5ef9a）整個拿掉，原本的做法在 git 歷史（`git show f133362:docs/design-windows.md` 的 §11.32）。同一群人固定開的會用資料夾放，要自動放進去用資料夾的自動加入條件（§11.31：標題、人物、範本）。
+- 拿掉的：Core 的 `MeetingSeries`、`MeetingTime`、`SeriesCandidate`、`SeriesDetector`（找可能的定期會議、自動加入的判斷、名稱和頻率的文字）、`PreviousMeeting`、`SeriesTasks`；`MeetingNotes.FollowUps`（`FollowUp`、`FollowUpStatus`）、`NotesContext.Previous`、`NotesPrompt.PreviousBlock`、匯出的「上次的待辦」；`FolderRule.SeriesId`、`Meeting.SeriesId`；Data 的 `Series`、`CreateSeries`、`RenameSeries`、`DeleteSeries`、`SetSeries`、`SeriesMeetings`、`PreviousSeriesMeeting`、`AutoJoinSeries`、`RejectSeries`、`SeriesOpenItems`；Services 的 `MeetingGrouping.Series`（以前存的 `series` 讀成不分組）、`Organizing.SeriesInputs`／`CommonSeries`／`Regulars`／`JoinSuggestion`、`SeriesJoinSuggestion`、`RenameTarget.Series`、`SidebarCollapse.SeriesKey`、`AppController` 的定期會議動作、轉錄完的自動加入、整理時接上一場；App 的側欄「發現 N 組可能的定期會議」和定期會議的列（↻ 標記）、確認彈窗（`Dialogs.SeriesSuggestions`）、系列頁（`Views/SeriesPage`；裡面的 `FlowPanel` 會議頁的資訊列還在用，搬到 `Ui/Ui.cs`）、資訊列的「↻ 名稱」、紀錄分頁的建議加入和「上次的待辦」、右鍵的「加到定期會議 ▸」「移出「X」」、資料夾條件的「屬於定期會議」、拖到定期會議、使用說明那兩條；DEBUG 的 `seriesnew`、`seriesdeleteui`、`seriessuggest`、`seriessuggestion`、`seriescandidates`、`seriescreate`、`seriesreject`、`seriesjoin`、`seriesfilter`、`seriesrename`、`seriesdelete`、`autojoin`、`seriessheet`、`seriesopenitems`、`previousmeeting`，state 的 `series`、`seriesCandidates`、`seriesFilter`、`seriesDialog`、`confirmDeleteSeries`、`folderRules` 的 `seriesId`。
+- 留著的（資料夾的建議 §11.31 用）：`MeetingSimilarity`（同 Mac 改名：`SamePeople`、`Core`、`CommonWord` 和它用的 `IsWholeWord`、`WithoutNumbers`、`Clean`、`IsSignificant`）；Core 的 `Series.cs` 改名 `FolderRules.cs`，Data 的 `AppDatabase.Series.cs` 改名 `AppDatabase.FolderRules.cs`（條件、自動放、`MeetingPeople`）。
+- migration v14（同 Mac 的 v14）：`RunMigration` 先把每個 `series`（`ORDER BY id`，名稱頭尾的空白去掉，空的跳過）換成同名資料夾：`INSERT OR IGNORE INTO folders`（已經有就合在一起）、`series_id` 是它而 `folder` 是空的會議設成這個名字、`folder_decided = 1`（已經在別的資料夾的不動）；再跑 `MigrationSql.V14`：`folder_rules.series_id` 都設 null、`keywords`、`people` 都是 `'[]'` 且 `template_id` 是 null 的刪掉、`meetings.series_id` 都設 null、清空 `series` 和 `series_rejected`。表、欄位留著不用（拿掉有外鍵的欄位要重建整張 `meetings`，不值得）；會議整列寫入（`MeetingColumns`）不再寫 `series_id`、存條件時一律寫 null。換掉的名稱記在 `AppDatabase.MigratedSeries`（id → 名稱，只有跑 v14 的那一次有），`AppHost` 開資料庫後交給 `SidebarCollapse.ReplaceSeriesKeys`：settings.json 的 `sidebarExpanded`、`sidebarOrder` 裡的 `series:<id>` 換成 `folder:<名稱>`，換完跟原本的重複時留前面的、找不到的拿掉（展開的照 Ordinal 排序存，排序的照原本的順序；同 Mac 的 `AppDatabase.replaceSeriesKeys`，Mac 在 migration 裡直接改 UserDefaults，Windows 的 Data 碰不到設定所以交給 Services）。
+- 會議紀錄的 `followUps`：以前存的照樣留在資料庫的 JSON 裡，解碼時略過、`ToJson` 不寫，重新整理或編輯存回去時就沒了；整理工具還回 `followUps` 也不存。`JsonSchema`、提示詞、匯出跟 4.8.1 一樣（加上 people）。
+- 標準答案（Mac 重跑）：拿掉 `util/series-*`、`meeting-time`、`followups-validate`、`export/*/notes-followups.*`、`prompts/*/summarize-followups.txt`；`series-common-word` 改名 `util/common-word.json`；`folder-rule-match` 沒有 `seriesId`（6 個）；`schemas/notes.json` 沒有 `followUps`；`llm/mac-requests.jsonl` 重錄。
+- 測試：`OrganizeTests.CommonWordMatchesMac`、`FolderRulesAndSuggestionsMatchMac`、`MigrationV14TurnsSeriesIntoFolders`（暫存的資料庫退回 v13 塞定期會議、拒絕的組、條件，重開後換成資料夾、條件、series 清空、`MigratedSeries`，再開一次是空的；settings.json 的鍵換掉）、`OldFollowUpsAreDropped`；`ServicesTests.SummarizeFilesIntoFolderWithoutFollowUps`（提示詞沒有上一場、整理工具回的 followUps 不存、整理完照條件放進資料夾發 `Organized`）；側欄、拖曳、重新命名、列表的測試拿掉定期會議的部分。
+- 驗證：虛擬機用舊版建的有定期會議的資料（或 SQL 塞一筆 series）開新版：側欄是同名資料夾、會議在裡面（已經在別的資料夾的不動），展開、順序照舊；右鍵、顯示方式的分組、資料夾條件都沒有定期會議。
+
+### 11.33 每一種東西都能直接改、刪（R100，M§74）
+
+- 三條路、同一份選單（同 M§74）：右鍵（`ContextFlyout`）、列右邊的「⋯」、頁面的「更多」都呼叫同一個填選單的函式，打開時才建（人、資料夾可能改了）：側欄的會議 `FillRowMenu`（一場時第一項「重新命名…」＋分隔線，再來移到資料夾、移到垃圾桶；垃圾桶裡還原、永久刪除…）、資料夾 `FillFolderMenu`（自動加入的條件…、重新命名…、分隔線、刪除資料夾…；R101 起重新命名在條件前面，§11.34；R101 加過的最上面「只看這個資料夾」fa12d60 拿掉）、人物 `PersonPage.MenuItems`（重新命名…、合併到 ▸、分隔線、移除這個人…）、人物頁的會議列（打開這場會議）。
+- 「⋯」（`Ui/RowMore`，同 Mac 的 `RowMenuButton`）：`Ui.Borderless` 的按鈕、`E712`（More）、次要文字的顏色，`ToolTip` 和無障礙名稱「更多動作」；`Flyout` 是同一份選單。滑鼠進出那一列（`PointerEntered`／`PointerExited`）、那一列選到（`SelectorItem.IsSelectedProperty` 的變化）或選單開著時顯示，沒顯示時透明、不能按、不能 Tab（照樣佔位，列的寬度不跳）。資料夾的「⋯」跟數量疊在同一格，顯示時數量透明（同 Mac 的 `FolderRow`）。會議列、人物列放在最右邊一欄；人物頁的會議列放在列右邊的內距裡；紀錄的條目接在時間點、待確認的標記後面（同 `Ui.Inline` 的 trailing，短的時候緊接在文字後面）。
+- 鍵盤（側欄）：照選到、亮起來的東西（`MainWindow.SidebarRename`、`SidebarDelete`，同 Mac 的 `sidebarReturn`、`sidebarDelete`）。重新命名是 Enter 或 F2（Windows 的慣例，檔案總管、Outlook 的資料夾都是 F2；Mac 是 Return）。會議列表（`list.KeyDown`）：人物模式選到人 → 重新命名／移除；選到一場會議（不是多選）→ 重新命名（R102 起都是重新命名的對話框，§11.35）；多選時 Delete 一起移到垃圾桶；沒選會議而在看資料夾 → 重新命名或刪除它；垃圾桶裡 Delete 是永久刪除。側欄上面的資料夾那幾列有焦點時照那一列，不是右邊選的會議（Windows 的側欄是兩個清單，Mac 是一個）；R101 起那幾列點了是在原地展開（§11.34），按鍵在那一列自己處理：F2 重新命名、Delete 刪除，Enter 是展開收起。Ctrl＋Delete 照舊是整個視窗的移到垃圾桶。
+- 會議的重新命名（`RenameMeetingUi`）：原本是選那場、打開「編輯」的 `ContentDialog`（標題、日期、與會者）；R102 起是重新命名的對話框（§11.35）。
+- 刪除資料夾的確認改到主視窗（`ConfirmDeleteFolder`，`Dialogs.Confirm`；R106 起是 §11.39 的確認，紅底、Enter 是確認）：「刪除資料夾「X」？」說明「裡面的 N 場會議會留著，移到「不在資料夾」。自動加入的條件也會刪掉。」（沒有會議時只有後半句）、按鈕「刪除資料夾」。原本資料夾右鍵的「刪除…（會議會保留）」直接刪，改成先確認（同 Mac）。正在看那個資料夾時刪掉後回到所有會議。
+- 人物頁：名字旁的鉛筆 `ToolTip` 改「重新命名」；摘要下面一排 `Ui.Borderless`：「合併到」（`DropDownButton`，`Symbol.People`，沒有別人時不放，`ToolTip`「同一個人被記成兩個名字時，合併成一個」）、「移除這個人…」（`Symbol.Delete`、`Ui.Danger` 的紅字）。右上角的「更多」照舊。
+- 按鈕吃掉右鍵的問題（Mac a8a59e8）：WinUI 的右鍵選單是 `ContextFlyout`，掛在按鈕本身就出得來；人物頁的會議列、說話者的名字都掛在按鈕上，側欄的資料夾列是 `ListViewItem`（不是按鈕），掛在整列。
+- 會議頁上方的說話者：沒有自動帶入的名字改成 `HyperlinkButton`（頭像＋名字），點了打開重新命名的 `Flyout`（名字選好、Enter 儲存，`RenameSpeaker`），`ToolTip`「重新命名「X」，整場的逐字稿和會議紀錄都會跟著改」；右鍵：重新命名…、合併到 ▸（其他說話者，`MergeSpeaker`）。自動帶入的名字點了照舊是「是別人／不是他」的選單，右鍵同上。
+- 紀錄的條目（條列的摘要、決議、待辦的事項、未決問題、議題的要點、自訂段落；人物的重點）：不開文字選取（同 Mac a8a59e8：`IsTextSelectionEnabled` 開著時，字上的右鍵是系統的文字選單、按兩下只選到一個詞，自己的選單和就地改都出不來），要拷貝用右鍵的「拷貝」；整行（含行尾空白）都收得到右鍵、按兩下：列的 `Panel` 背景設成透明（沒有背景的 `Panel` 空白處點不到），待辦的事項外面再包一層撐滿那一欄的 `Grid`。問答照舊可以選取。按兩下就地改（`AddHandler(DoubleTappedEvent, …, handledEventsToo: true)`）；改的時候是 `TextBox`（Enter 儲存、Esc 取消、「取消」「儲存」，下面小字「Enter 儲存、Esc 取消」，Mac 寫 Return）。右鍵：拷貝、從這裡播放（有時間點、有錄音時）、分隔線、編輯這一條、刪除這一條（沒辦法改時停用：垃圾桶裡、錄這場、正在處理、開著編輯器）。存檔走 `AppController.EditNoteItem`／`DeleteNoteItem`（Core 的 `NoteItemEdits.TextAt`、`WithText`、`Removing`，同 Mac 的 `text(at:)`、`setText`、`remove`；`SaveEditedNotes` 留一個版本）。刪除不確認，提示「已刪除一條紀錄，可以按紀錄分頁「編輯」旁的「復原上一版」還原」（Windows 才有的句子：Windows 沒有選單列，復原在「編輯」旁邊）。主視窗每次資料改了都整頁重畫，正在改的那一條記在 `NotesTabs`（換一場會議不算）。
+- 重點標記（逐字稿「我的筆記」那一列的「重點標記 N」）：每個標記一個子選單：跳到這裡、重新命名…（R102 起是重新命名的對話框，說明「mm:ss 的標記」，§11.35）、分隔線、刪除。`AppDatabase.RenameBookmark`。
+- 按 Enter 存檔、輸入框被拿掉時，焦點落到視窗的第一個元件（錄音按鈕）；`SplitButton` 放開 Enter、空白鍵就執行（不管在哪裡按下），放開的 Enter 就開始錄音（2026-11-16 虛擬機上就地改紀錄時發生）。錄音、匯出這兩個 `SplitButton` 用 `Ui.IgnoreStrayKeyUp`：`PreviewKeyDown` 記下按下的鍵，放開的 Enter、空白鍵沒有在這個按鈕上按下過就標成處理過。逐字稿的就地改等原本按 Enter 存檔的地方也一起受惠。
+- 設定：詞彙每一列加鉛筆（「修改「X」」）、按兩下詞改字（兩下點擊各切換一次勾選，剛好切回原本的；`CheckBox` 自己處理指標、不發 `DoubleTapped`，掛在字上或 `handledEventsToo` 都收不到，改成用 `PointerPressed`／`PointerReleased`（`handledEventsToo`）看兩次按下的間隔 ≤ 500 毫秒，第二次放開後才進入修改）、整列（背景透明）右鍵重新命名…、刪除；改的時候是 `TextBox`（Enter 儲存、Esc 取消）。`AppDatabase.RenameTerm`（同 Mac：改成已經有的詞時合併、刪掉這一個）。範本列表右鍵：複製、設為預設範本（已經是預設時停用）、刪除（自訂的才有）。名字放在撐滿的那一欄、太長時省略號（英文「General meeting (copy)」會把「Default」擠出列表）；複製內建範本（右鍵和下面的按鈕）用畫面上的內容，簡體介面複製出簡體（同 Mac「複製」按鈕的 draft；Mac 的右鍵「複製」直接拿繁體的定義，2026-11-16 回報）。認識的人：「改名」改叫「重新命名」，垃圾桶的 `ToolTip`「移除「X」（會議裡的名字留著）」、移除前確認（用詞同人物頁，預設按鈕是取消）、右鍵重新命名…、移除這個人…。
+- 使用說明（`OtherWindows` 的「找會議、播放」）加兩條（原本三條，定期會議那一條 D177 拿掉）：顯示方式和自動加入的條件、直接改刪（Windows 寫「漏斗按鈕」「Enter 或 F2」「按兩下」「紀錄分頁「編輯」旁的「復原上一版」」）；人物那一條改成同 Mac 的新說法。
+- 介面文字：Mac 的鍵在 c2e2be0 才加，這個分支從那之前開的，英文照 Mac 的寫進 `Windows.xcstrings`（合併後兩邊相同）；Windows 才有的：「Enter 儲存、Esc 取消」、「已刪除一條紀錄，…「復原上一版」還原」和使用說明的四條。
+- DEBUG（同 Mac 的名稱）：`renamemeetingui <id>`、`folderdeleteui <名稱>`（打開確認）、`sidebarkey return|delete`（等於在會議列表按 Enter、Delete，回傳 `handled`）、`noteitem editui|edit|delete|cancel <section> <i> [<j>] [文字]`、`bookmarkrename <id> <名稱>`、`bookmarkrenameui <id>`、`termrename <id> <詞>`；state 加 `confirmDeleteFolder`、`editingNoteItem`、`bookmarks`（選取中的會議的標記；Mac 沒有）。
+- 測試：`AppTests.EditAndDeleteThingsInPlace`（就地改：待辦只改事項、時間點不變、留版本、空的和沒改的不存；刪除一條的提示、復原上一版拿回來；標記重新命名；詞改字、改成已經有的詞時合併）。
+
+### 11.34 側欄的段落、資料夾可以收合，側欄和選單的樣子，下面只放其他會議（R101，M§75、D175）
+
+- 狀態：Services 的 `SidebarCollapse`（同 Mac 的 `Store/SidebarCollapse.swift`）讀寫 settings.json 的 `sidebarCollapsed`（收起來的段落：`folders`、`meetings`、`people`、`group:<分組 id>`，分組 id 同 Mac 的 `month-2026-11`、`folder-客戶`）和 `sidebarExpanded`（在原地展開的列：`folder:<名稱>`；以前的 `series:<id>` 在 migration v14 換成同名資料夾的鍵，§11.32），字串陣列、照 Ordinal 排序，值真的變了才寫。資料夾改名、刪除資料夾時由 `AppController.RenameFolder`／`DeleteFolder` 跟著改鍵（Mac 在 AppModel；Windows 的這幾個動作都在 AppController，對話框、確認、控制通道都走這裡）。主視窗聽 `Settings.Changed` 的這兩個鍵重畫（控制通道改的也一樣）。
+- 用了哪些元件：Windows 的側欄是兩個 `ListView`（上面的導覽 `scopes`：所有會議、人物、資料夾那一段；下面的會議列表 `list`），中間是標題列（§11.30）。**不用 `TreeView`、`Expander`**：TreeView 的子節點是可以選的節點，選到展開的那場就把目前的範圍（所有會議／資料夾）的選取換掉，跟「下面的列表不換」衝突；Expander 不能放進 ListView 的一列，上下鍵也不能從一段走到下一段。所以照 Mac 自己畫，放在原本的清單裡。ListViewItem 本來就有滑過時一塊圓角的淡底、跟選取那一塊一樣大（R101.4 要的樣子，Mac 要自己畫 `sidebarHover`），不用另外做。
+- `Ui/SidebarItem`（`ListViewItem` 的子類別）：段落標題、資料夾的列、展開的會議、「顯示全部 N 場」、分組的標題都是這個。上下鍵走得到、滑過有底色，但點了不會變成選取：左鍵、觸控按下時不交給 ListViewItem（`OnPointerPressed`／`OnPointerReleased` 自己處理、自己拿焦點，從列裡的按鈕來的、右鍵照舊）——交給它的話會先選到這一列，清單把選取還原時焦點跳回選到的那一列、整個清單捲走（2026-11-16 虛擬機：點下面的資料夾展開的會議，上面捲回最上面）；上下鍵選到時清單馬上把選取還原（`scopes`；`list` 是 Extended，拿掉被選到的標題，只選到標題時還原原本選的會議，Shift 點選跨過標題時照舊選那一段）。動作只在點一下（`Tapped`，`handledEventsToo`；從「⋯」來的不算）、Enter／空白鍵（`PreviewKeyDown`，焦點在這一列本身時）、UI Automation 的 Invoke 時做：自己的 AutomationPeer（`ListViewItemAutomationPeer` 加 `IInvokeProvider`，可以收合的多 `IExpandCollapseProvider`；ListView 的項目 peer 把不認得的 pattern 交給容器的 peer，虛擬機上 `uia.sh click` 用 Invoke 按得到）。原本停用的標題項目（資料夾、分組的每一組）換成這個：停用的項目不能點、不能有焦點。
+- 段落標題（資料夾、分組的每一組）：標題（14 號、不加粗、次要文字的顏色：跟列一樣大的灰字）後面一個小箭頭（Segoe Fluent 的 `E70D` 展開／`E76C` 收起，10 號，第三層文字的顏色），收起來時一直顯示，展開時只在滑過、有鍵盤焦點時出現（opacity，位置留著；R101.1）；滑過去沒有底色（`ListViewItemBackgroundPointerOver`／`Pressed` 換成透明；對比主題時照平台，不然反白的字落在透明的底上看不見）。點標題、Enter、空白鍵切換；收起時那一段只剩標題。無障礙名稱是標題，`ItemStatus`「已展開」「已收起」，`HeadingLevel` 2，`ToolTip`「收起這一段」「展開這一段」。
+- 會議列表的標題列（`sectionHeader`）：左邊的名稱換成沒有框的按鈕（`Ui.Borderless`、次要文字，滑過去沒有底色、只出現箭頭，對比主題時照平台的按鈕）：名稱、後面同樣的箭頭（`Ui.Inline`：短的時候箭頭緊接在字後面，長的時候名稱省略號、箭頭留著），點了切換 `meetings`（人物模式是「人物」、`people`）；右邊的「顯示方式」不動。Windows 的兩個是分開的按鈕，沒有 Mac 段落標題併成一個元件、選單打不開的問題（M§75），所以標題是一般的按鈕（名稱是標題、`ItemStatus`）。收起時篩選列、篩選後空的提示、列表（人物模式是人物列表）都不顯示；垃圾桶、搜尋結果不收合。
+- 「資料夾」一段（R101.3）：資料夾（照拖曳排的順序，§11.36）；R104 起一直顯示，標題右邊「+」（§11.37）。
+- 資料夾的列（`FolderRow`，R101.2）：點整列（Enter、空白鍵、UI Automation 的 Invoke）是在原地展開、收起，不換下面的列表；沒有箭頭，圖示就是狀態：收起時關著的資料夾（Segoe Fluent 的 Folder `E8B7`）、展開時打開的資料夾（FolderOpen `E838`），20 號（跟所有會議、人物的 `SymbolIcon` 同寬，圖示照舊對齊）。有自動加入條件的資料夾右下角一個小齒輪（`E713` 11 號，M§72），標記放在側欄底色的 13×13 小圓上、青瓷綠（墊底色，資料夾的線不會穿過標記；Mac 是挖空。已知：滑過、選到時列的底色跟小圓的底色不一樣，看得出一個小圓），關著、打開兩種圖示都有。無障礙：名稱「客戶」，`ItemStatus`「已展開、8 場」（右邊不放場數，§11.34 的單色），ExpandCollapse。只看某個資料夾（「顯示全部」）時那一列照舊是選到的樣子：`SyncScopeSelection` 照 `FolderFilter` 選它（程式選的不還原）。鍵盤：F2 重新命名、Delete 刪除（先確認，R100）、→ 展開、← 收起（TreeView 的習慣）；Enter 是展開收起（這一列是按鈕；原本 §11.33 的 Enter 重新命名改成只有 F2）。資料夾的選單沒有「只看這個資料夾」（fa12d60 拿掉，使用者：「不用只看這個」），只看一個資料夾從展開後的「顯示全部」。
+- 展開的內容：那個資料夾最近 5 場（`SidebarCollapse.PeekRows`：記憶體裡的會議列表，資料庫照 `meeting_date DESC, id DESC` 讀出來，不含垃圾桶），每場一列：前面留圖示的空位（名稱跟資料夾名稱對齊）、標題 13 號一行（太長省略號），`ToolTip` 是「日期・標題」，無障礙名稱是標題。點了 `MainState.OpenFromSidebar`：人物模式換回會議、選那場，下面的列表不換；人物模式換回會議時上面的選取換成「所有會議」，清單會把焦點帶過去，所以焦點留回這一列（接著按 Enter 才是重新命名這場）。選到的那場：一塊灰底、字照常（85e6998 起，同下面列表選到的樣子；原本青瓷綠粗體）——不能用平台的選取：上面清單的選取是目前的範圍，同一場也在下面的列表，兩邊都亮起來會像多選（同 Mac 的理由），所以用 `SidebarItem.Backplate` 自己畫（下面「單色」）。對比主題時字不自己給顏色（跟著列的前景色：滑過去是反白的底，反白顏色的字會看不見），改成粗體加一圈反白顏色的細框（同逐字稿目前的段落，§11.3）。選到的那場換了只改字的樣子、不重建（`SyncScopeSelection`）。右鍵、「⋯」同會議列表（`FillRowMenu`，只這一場、不管多選，同 Mac 的 `MeetingMenuItems(ids: [id])`）。鍵盤：焦點在展開的會議時 Enter／F2：選到的那場重新命名（同會議列表），還沒選到的打開它；Delete：選到的那場移到垃圾桶（先確認），還沒選到的不處理。超過 5 場時最後一列「顯示全部 N 場」（次要文字）：下面的列表只看這個資料夾（`ShowMeetings`）。沒有會議時（空的資料夾：有自動加入條件的、新增的，§11.37）一列次要文字的「沒有會議」（停用的項目，不能選、不能有焦點）。
+- 下面的列表（R101.6，`SidebarCollapse.ShowsOthersOnly`、`MainState.ListShowsOthersOnly`）：不在垃圾桶、沒看某個資料夾、沒篩選、不是依資料夾分組（存的分組方式），而且至少有一場會議在資料夾裡時，`FilteredMeetings` 只留不在資料夾的會議，標題「其他會議」；空的時候一行次要文字的「不在資料夾裡的會議會列在這裡」（停用的項目）。其他情況照舊（標題「所有會議」或資料夾的名稱）。`SelectedMeetings`、多選、Ctrl+Delete 都照 `FilteredMeetings`：從展開的會議打開資料夾裡的一場時它不在下面的列表，鍵盤由那一列自己處理（上一條）。
+- 選單（R101.4）：側欄和物件的選單（會議 `FillRowMenu`、移到資料夾、資料夾、人物、人物頁裡的會議、紀錄的條目、重點標記、設定的詞彙和認識的人）每一項有圖示（`MenuFlyoutItem.Icon`，跟字同色）：重新命名 `Symbol.Edit`、移到資料夾 `Folder`、移出 `Remove`、新資料夾 `NewFolder`、自動加入的條件 `Setting`、打開（打開這場會議）Segoe Fluent 的 OpenInNewWindow `E8A7`、還原 `Undo`、拷貝 `Copy`、從這裡播放 `Play`、合併到 `People`、刪除 `Delete`、移除這個人 BlockContact `E8F8`；資料夾名稱、人名這些選項不放圖示。刪除、移除這類（移到垃圾桶、永久刪除、刪除資料夾、移除這個人、刪除這一條、刪除這句、重點標記和詞彙和範本的刪除、清除問答紀錄）用 `Ui.DangerItem`：紅字紅圖示（`Ui.Danger`，`MenuFlyoutItemForeground`／`PointerOver`／`Pressed` 一起換，滑過去也是紅的）；本來沒有圖示的選單（提問的「⋯」）只有紅字。對比主題時不上紅色，照平台的顏色（§11.3：滑過去是反白的底）。「⋯」本來就是沒有圈的三個點（`E712`）。
+- 收合、展開會重建清單（樣子的比對加上收合的狀態、展開的會議的標題、「其他會議」）；重建前記下兩個清單捲到哪裡，排好版後捲回來（不然展開下面的資料夾時那一列被捲走）；用鍵盤收合時焦點回到同一列（每一列的 `AutomationId`：`section:folders`、`scope:folder:客戶`、`peek:folder:客戶:42`、`group:month-2026-11`…，清單重建後找回來 `Focus`）。
+- 上面的導覽（`scopes`）最高是側欄的 60%，超過時自己捲動：原本放在 Auto 高度的列、不能捲，資料夾多或展開了好幾個時會把下面的會議列表擠掉、超出的部分被切掉。
+- 程式帶你去某場會議（`MainState.Reveal`：錄音開始、會議連結、通知、問所有會議的出處、控制通道的 `select`；搜尋結果點進去）時 `ExpandToShow`：在下面的列表就展開 `meetings` 和那一組；在資料夾裡（下面的列表沒有）就展開 `folders` 和那個資料夾（同 Mac）。
+- 顏色照 §11.3：標題、箭頭、資料夾圖示是文字的顏色（對比主題時 `FollowForeground` 清掉，跟著列的前景色）；小標記的圓底是側欄的底色（對比主題時是視窗底色，`FollowForeground` 跳過有底色的一小塊）。
+- 單色（85e6998，R101.4 使用者：「你可以學一下嗎？他這美觀多了」，同 M§75「單色」）：`Ui/SidebarLook`。
+  - 圖示跟字同色：資料夾的小標記（齒輪）不再是青瓷綠，跟著列的字。
+  - 選到的列一塊灰色圓角底、字照常，滑過一塊更淡的灰：`SidebarLook.Row` 在建列時（範本套上之前）覆寫這一列的資源：`ListViewItemBackgroundPointerOver`／`Pressed` 是字色 6%，`ListViewItemBackgroundSelected`／`SelectedPointerOver`／`SelectedPressed` 是 11%，`ListViewItemSelectionIndicator*Brush` 透明（拿掉左邊那條強調色的線），`CornerRadius` 8（同 Mac 的 `sidebarHover(selected:)`）。用在所有會議、人物、資料夾、展開的會議、「顯示全部」、下面的會議、人物、搜尋結果。「所有會議」選到也不畫（`showSelected: false`；人物模式時「人物」亮）。
+  - 不在清單選取裡的列要自己畫底（展開的會議選到時的灰底、拖東西進來時的青瓷綠，§11.36）：`SidebarItem.Backplate(brush)`。平常的狀態畫的是 `ListViewItem.Background`，滑過、選到的狀態是 `ListViewItemPresenter` 的 `PointerOverBackground`、`SelectedBackground`、`SelectedPointerOverBackground`，兩邊都要換，換完切一次視覺狀態（`GoToState` 到另一個再回來）才會重畫。踩到的（2026-11-17 虛擬機）：只改 presenter 的 `Background` 畫面沒變；只改 `ListViewItem.Background` 的話滑過時（拖曳經過也算滑過）被滑過的灰蓋掉；`ClearValue` 拿掉之後畫面停在原本的顏色，要切一次狀態。範本套上之後才有 presenter，`Loaded` 時套一次、再排一個低優先順序的再套一次。
+  - 右邊不放場數，滑過或選到時「⋯」；無障礙的值（`ItemStatus`）唸得到：資料夾「已展開、4 場」，所有會議「47 場」，人物「2 人」。
+  - 段落標題、會議列表的標題（「其他會議」）14 號灰字、不加粗（上面「段落標題」）。
+  - 段落標題右邊的小按鈕（7fb4224，使用者：「你可不可以學一下他的＋，目前的有夠醜」）：`SidebarLook.HeaderIcon`：細線的圖示 15 號（Segoe Fluent 的字形只有一種粗細）、次要文字的顏色、26×24 的點擊範圍、圓角 6，滑過變成文字的顏色加字色 8% 的底，右邊留 6 跟列的「⋯」對齊。「資料夾」的「+」（`E710`）和會議列表、垃圾桶的「顯示方式」都用它；「顯示方式」從有圈的漏斗（`E71C`）改成 Equalizer（`E9E9`，橫的三條滑桿，同 Mac 的 `slider.horizontal.3`），篩選中是強調色的字（原本是實心的強調色按鈕）。
+  - 對比主題照平台的系統色（不覆寫；「所有會議」選到時底透明、字是文字的顏色），小按鈕照 `Ui.Borderless`。
+- 使用說明（「找會議、播放」）三條同 Mac 的新說法（資料夾點一下展開、展開後點「顯示全部」只看這個資料夾（fa12d60 起，原本是右鍵的「只看這個資料夾」）、其他會議；「側欄太長時可以收起來」），整理那一條 Windows 照舊寫「漏斗按鈕」、沒有選單列。
+- DEBUG（同 Mac）：`sidebarsection <folders|meetings|people|group:…> on|off`（on 是展開）、`sidebarexpand <folder:名稱> on|off`、`folder <會議 id> <資料夾|->`（移到資料夾，同 Mac）；state 的 `sidebarCollapsed`、`sidebarExpanded`（陣列）；`list.ids` 是「其他會議」時只有其他會議。
+- 測試：`OrganizeTests.SidebarCollapseKeys`（鍵、預設展開／收起、值沒變不寫、資料夾改名、展開的會議的順序、ExpandToShow 兩種情況、其他會議的條件）、`AppTests.SidebarKeysFollowFolderRenameAndDelete`（資料夾改名鍵跟著改、刪除資料夾時拿掉、段落的收合不受影響）。
+
+### 11.35 重新命名的對話框（R102，M§76）
+
+- 狀態、規則在 Services（`Renaming.cs`，同 Mac 的 `Store/RenameTarget.swift`）：`RenameTarget`（record：`Meeting(id)`、`Folder(名稱)`、`NewFolder(會議 id)`、`Person(id)`、`Bookmark(id)`；`Key` 同 Mac 的 `"\(self)"`：`meeting(42)`、`folder("客戶")`、`newFolder([1, 2])`）；`Renaming.CanSave`（名字空白、沒改不能存，新資料夾有字就能建立）、`Renaming.Conflict`（資料夾同名、人物同名大小寫不分時是合併）；`AppController.CurrentName`（從資料庫讀：沒取過標題的會議是檔名；人物、標記不靠畫面上的列表，Mac 驗收時人物列表沒打開過、輸入框是空的）、`CommitRename`（走原本的動作）。
+- 對話框 `Dialogs.Rename`（`RenameDialog.cs`）。樣子同 M§76 的 `RenameSheet`（R102.1）：
+  - 內容寬 392（`ContentDialog` 自己的內距 24）：上面一列是大標題（`Ui.DialogTitle`，22 號粗體：重新命名會議／資料夾／這個人／標記、新資料夾）和右上角的 ✕（`SidebarLook.HeaderIcon` 的 `E711`，`ToolTip` 和無障礙名稱「取消」（R106 起「關閉」、不能 Tab，§11.39），等於取消），標題下面一行灰字說明（14 號、`Ui.Secondary`，文字同 Mac：會議「保持簡短、容易辨識。日期和與會者在會議頁的「編輯」改。」、資料夾「資料夾裡的會議都會跟著改。」、新資料夾「例如專案名稱或客戶名稱。這場會議會移進新資料夾。」（好幾場時「這 N 場會議」）、「+」的新資料夾「例如專案名稱或客戶名稱。」、人物「所有會議裡的這個人都會跟著改。」、標記「12:34 的標記」）；再來是輸入框；右下兩顆圓角按鈕「取消」「儲存」（新資料夾「建立並移入」、「+」是「建立」）。
+  - 輸入框（`RenameBox`）：細框、沒有強調色的焦點線：覆寫 `TextControlBorderBrush`（字色 25%）、`PointerOver`（40%）、`Focused`（75%），`TextControlBorderThemeThickness` 1、`Focused` 1.5（原本是底下一條 2 的強調色），底色字色 4%，圓角 10、字 15、內距 12×8。`PlaceholderText` 和無障礙名稱：資料夾名稱、名字、名稱。
+  - 按鈕（`PillButton`，同 Mac 的 `SheetPillButtonStyle`）：圓角 10、高 34、最寬 68 起、左右 18。主要按鈕是字的顏色當底、視窗底色的字（淺色黑底白字、深色白底黑字），滑過 85%、按下 75%、停用 35%（覆寫 `ButtonBackground*`、`ButtonForeground*`、`ButtonBorderBrush*`）；取消是字色 6% 的底加 18% 的細框。
+  - 為什麼不用 `ContentDialog` 內建的標題和按鈕：內建的兩顆按鈕撐滿一整排、主要按鈕在左邊、底下一條灰色的按鈕區，樣式只能整組換。所以標題、按鈕都放在內容裡，`PrimaryButtonText`、`CloseButtonText` 不設；按鈕區（範本裡的 `CommandSpace`，沒有按鈕時照樣是一條灰色的空白）在 `Opened` 時從視覺樹找出來收起。Enter（輸入框的 `KeyDown`）存、Esc（內容的 `KeyDown`）和 ✕、取消是 `Hide`，存了沒有自己記（`ShowAsync` 的結果都是 None）。
+  - 名字空白、沒改時主要按鈕停用（Enter 也不會存）；輸入時說明即時換成合併的提醒：「已經有「X」，儲存後會合併成一個。」（從會議的選單建的新資料夾「…，會議會移進那個資料夾。」；「+」的新資料夾「已經有「X」。」而且「建立」停用，§11.37）。
+  - 焦點：`ContentDialog` 打開後會把焦點給第一個能按的元件（右上角的 ✕，2026-11-17 虛擬機：F2 打開後焦點在 ✕、名字沒選起來），所以在 `Opened` 之後排一個低優先順序的工作讓輸入框拿到焦點、全選。關掉後焦點回到原本那一列（`MainWindow.RenameAndRefocus`：`ContentDialog` 自己還原時落到視窗的第一個元件、錄音按鈕；存了之後清單可能重建，等下一次重畫、排好版再找：原本的元件還在清單裡就用它，不然是清單選到的那一列、側欄同一個 AutomationId 的列）。這樣接著按 F2、Delete、方向鍵都對。
+  - 對比主題：輸入框、按鈕都不覆寫（照平台的系統色；主要按鈕是 `AccentButtonStyle`）。
+  - 同時只開一個（`Dialogs.RenamingTarget` 有值時其他重新命名不理；`ContentDialog` 同時只能一個，§11.2.1）。
+- 會議列表的 Enter：`ListView` 自己會把列上的 Enter 標成處理過（2026-11-16 虛擬機：F2 打得開重新命名、Enter 沒反應，§11.33 寫的 Enter 一直沒作用），所以 `list` 的按鍵改用 `AddHandler(KeyDownEvent, …, handledEventsToo: true)`，只管焦點在列本身時（列裡的「⋯」按 Enter 是打開選單）。
+- 儲存：會議 `UpdateInfo`（只改標題，日期、與會者照舊；改了會鎖住標題，整理時不再取名）、資料夾 `RenameFolder`（正在看那個資料夾時先換篩選，重讀時才不會回到所有會議；展開、排序的鍵跟著改）、新資料夾 `MoveToFolder`（「+」的空資料夾是 `CreateFolder`，§11.37）、人物 `RenamePerson`（同名時合併；人物模式時選改完的那個人）、標記 `RenameBookmark`。
+- 用到的地方（原本各自的 `TextBox` 對話框、人物頁的 `Flyout` 都換成這一個）：會議（側欄右鍵、「⋯」、列表的 Enter／F2、展開的會議的 Enter／F2；§11.33 原本是打開會議頁的「編輯」，Mac 原本也是）、資料夾（右鍵、「⋯」、那一列的 F2、看資料夾時列表的 Enter／F2）、新資料夾（「移到資料夾 ▸ 新資料夾…」、多選的「移到資料夾」）、人物（人物頁名字旁的鉛筆、「更多」、側欄右鍵、Enter／F2）、重點標記（「重點標記 N」每個標記的子選單）。會議頁的「編輯」（標題、日期、與會者一起改）照舊。設定「認識的人」的重新命名照舊（設定是另一個視窗；Mac 也是在設定頁就地改）。
+- DEBUG：`renameui <meeting|folder|person|bookmark|newfolder> <id、名稱或會議 id,…>`（同 Mac）；`renamemeetingui`、`personrenameui`、`bookmarkrenameui` 照舊、打開同一個對話框；state 的 `renameTarget`（沒開是空字串；取代 `renameMeetingRequest`、`renamingBookmark`、`personRenameOpen`，同 Mac）。
+- 測試：`OrganizeTests.RenameRules`（能不能存、合併的名字、鍵）、`AppTests.RenameDialogReadsAndCommits`（目前的名字、會議沒改不存和鎖住標題、新資料夾、資料夾改名排序的鍵、人物合併、標記、空白不存）。
+
+### 11.36 拖曳（R103，M§77）
+
+- 拖的東西：會議（`DataPackage` 的自訂格式 `com.weiwei.shiyin.meeting-ids`，逗號分開的 id）、資料夾（`com.weiwei.shiyin.sidebar-item`，鍵 `folder:名稱`，同 `sidebarExpanded`）、檔案總管的檔案（`StorageItems`）。沒有放純文字：拖到記事本、檔案總管不會變成一段字。拖的內容同時記在主視窗（`draggingMeetings`、`draggingItem`）：`DragOver` 要知道是不是拖到自己上面（排序），`DataPackageView` 的資料只能非同步讀；放下、拖曳結束（`DropCompleted`、`DragItemsCompleted`）時清掉。是不是自己拖的看兩樣都有（記下的內容和 `DataView.Contains(格式)`）。
+- 拖的來源：
+  - 下面的會議列表：`ListView.CanDragItems`（只在會議列表；垃圾桶、搜尋結果、人物列表不能拖）、`DragItemsStarting`：拖的是選到的列時 ListView 本身就帶整個多選（R103.1），只有一場時再照多選補齊（`SidebarDrag.DragIds`，同 Mac 的 `dragIDs`）；沒有會議（分組的標題）就取消。項目直接是 `ListViewItem` 時 `e.Items` 裡是它的 `Content`（同 `scopes` 的 `ClickedItem`），要從 `list.Items` 找回那一列拿 `Tag`（2026-11-17 虛擬機：一開始照 `ListViewItem` 找，找不到就取消，會議一直拖不動）。可以拖曳時清單的選取在放開時才決定（按住 Ctrl 點選多選，Ctrl 要按到放開之後）。
+  - 上面的資料夾、展開的會議：是 `SidebarItem`，左鍵按下不交給 ListViewItem（§11.34：交給它會選到這一列、清單捲走），ListView 自己的拖曳不會開始（同 Mac：List 裡沒有 tag 的列不能拖）。`SidebarItem.DragData` 有值時，按住左鍵移動超過 4（系統的拖曳門檻 SM_CXDRAG）就 `StartDragAsync`，`DragStarting` 填資料；沒移動就是原本的點一下（`Tapped`：展開、打開）。拖的圖是系統用那一列的樣子產生的（Mac 是名稱的圓角標籤）。
+  - 不用 `CanReorderItems`：ListView 自己的重新排序會把段落標題、展開的會議、所有會議、人物都一起排，也只能排、不能「放進去」；排序只在「資料夾」那一段，自己算位置。
+- 放的地方（`AllowDrop`；`DragOver` 設 `AcceptedOperation` 和說明文字 `DragUIOverride.Caption`，處理了就 `Handled`，不然往上到整個視窗的「拖檔案進來匯入」，R3.1）：
+  - 資料夾列：會議 → `MoveToFolder`（說明「移到「客戶」」）；檔案 → 匯入到這個資料夾（`MainWindow.ImportInto`，同 Mac 的 `importDropped`：參考文件類的不收，全部是參考文件時說「參考文件請拖到會議頁，會加進那場會議」；逐字稿、封包直接匯入到那裡，錄音、影片跳原本的匯入對話框、資料夾先設好；說明「匯入到「客戶」」，`Copy`）；別的資料夾 → 排序。
+  - 會議列表的標題列（`sectionHeader` 整條，`AppController.DropOnListHeader`，同 Mac 的 `dropOnListHeader`）：在看資料夾＝移進那個資料夾、「其他會議」＝移出資料夾（說明「移出資料夾」；都不在資料夾裡時「這場會議沒有在任何資料夾裡」）。看所有會議、人物、垃圾桶時不收（`SidebarDrag.HeaderAccepts`）。
+  - 側欄下面的「垃圾桶（N）」：會議 → `MoveToTrash`（不確認，同 Mac 的 ⌘⌫ 和 Windows 右鍵的一場；可以還原，提示照舊）。
+  - 拖到自己上面（排序）不能放。
+- 回饋（R103.4）：會議、檔案拖到資料夾上時，那一列整塊青瓷綠 18% 的底（`SidebarItem.Backplate`，§11.34 的單色：拖曳經過時列是滑過的狀態，只改 `ListViewItem.Background` 會被滑過的灰蓋掉），圖示換成打開的資料夾；排序時看放開的位置在那一列的上半或下半，在上緣或下緣一條 2 的青瓷綠線（列的內容外面一層 `Grid`，`VerticalContentAlignment = Stretch`，線用負的邊距伸到整列；上緣的線常被系統拖曳的圖蓋住，下緣的看得到）。拖到列表的標題、垃圾桶時字換成青瓷綠。拖曳的說明文字（`DragUIOverride.Caption`）：「移到「客戶」」「匯入到「客戶」」「移出資料夾」「移到垃圾桶」（Windows 才有：檔案總管也是這樣說，Mac 沒有說明文字）；排序時不放說明和圖示。對比主題：淡淡的底看不出來（`Ui.Tint` 是透明的），改成一圈 2 的反白顏色的框（`ListViewItem.BorderBrush`），線、字是反白的顏色；拖曳經過的列本來就是平台滑過的反白底，看得出放在哪裡。
+- 同時只亮一個地方（`ShowDropRow`、`ClearDropTargets`）：列的 `DragLeave` 不一定來（2026-11-17 虛擬機：拖過去經過的資料夾一直是青瓷綠、排序的線留在經過的列），所以記下亮著的那一列，換到別列、標題、垃圾桶時把前一個收掉；整個視窗的 `DragOver`（拖到沒有收東西的地方）、`DragLeave`、放下、拖曳結束時全部收掉。
+- 排序（`SidebarDrag`，Services，同 Mac 的 `sidebarFolderItems`、`moveSidebarItem`）：settings.json 的 `sidebarOrder`（字串陣列，照順序、不排序；鍵同 `sidebarExpanded`）；`Sorted`：有在 `sidebarOrder` 的照它，沒有的（新的）排在後面、照名稱。放開時把拖的那個移到目標的前面或後面，整段的順序寫回（值沒變不寫）。資料夾改名（改成已經有的資料夾、合併時拿掉舊的，留那個的位置）、刪除資料夾時 `AppController` 跟著改。主視窗聽 `Settings.Changed` 的 `sidebarOrder` 重畫（樣子的比對加上順序）。
+- 鍵盤、輔助使用：Mac 的 VoiceOver 有「往上移」「往下移」的自訂動作，UI Automation 沒有對應的東西，所以資料夾列有焦點時 Alt+↑／Alt+↓ 往上、往下移一格（焦點留在那一列；到頭了不動），無障礙說明（`HelpText`）是「按 Alt+↑、Alt+↓ 可以往上移、往下移」，螢幕閱讀器會念。
+- DEBUG（同 Mac）：`importinto <資料夾> <檔案>`（等於從檔案總管把檔案拖到資料夾）；state 的 `sidebarOrder`（「資料夾」那一段實際的順序）、`showImportSheet`（匯入的對話框開著沒）。拖曳只能用真的滑鼠：`uia.sh drag <視窗> <來源> <目標> [top|center|bottom] [停留秒數]`（`mouse_event` 按下、絕對座標的移動（`SetCursorPos` 只搬游標，WinUI 的指標事件收不到）、先慢慢移過拖曳的門檻、分段移到目標、停一下（每 0.3 秒動 1 像素讓 `DragOver` 一直來）、放開；停留時可以 `shot.sh` 截拖曳中的樣子；清單裡沒捲到的項目先捲進畫面，還是沒有位置就不拖，不然會按在桌面的角落）。檔案總管的檔案也是同一個指令：來源寫「視窗標題::檔名」（`ShiyinDrop*::a.srt`），先把檔案總管拉到前面，拾音的側欄要露在外面。`uia.sh focus <視窗> <名稱>` 用 UI Automation 給鍵盤焦點（測 Alt+↑↓、F2），`uia.sh focused <視窗>` 看焦點在哪，`key` 多了 `alt`。
+- 測試：`OrganizeTests.SidebarOrderMovesAndFollowsRename`（新的排最後、前面後面、往上往下移到頭了不動、改名換鍵和合併、刪除、拖的會議、標題收不收）、`AppTests.DropOnListHeaderMovesMeetings`。
+
+### 11.37 新增空的資料夾（R104，M§78、D176）
+
+- 資料：Shiyin.Data 的 migration v13（`folders` 表）、`CreateFolder`、`FolderNames`，`SetFolder`、`RenameFolder` 跟著改（fa12d60 跟 Mac 一起做，標準答案的 schema 一致）。
+- 側欄的資料夾是資料夾表、會議的資料夾、自動加入條件三者的聯集（`Organizing.Folders(meetings, rules, names)`、`MainState.Folders`；`FolderNames` 跟列表一起讀），沒有會議的是 0 場；會議都移走了資料夾還在，要自己刪除（刪除時資料夾表那一列也拿掉）。正在看的資料夾不見了（刪除、改名）才回到所有會議。「移到資料夾」的選單、新資料夾的同名檢查、拖曳排序都照這個聯集。
+- 「資料夾」那一段一直顯示；標題右邊「+」（`SidebarLook.HeaderIcon` 的 `E710`，`ToolTip`、無障礙名稱「新資料夾」；點按鈕不會收合，`SidebarItem` 不管從按鈕來的點擊）打開 §11.35 的對話框（`RenameTarget.NewFolder([])`）：標題「新資料夾」、說明「例如專案名稱或客戶名稱。」、主要按鈕「建立」；名字跟已經有的資料夾一樣時說明「已經有「X」。」、「建立」停用（`Renaming.CanSave` 的 conflict）。建立走 `AppController.CreateFolder`（同名的不建，提示「已建立資料夾「X」」），新的資料夾排在「資料夾」那一段的最後（§11.36 的排序）。沒有任何資料夾時，段落裡一行次要文字「按 + 新增資料夾」（停用的項目）。Windows 沒有選單列（Mac 的「檔案 → 新資料夾…」⇧⌘N 沒有對應）。
+- DEBUG（同 Mac）：`foldernew <名稱>`；state 的 `folders`（名稱、場數，同 Mac）。
+- 測試：`OrganizeTests.OrganizingHelpers`（資料夾表的名字也列出來、不重複）、`OrganizeTests.RenameRules`（「+」同名不能建）、`AppTests.RenameDialogReadsAndCommits`（「+」建立、提示、同名不建、會議都移走了還在）。
+
+### 11.38 選單的樣子（R105，M§79）
+
+- 用什麼做（評估後）：**平台的 `MenuFlyout` 加輕量的樣式覆寫**（`Ui/MenuLook`），不像 Mac 自己畫面板。Mac 自己畫是因為 macOS 的 NSMenu 換不了樣子（圓角、列高、底色、圖示顏色都固定）；WinUI 的 MenuFlyout 本來就是圓角面板、Segoe Fluent 的細線圖示（`Icon`）、右邊灰色的快捷鍵提示（`KeyboardAcceleratorTextOverride`，範本裡的 `KeyboardAcceleratorTextBlock`）、子選單的「›」（`E974`）、滑過一塊圓角底，子選單開在右邊（滑鼠移過去的延遲照系統的選單延遲），↑↓→←、Enter、Esc、點外面和切到別的 app 就關、UI Automation（`uia.sh rclick` 照樣按得到）、對比主題都由平台處理；差的只是尺寸和顏色，都有主題資源或屬性可以換（`MenuFlyoutPresenterStyle`、項目的 `Resources`、`CornerRadius`、`MinHeight`），不用換 ControlTemplate。自己用 `Popup` 畫的話鍵盤、焦點、無障礙、對比主題、螢幕邊緣、子選單的斜移都要自己做（winui-design 的「自己做元件」要全部做到），沒有必要。
+- 樣子（數字照 M§79）：
+  - 面板：`MenuFlyoutPresenterStyle`（`MenuLook.Presenter`，照深淺色快取：Style 用過之後不能改）圓角 14、不透明的底（淺色白；深色 #323232：Mac 是 white 0.17＝#2B2B2B，但 Windows 的側欄就是 #2B2B2B，開在側欄上只剩細框分得出來；平台是壓克力）、字色 10% 的細框、內距 1,3（加上每一項平台的外距 4,2，四邊各 5，同 Mac 的 padding 5）、最窄 200。陰影照平台。子選單的面板 WinUI 會套同一個 Style（MenuFlyoutSubItem 把 MenuFlyout 的 MenuFlyoutPresenterStyle 帶給子選單的面板）。
+  - 每一項（`MenuFlyoutItem`、`MenuFlyoutSubItem`）：`MinHeight` 36（減掉平台上下各 2 的外距，滑過的底 32；平台用滑鼠打開時約 29）、圓角 8、滑過字色 9% 的底（按下 12%、子選單打開時 9%），鍵盤選到的是平台的焦點框（圓角跟著是 8）。字 14、圖示 16（平台的 Viewbox）照平台。快捷鍵提示、「›」是次要文字的顏色（紅色那一項的快捷鍵也是灰的，同 Mac）。左右的內距照平台（滑鼠打開時 11，範本的 NarrowPadding 動畫寫死的 StaticResource，覆寫不到；Mac 是 9）。
+  - 分隔線：字色 10%、上下 4、左右縮進 8（`Padding` 8,4；平台是 -4,1，伸到項目外面）。
+  - 刪除、移除這類照 §11.34 的 `Ui.DangerItem`（紅字紅圖示，滑過也是紅的）。
+- 右邊的快捷鍵提示（`MenuLook.Hint`）：只是提示、不註冊快捷鍵（ContextFlyout 裡的 KeyboardAccelerator 在選單關著時也會生效，每一列都註冊一次會搶同一個鍵；同 Mac 不註冊的理由）。寫 Windows 的鍵（§11.33 的側欄鍵盤）：重新命名…「F2」（會議、資料夾、人物；會議、人物 Enter 也可以，但 F2 是 Windows 的慣例）、移到垃圾桶／把 N 場會議移到垃圾桶…／永久刪除…／刪除資料夾…／移除這個人…「Delete」。Mac 只標會議的重新命名、移到垃圾桶和人物的重新命名（↩、⌘⌫）；Windows 的資料夾列也有 F2、Delete，一起標。人物頁右上角的「更多」（同一份項目，`PersonPage.MenuItems(sidebar: false)`）不標：焦點不在側欄時 F2、Delete 沒作用。
+- 用在哪裡（R105.1）：`RowMore.Button`／`RowMore.Context`（側欄的資料夾、展開的會議、人物，人物頁裡的會議，會議紀錄的每一條）和會議列表的右鍵（`MainWindow.RowMenu`）：打開時（`Opening`）填完內容後 `MenuLook.Apply`，建的時候也先套一次（面板在第一次打開前就建好）。工具列和頁面的「更多」、逐字稿的右鍵、錄音按鈕、顯示方式、設定的選單照舊是平台的樣子（R105.2）。
+- 「⋯」打開的位置：`BottomEdgeAlignedLeft`（選單左上角對齊「⋯」的左下，同 Mac；原本 BottomEdgeAlignedRight），放不下時平台會換邊。右鍵照平台開在游標的位置。
+- 對比主題：不覆寫（`MenuLook.Apply` 直接回傳），照平台的系統色（§11.3：滑過去是反白的底，自己的灰色會看不見）。
+- 驗證：虛擬機 `uia.sh menukeys <視窗> <列> <鍵…> [right|more]`（真的滑鼠右鍵或點列右邊的「⋯」打開，同一個程序接著按鍵：下一個 PowerShell 會搶到焦點、選單被關掉），截圖（深色、淺色、高對比）。
+
+### 11.39 彈窗、確認、就地編輯的共用樣子（R106，M§80）
+
+- 元件在 `Ui/Sheet.cs`（同 Mac 的 `Views/SheetStyle.swift`），從 §11.35 的重新命名對話框抽出來（重新命名的樣子不變）：
+  - `Sheet.Header(標題, 關閉, 說明, 右邊的小字)`：大標題（22 號粗體）、標題下面一行灰字說明（`Sheet.Subtitle`，14 號、次要文字、會換行）、標題列右邊的小字（「第 1 組，共 2 組」，13 號次要文字）、右上角 ✕（`SidebarLook.HeaderIcon` 的 `E711`，`ToolTip` 和無障礙名稱「關閉」，同 Mac；§11.35 原本是「取消」）。✕ 不能 Tab：`ContentDialog` 打開時會把焦點給第一個能 Tab 的元件（§11.35 踩過：焦點在 ✕），同 Mac 的 ✕ 沒有焦點，鍵盤用 Esc。
+  - `Sheet.Field(TextBox, compact)`：§11.35 的 `RenameBox` 搬過來：字色 4% 的底、25% 的細框、滑過 40%、有焦點 75% 1.5（覆寫 `TextControlBorderBrush*`、`TextControlBorderThemeThickness*`；原本是底下一條 2 的強調色），圓角 10、字 15、內距 12×8。compact（就地編輯）圓角 8、內距 9×5，字照原本（會議內容跟著文字大小）。多行的、唯讀的也一樣。`Sheet.TextField(字, placeholder)` 建一個新的（placeholder 也是無障礙名稱）。
+  - `Sheet.Combo(ComboBox)`：選單式的欄位（同 Mac 的 `SheetMenuField`）：同一種框（`ComboBoxBackground*`、`ComboBoxBorderBrush*`、`ComboBoxBorderThemeThickness`），圓角 10、字 15、高 38、撐滿欄寬；有鍵盤焦點時左邊那一小條（範本的 `Pill`，原本強調色）換成字色 75%。下拉的清單照平台。
+  - `Sheet.Date(CalendarDatePicker)`：同一種框（`CalendarDatePicker*`），右邊的日曆圖示、打開的月曆照平台（Mac 要自己把沒有框的日期欄位放進框裡，Windows 的 CalendarDatePicker 本來就是一個框）。
+  - `Sheet.Label`、`Sheet.Labeled(標籤, 欄位)`：欄位上面的灰色小標籤（13 號、次要文字，間距 6；欄位沒有無障礙名稱時用標籤的字）。原本用控制項的 `Header`（14 號主色字）都拿掉。`Sheet.Pair`：兩個欄位排一列、各一半（同 Mac 的 HStack 兩欄）。`Sheet.Box`：同一種框的一塊（勾選清單、好幾個檔時「依各檔案的檔名或修改日期」）。
+  - `Sheet.Pill(字, Kind, compact)`：§11.35 的 `PillButton` 搬過來，多一種刪除類：`Primary` 字色當底、視窗底色的字（淺色黑底白字、深色白底黑字），`Destructive` 紅底白字（#C42B1C，Windows 的 critical 紅，深淺色同一個：`Ui.Danger` 深色模式是淡紅，配白字看不清；白字對比 5.9:1），兩種都是滑過 85%、按下 75%、停用 35%；`Secondary` 字色 6% 的底加 18% 的細框。圓角 10、高 34、最窄 68、左右 18；compact（就地編輯）圓角 8、高 26、最窄 52、左右 12、字 13。`Sheet.DangerText`：次要按鈕紅字（資料夾條件的「移除條件」）。`Sheet.Buttons(左邊, 右邊…)`：按鈕列，左邊一顆（「分享…」「移除條件」）、其他靠右，間距 10。
+  - 對比主題：框、按鈕都不覆寫（照平台的系統色；主要、刪除類是 `AccentButtonStyle`），`Sheet.Box` 是一圈文字顏色的細框（§11.3）。
+- `SheetDialog`：照這個樣子的 `ContentDialog`（§11.35 的做法搬過來）：內建的標題、按鈕都不用，內容寬 392（Mac 的 sheetChrome 440 減掉 ContentDialog 兩邊的 24）或 432（Mac 480），按鈕區（`CommandSpace`）在 `Opened` 時收起來。`ContentDialogMinHeight` 改 0（平台最小 184，一行說明的確認底下會多一塊空白）。
+  - 深淺色：`RequestedTheme` 照主視窗（`Ui.IsDark`）。開著拾音時換了 Windows 的深淺色，ContentDialog 照樣是開 app 時的顏色（2026-11-17 虛擬機：換成深色後對話框是淺色的底、字是照深色給的白字）。對比主題時不設。
+  - 焦點：打開後給 `Focus`（輸入框全選，`SelectOnFocus` 是 false 時不選）：排一個低優先順序的工作，350 毫秒後還不在它上面（使用者還沒按鍵）再給一次；而且 `Focus` 的 `TabIndex` 設 0。ContentDialog 打開後自己會把焦點給「第一個」能 Tab 的元件，有時候比排的工作晚（2026-11-17 虛擬機：清空垃圾桶的確認焦點落在「取消」，Enter 變成取消）。
+  - 焦點留在對話框裡（`FocusManager.GettingFocus`）：選單裡的項目打開對話框時，選單晚一點關掉、把焦點還給對話框後面的「⋯」（2026-11-17 虛擬機：之後的 Enter、Esc 都送到側欄，對話框關不掉）。焦點要跑到主視窗裡的元件時，原本在對話框裡就留在原地，不然給 `Focus`／`Primary`；下拉選單、月曆在對話框自己的 popup 裡，不管。
+  - Enter（ContentDialog 的 `PreviewKeyDown`，往下傳的時候就接住）：焦點不在按鈕（勾選框不算）、選單式的欄位、日期、多行的輸入框上時做 `Submit`；`Primary` 停用時不做（同 Mac 的 `.defaultAction` 停用時按 Return 沒反應）。不能等內容的 `KeyDown`：ContentDialog 自己也收 Enter（沒有內建按鈕時關掉、結果是 None），剛打開、視窗剛拿回前景、焦點還沒進到內容裡時按 Enter 就被它關掉了（2026-11-17 虛擬機：刪除資料夾的確認按 Enter 沒刪）。
+  - Esc（內容的 `KeyDown`）、✕：`Escape`，沒給是關掉。`ContentDialog` 自己也會收 Esc（焦點不在內容裡時）：`Closing` 不是自己關的就取消、改做 `Escape`（目前沒有用到；D177 拿掉的可能的定期會議用過：Esc 是「略過」，不是關掉）。
+  - 同時只開一個（`Dialogs.Show` 的 Gate，§11.2.1）。開著時 `Dialogs.OpenSheet` 是標題（DEBUG 的 state `sheet`）。
+  - 標題列自己排兩欄（不用 `Ui.Bar`：左邊空的那一欄照樣多一段間距，標題會比欄位往右縮 12）。
+- 確認（R106.2）：`Dialogs.Confirm(標題, 說明, 確認的字, destructive)` 改成 SheetDialog：標題、說明、✕，右下「取消」（次要）、確認（刪除類紅底，其他主要按鈕），寬 392、間距 22。打開時焦點在確認的按鈕（`Programmatic`：Enter 直接按它；Tab 到「取消」再 Enter 是取消）。**改了**：原本刪除類的預設按鈕是「取消」（不小心按 Enter 不會刪），R106.2 改成 Enter 是確認、Esc 是取消（同 Mac 的 `.defaultAction`）。
+  - 刪除類（紅底）：刪除資料夾、移除這個人、移到垃圾桶（原本不是刪除類，同 Mac 改成紅底）、永久刪除、清空垃圾桶。分成兩場不是刪除類（原本是，同 Mac 改成主要按鈕；「分開後沒辦法合併回來」寫在說明）。麥克風權限的「打開設定」也走這裡（主要按鈕）。
+  - Windows 的確認本來就是各自 `await`（`MainWindow.ConfirmTrash`、`ConfirmPurge`…），不用 Mac 的 `activeConfirmation`（Mac 是 SwiftUI 一個 `.sheet(item:)` 從狀態組出來）；DEBUG 的狀態（`deleteTargets`、`confirmPurge`、`confirmDeleteFolder`…）照舊。
+  - 錯誤、錄音的提醒（`Dialogs.Alert`）照舊是系統的對話框（同 Mac 的 `.alert`）；設定視窗、更新、結束拾音的對話框照舊（R106 沒列）。
+- 其他彈窗（R106.1、R106.3，同 Mac 的版面）：
+  - 匯入（寬 432）：「匯入錄音」（好幾個「匯入 N 個錄音檔」）、檔名（灰字，前面 `E8D6` 的聲音圖示）、標題（一個檔時）、會議日期｜大約幾個人、與會者、範本｜會議語言，「取消」「匯入並開始轉錄」。
+  - 匯出（寬 432）：「匯出「X」」、項目｜格式、包含時間點和包含說話者同一列（逐字稿時）、說明（還沒有會議紀錄時琥珀色）；左下「分享…」（次要；原本是 ContentDialog 的第二顆按鈕），右下「取消」「存檔…」。打開時焦點在「存檔…」（欄位都是選單式的，選單有焦點時 Enter 是打開它）。
+  - 重新辨識說話者：說明放在標題下面、大約幾個人（寬 220）、灰字的提醒，「取消」「開始」。打開時焦點在「開始」（同匯出）。
+  - 拆成兩句（Windows 才有的對話框，Mac 是就地拆）：說明「在文字裡點一下要拆開的地方」、唯讀的文字放進同一種框（有焦點時框變亮，打開時焦點在文字上、不全選）、預覽、後半句是，「取消」「拆開」（沒點在中間時停用）。
+  - 編輯會議資訊（R106.3）：標題改「編輯會議資訊」（原本「編輯」）、說明「標題、日期、與會者。」，標題（打開時全選）、會議日期、與會者，「取消」「儲存」。Windows 本來就是對話框（Mac 原本是小視窗）。
+  - 用詞修正（寬 432）：說明、錯誤寫法｜正確寫法（打開時錯誤寫法全選）、加進詞彙表、結果（青瓷綠，取代之後才出現），「取消」（取代過後是「完成」）「全部取代」（錯誤寫法空白或跟正確寫法一樣時停用；原本按了沒反應）。
+  - 資料夾的自動加入條件（寬 432）：說明、標題包含、這些人都參加（同一種框裡的勾選清單，最高 140）、用這個範本、套用；左下「移除條件」（紅字的次要按鈕，有條件時；原本是第二顆按鈕），右下「取消」「儲存」。
+  - 同一個輸入框換到新的容器（D177 拿掉的可能的定期會議，換一組時用過）：先從舊的那一欄拿下來，它還掛在舊的欄裡、`Parent` 卻是 null，要自己記著那一欄；直接放進新的欄 WinUI 丟 0x800F1000（2026-11-17 虛擬機：略過第一組後第二組只剩標題）。
+  - 重新命名（§11.35）改用共用的元件（`SheetDialog`、`Sheet.TextField`、`Sheet.Pill`），樣子、行為不變，✕ 的名稱改「關閉」。
+- 就地編輯（R106.4）：
+  - 逐字稿改句子：同一種框（不是 compact 的框，字照會議內容的文字大小，同 Mac 的 `.sheet`），「取消」「儲存」compact。
+  - 說話者改名的小視窗（逐字稿點說話者、會議頁上方的說話者）：標題「說話者名字」18 號粗體、輸入框（`Sheet.TextField`）、「不是他」「合併到…」「復原：…」次要、「儲存」主要（同 Mac 的小視窗用一般大小的按鈕），寬 320。
+  - 紀錄的條目、待確認的回答（「是誰？」「正確的是…」「你的回答」）和「全部略過」「收合」「送出」、編輯會議紀錄（每個欄位、標題 18 號粗體、「取消」「完成」）：compact。
+  - 提問的輸入列（這場會議、所有會議共用 `AskTab.InputBar`）：同一種框（一般大小）、「提問」主要按鈕。
+- 頁面的提示條、空白頁的按鈕照舊（R106.5）。
+- DEBUG：`dialogui <export|rediarize|editinfo|replace|split|trash|purge> <會議 id[,…]> [段落 id 或錯誤寫法]`（同 Mac 的 `exportui`、`preview editinfo|replace|rediarize`；確認的其他幾種照舊用 `folderdeleteui`、`personremove`、`confirmemptytrash`、`splitconfirm`，資料夾條件 `editfolderrule`、匯入 `importinto`、重新命名 `renameui`），state 的 `sheet`（開著的對話框的標題，沒開是空字串）。
+- 驗證：虛擬機 `uia.sh` 打開每一種、截圖（深色、淺色、高對比），按 Enter／Esc（`uia.sh key`）、✕（`uia.sh click … 關閉`），看 state 的 `sheet` 和對應的狀態；從右鍵選單的項目打開（`uia.sh rclick … <項目>`、`menukeys … 28,0D`）再按 Enter／Esc；開著拾音時換深淺色再打開。
 
 ## 12. 系統整合
 
@@ -609,7 +840,7 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 
 ### 12.9 log
 
-`logs\shiyin-<日期>.log`，保留 7 天；不寫逐字稿和會議紀錄的內容、不寫 key（同 CLAUDE.md 的規則）。
+`logs\shiyin-<日期>.log`，保留 7 天；不寫逐字稿和會議紀錄的內容、不寫 key（同 Mac 的規則）。
 
 ### 12.10 匿名使用統計（R40.7，M§30）
 
@@ -687,7 +918,7 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 - Windows 的更新來源（Velopack 的 GithubSource 讀 GitHub 的 release 清單）要能跳過沒有 Windows 檔案的 Mac release：只有 Mac 的 release 時顯示「已是最新版本」、沒有錯誤。
 - **release 清單讀 100 筆**（D94）：Velopack 的 GithubSource 只讀最新的 10 筆（`releases?per_page=10&page=1`）。Windows 使用者一段時間沒開、這期間 Mac 發了 10 版以上，Windows 的新版就不在這 10 筆裡，顯示「已是最新版本」，要等下一個 Windows 版發布才看得到。`Services/WindowsReleaseSource.cs` 繼承 GithubSource、只換掉讀清單的那一步：讀 100 筆（GitHub 一次最多），只留有 Velopack 更新說明（`releases.*.json`）的最新 10 個，找新版、下載照 Velopack 原本的做法。測試：12 個 Mac 版之後才有 1 個 Windows 版的清單找得到（`ServicesTests.ReleaseSourceFindsWindowsBehindManyMacReleases`）。
 - 新的工作流程 `.github/workflows/release-windows.yml`：推 `win-v*` 時在 `windows-latest`（x64）、`windows-11-arm`（ARM64）建置，跑測試、whisper 從固定 commit 建（檢查沒有匯入 VC++ 的 DLL、印出每個 DLL 的 SHA-256）、`vpk pack`、簽更新金鑰、建立 Release（不設成 latest）。手動執行只產出 artifact（同 Mac）。
-- Release 說明的格式同 CLAUDE.md 的規定，標題改成「拾音 Windows X.Y.Z：…」「Shiyin for Windows X.Y.Z: …」。
+- Release 說明的格式同 Mac（docs/website.md §7），標題改成「拾音 Windows X.Y.Z：…」「Shiyin for Windows X.Y.Z: …」。
 
 ### 14.4 官網
 
@@ -719,6 +950,7 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 - 從 Mac 操作：`sync.sh` 把工作目錄（git 追蹤和還沒加的檔案）同步到 `C:\src`（不用共用資料夾：桌面有 iCloud）；`ssh.sh`、`run.sh` 在 SSH 的工作階段跑 PowerShell（建置、測試）；`ps/rebuild.ps1` 重建 DEBUG 版；`ctl.sh` 送控制通道的指令。Mac 上的本機伺服器（假的整理工具、更新檔）用 `ssh -R <埠>:127.0.0.1:<埠>` 讓虛擬機從 127.0.0.1 連過來。
 - 虛擬機**沒有音效裝置**：WASAPI 的錄音、換裝置、播放的聲音都測不到，錄音用 `record-sim`；真的麥克風、電腦聲音要使用者的電腦（W0.3）。
 - 磁碟：虛擬機裡刪檔案不會讓 Mac 上的磁碟檔變小，刪完要 `Optimize-Volume -DriveLetter C -ReTrim`。
+- 停虛擬機用 `utmctl stop --request "Shiyin Windows"`（請 Windows 自己關機）：`utmctl stop` 預設是強制斷電，還沒寫回磁碟的登錄檔、檔案的改動會不見（2026-11-16 對比主題巡檢：改回原本的佈景主題、刪掉測試資料夾後強制斷電，重開機又是「夜空」、資料夾還在）。
 - 使用者在用拾音錄會議時（Mac 的 `audio/recording/` 有檔案）不開虛擬機、不跑重的工作。UTM 的視窗會出現在使用者的螢幕上（不會搶前景）。
 
 ### 15.3 控制通道
@@ -732,7 +964,7 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 從 SSH 啟動的程式不會出現在登入的桌面，UI Automation 也碰不到桌面。所以用排程工作在桌面的工作階段執行 PowerShell（`ps/in-session.ps1`：註冊「互動式登入」的工作、等它跑完、讀回輸出）。
 
 - `insession.sh`：把標準輸入的 PowerShell 放到桌面跑，例如 `ps/start-app.ps1` 在桌面開 DEBUG 版（資料在 `C:\ShiyinTest`）。
-- `uia.sh <動作> <視窗> <名稱>`（`ps/uia.ps1`，Windows 內建的 UIAutomationClient）：`windows`、`dump`、`click`（Invoke／Toggle／選取／展開）、`open`（會打開選單的按鈕，交給另一個程序按，不然會等到選單關掉）、`menu`、`choose`（下拉選單）、`set`（輸入框）、`close`。同名的元件能按的排前面，`名稱#2` 指定第幾個。SplitButton 的箭頭、DropDownButton、子選單用 `ps/expand.ps1 <視窗> <名稱> [項目] [子選單的項目或 ?]`（ExpandCollapsePattern；`uia.ps1` 的 `click`、`menu` 用 Invoke，會按到 SplitButton 主要的動作），放在 `insession.sh` 裡跑。
+- `uia.sh <動作> <視窗> <名稱>`（`ps/uia.ps1`，Windows 內建的 UIAutomationClient）：`windows`、`dump`、`click`（Invoke／Toggle／選取／展開）、`open`（會打開選單的按鈕，交給另一個程序按，不然會等到選單關掉）、`menu`、`choose`（下拉選單）、`set`（輸入框）、`close`、`menukeys`（真的滑鼠打開右鍵或「⋯」的選單、同一個程序接著按鍵，§11.38）。同名的元件能按的排前面，`名稱#2` 指定第幾個。拖曳用 `drag`（真的滑鼠，也能從檔案總管拖檔案進來，§11.36），鍵盤焦點用 `focus`、`focused`。SplitButton 的箭頭、DropDownButton、子選單用 `ps/expand.ps1 <視窗> <名稱> [項目] [子選單的項目或 ?]`（ExpandCollapsePattern；`uia.ps1` 的 `click`、`menu` 用 Invoke，會按到 SplitButton 主要的動作），放在 `insession.sh` 裡跑。
 - `shot.sh <檔案>`：在 Mac 上用 `screencapture -l` 截 UTM 的視窗（整個虛擬機的畫面）。
 - UI Automation 做不到時（開著選單、存檔對話框時 UI Automation 會卡住）：用 UTM 的 AppleScript `input scan code` 送按鍵，只會送進虛擬機，不會到 Mac 前景的 app。
 - 系統的視窗（SmartScreen、系統匣）不屬於拾音：直接從桌面的根元件找（例如系統匣在 `Shell_TrayWnd`，隱藏的圖示先按「顯示隱藏的圖示」）。
@@ -747,12 +979,12 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 | D45 | 「macOS 內建」換成「快速辨識」（SenseVoice） | 拿掉這個選項：第一場會議要等 1.7 GB 下載（D35 的理由）；即時逐字稿本來就要這個模型，不用多下載 |
 | D46 | whisper.cpp 自己從 Mac 同一版建，P/Invoke | Whisper.net：包的 whisper.cpp 比較舊、同一段錄音結果會跟 Mac 不一樣（R28.4）；語言偵測只給最高的那一個，拿不到中英日三個機率（R16 的門檻要用）；Vulkan 版只有 x64。執行 whisper-cli 子程序：進度、取消、token 機率都要從文字輸出解析 |
 | D47 | 說話者辨識用 sherpa-onnx（分群改成自己做，見 D58） | 把 FluidAudio 的流程（pyannote community-1＋VBx）整個搬到 ONNX：community-1 沒有官方 ONNX 版，要自己轉模型。pyannote（Python）：違反 D2。取捨：模型和 Mac 不同，聲紋不能共用、門檻要重新調（R28.6）；「至少 N 人」、聲紋、分不準的判斷要自己補（§9） |
-| D48 | 資料放 `%LOCALAPPDATA%\Shiyin`，設定放在裡面的 settings.json | 登錄（Registry）：換 `SHIYIN_HOME` 時設定還是同一份，測試會改到正式的設定（Mac 的 UserDefaults 就踩過，見 CLAUDE.md）。`%APPDATA%`（漫遊）：錄音和模型很大，不該跟著帳號漫遊 |
+| D48 | 資料放 `%LOCALAPPDATA%\Shiyin`，設定放在裡面的 settings.json | 登錄（Registry）：換 `SHIYIN_HOME` 時設定還是同一份，測試會改到正式的設定（Mac 的 UserDefaults 就踩過）。`%APPDATA%`（漫遊）：錄音和模型很大，不該跟著帳號漫遊 |
 | D49 | API key 存在認證管理員 | DPAPI 加密後存檔案：N6 規定 key 不寫進檔案。WinRT 的 PasswordVault：底層也是認證管理員，不打包的 app 用起來比較麻煩 |
 | D50 | 用 Velopack 安裝和更新，加上自己的更新金鑰（ECDSA）驗證發布者 | MSIX：自簽的 MSIX 要先用系統管理員把憑證裝進「受信任的人」，一般使用者裝不起來。Inno Setup 加自己寫更新器：要自己處理替換、重開、解除安裝，Velopack 都有，還有差異更新。只靠自簽的 Authenticode 比對簽署者：做得到（`CERT_E_UNTRUSTEDROOT` 表示簽章完整只是不受信任），但對 SmartScreen、Smart App Control 沒有幫助，還要多保管一張憑證；更新金鑰的驗證只要幾行標準的密碼學程式。Microsoft Store：要開發者帳號和審核，之後再說 |
 | D51 | Windows 的 release 用 `win-v*` tag，不設成 latest | 同一個 release 放兩邊的檔案、版號一樣：兩邊一定要同時發布，但 Windows 修自己的問題、Mac 加新功能的時間不會一樣。Windows 的 release 標成 prerelease：官網、Velopack 預設都會略過它，使用者看不到也更新不到。另外開一個 repo：星星、issue、官網的資料來源都要分開。取捨：官網的 `releases.mjs` 要改成認兩種 tag，而且要在第一個 Windows release 之前改好 |
 | D52 | Windows 的版號對齊 Mac 的功能版本，第一版 4.0.0（跟 Mac 一起發布） | 從 1.0.0 開始：使用者看不出 Windows 版有哪些 Mac 的功能 |
-| D53 | 驗證用排程工作在桌面跑 PowerShell 的 UI Automation，加上 named pipe 的控制通道（§15.4；原本規劃的桌面代理 app 用不到） | 在使用者的電腦上送鍵盤事件：CLAUDE.md 禁止。WinAppDriver：微軟已經不維護。從 SSH 直接開 app：不會出現在桌面，截不到圖 |
+| D53 | 驗證用排程工作在桌面跑 PowerShell 的 UI Automation，加上 named pipe 的控制通道（§15.4；原本規劃的桌面代理 app 用不到） | 在使用者的電腦上送鍵盤事件：會送進使用者正在用的 app，不行。WinAppDriver：微軟已經不維護。從 SSH 直接開 app：不會出現在桌面，截不到圖 |
 | D54 | 複製富文字只放純文字和 HTML | 再放 RTF：要自己從 HTML 產生 RTF；Windows 上常用的貼上目標都吃 HTML |
 | D55 | 偵測會議讀隱私設定的麥克風使用紀錄（ConsentStore） | audio session 清單（IAudioSessionManager2）：要一個一個裝置列，瀏覽器和 WebView2 用另一個程序收音，容易漏。取捨：ConsentStore 沒有官方文件，Windows 改版時可能變；它是系統「麥克風使用中」指示的資料來源，改了也比較容易發現 |
 | D56 | whisper 外面包一層小的 C shim | 在 C# 宣告整個 `whisper_full_params`：傳值、1 byte 的 bool、巢狀 struct 和 callback，對錯了不會報錯、只會結果怪；每次升級 whisper.cpp 都要重新對一次 struct |

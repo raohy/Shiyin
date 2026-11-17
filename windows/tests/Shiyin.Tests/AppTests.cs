@@ -7,6 +7,7 @@ using Shiyin.Model;
 using Shiyin.Notes;
 using Shiyin.Services;
 using Shiyin.Services.Capture;
+using Shiyin.Text;
 using Shiyin.Speech;
 using Shiyin.Transcribe;
 using Shiyin.Whisper;
@@ -276,6 +277,229 @@ public sealed class AppTests : IDisposable
         Assert.Null(db.Meeting(id)!.DeletedAt);
         controller.DeletePermanently(id);
         Assert.Null(db.Meeting(id));
+    }
+
+    /// <summary>
+    /// 「產生精簡版」（R96.2、M§70）：沒設整理工具、整理工具還沒準備好時不排、說原因；排的是輔助線的 clean（不改會議的狀態），
+    /// 已經在排時不重複排；失敗的原因帶到 MeetingDetail.CleanFailure
+    /// </summary>
+    [Fact]
+    public void GenerateCleanTranscriptQueuesAuxiliaryJob()
+    {
+        var settings = AppSettings.InMemory(new Dictionary<string, string> { ["llmProvider"] = "none" });
+        var controller = Controller(settings, out _);
+        var errors = new List<string>();
+        controller.Error += errors.Add;
+        var id = db.InsertMeeting(new Meeting { SourceFilename = "a" }, null).Id!.Value;
+        db.SaveTranscript(id, [new Segment { MeetingId = id, Seq = 0, Start = 0, End = 2, Text = "嗯，好" }], 2, 0);
+        controller.GenerateCleanTranscript(id);
+        Assert.Equal(["整理工具設定為「不整理」，請先到設定改成 Claude、Codex 或 API"], errors);
+        Assert.Null(db.LastJob(id, JobKind.Clean));
+        settings.Set(AppSettings.ProviderKey, "anthropic");
+        settings.HasKey = _ => false;
+        controller.GenerateCleanTranscript(id);
+        Assert.Equal(2, errors.Count);
+        Assert.Null(db.LastJob(id, JobKind.Clean));
+        settings.HasKey = _ => true;
+        controller.GenerateCleanTranscript(id);
+        controller.GenerateCleanTranscript(id);
+        Assert.Equal(1L, db.Read(d => d.Scalar("SELECT COUNT(*) FROM jobs WHERE meeting_id = ? AND kind = 'clean'", id)));
+        Assert.Equal((JobKind.Clean, JobStatus.Queued), (db.LastJob(id, JobKind.Clean)!.Kind, db.LastJob(id, JobKind.Clean)!.Status));
+        Assert.Equal((true, (double?)null), controller.CleaningProgress(id));
+        // 輔助工作：會議的狀態照舊是完成（列表不顯示排隊中）
+        Assert.Null(db.LatestJob(id));
+        Assert.Equal(JobLane.Assist, JobKind.Clean.Lane());
+        Assert.True(JobKind.Clean.IsAuxiliary() && JobKind.Clean.UsesSummarizer());
+        Assert.Equal(JobKind.Clean, JobKinds.Parse("clean"));
+        Assert.Null(MeetingDetail.Load(db, id)!.CleanFailure);
+        var job = db.ClaimNext(JobLane.Assist)!;
+        db.Finish(job.Id!.Value, JobStatus.Failed, "額度用完了", null);
+        Assert.Equal("額度用完了", MeetingDetail.Load(db, id)!.CleanFailure);
+        Assert.Equal((false, (double?)null), controller.CleaningProgress(id));
+    }
+
+    /// <summary>新增詞彙（R94.1、M§68）：一次好幾個、已經有的跳過，說明同 Mac；勾選後一起刪除</summary>
+    [Fact]
+    public void AddTermsExplainsWhatWasAdded()
+    {
+        var controller = Controller(AppSettings.InMemory(), out _);
+        var notices = new List<string>();
+        controller.Notice += notices.Add;
+        Assert.Null(controller.AddTerms("Redis"));
+        Assert.Equal("「Redis」已經在詞彙表裡了", controller.AddTerms(" Redis "));
+        Assert.Equal("已加入 3 個詞彙", controller.AddTerms("Kubernetes、拾音\nSendGrid,kubernetes"));
+        Assert.Equal("已加入 1 個詞彙，1 個已經有了", controller.AddTerms("Redis；Claude Code"));
+        Assert.Null(controller.AddTerms(" ，、\n "));
+        Assert.Equal(["「Redis」已經在詞彙表裡了", "已加入 3 個詞彙", "已加入 1 個詞彙，1 個已經有了"], notices);
+        Assert.Equal(["Redis", "Kubernetes", "拾音", "SendGrid", "Claude Code"], db.Glossary().Select(t => t.Term));
+        var ids = db.Glossary().Where(t => t.Term is "拾音" or "SendGrid").Select(t => t.Id!.Value).ToList();
+        controller.DeleteTerms(ids);
+        Assert.Equal(["Redis", "Kubernetes", "Claude Code"], db.Glossary().Select(t => t.Term));
+    }
+
+    /// <summary>側欄展開的資料夾（R101、design-windows §11.34）：資料夾改名時鍵跟著改，刪除資料夾時拿掉</summary>
+    [Fact]
+    public void SidebarKeysFollowFolderRenameAndDelete()
+    {
+        var settings = AppSettings.InMemory();
+        var controller = Controller(settings, out _);
+        var a = db.InsertMeeting(new Meeting { SourceFilename = "a", MeetingDate = "2026-11-02" }, null).Id!.Value;
+        var b = db.InsertMeeting(new Meeting { SourceFilename = "b", MeetingDate = "2026-11-09" }, null).Id!.Value;
+        db.SetFolder([a], "客戶");
+        db.SetFolder([b], "設計");
+        SidebarCollapse.SetRow(settings, "folder:客戶", true);
+        SidebarCollapse.SetRow(settings, "folder:設計", true);
+        SidebarCollapse.SetSection(settings, "folders", false);
+        controller.RenameFolder("客戶", "客戶 A");
+        Assert.Equal(["客戶 A", "設計"], db.MeetingRows().Select(r => r.Meeting.Folder).Distinct().Order());
+        Assert.Equal(["folder:客戶 A", "folder:設計"], settings.StringList(AppSettings.SidebarExpandedKey));
+        controller.DeleteFolder("客戶 A");
+        controller.DeleteFolder("設計");
+        Assert.Empty(settings.StringList(AppSettings.SidebarExpandedKey));
+        // 段落的收合不受影響
+        Assert.Equal(["folders"], settings.StringList(AppSettings.SidebarCollapsedKey));
+    }
+
+    /// <summary>
+    /// 重新命名的對話框（R102、M§76）：目前的名字從資料庫讀（沒取過標題的會議是檔名、人物和標記不靠畫面的列表）；儲存走原本的動作
+    /// （會議只改標題、鎖住標題，沒改不存；資料夾改名排序的鍵跟著改；新資料夾移進去；人物同名合併；標記）
+    /// </summary>
+    [Fact]
+    public void RenameDialogReadsAndCommits()
+    {
+        var settings = AppSettings.InMemory();
+        var controller = Controller(settings, out _);
+        var a = db.InsertMeeting(new Meeting { SourceFilename = "2026-11-02 週會.m4a", MeetingDate = "2026-11-02", Participants = "王小明" }, null).Id!.Value;
+        var b = db.InsertMeeting(new Meeting { SourceFilename = "b.m4a", Title = "客戶訪談", MeetingDate = "2026-11-09" }, null).Id!.Value;
+        Assert.Equal("2026-11-02 週會", controller.CurrentName(new RenameTarget.Meeting(a)));
+        Assert.Equal("客戶訪談", controller.CurrentName(new RenameTarget.Meeting(b)));
+        // 沒改不存（標題不會被鎖住）；改了只改標題，日期、與會者照舊
+        controller.CommitRename(new RenameTarget.Meeting(a), "2026-11-02 週會");
+        Assert.False(db.Meeting(a)!.TitleLocked);
+        controller.CommitRename(new RenameTarget.Meeting(a), " 產品週會 ");
+        var renamed = db.Meeting(a)!;
+        Assert.Equal(("產品週會", "2026-11-02", "王小明", true), (renamed.Title, renamed.MeetingDate, renamed.Participants, renamed.TitleLocked));
+
+        // 新資料夾：會議移進去；資料夾改名時排序的鍵跟著改
+        controller.CommitRename(new RenameTarget.NewFolder([a, b]), "客戶");
+        Assert.Equal(["客戶"], db.MeetingRows().Select(r => r.Meeting.Folder).Distinct());
+        settings.Set(AppSettings.SidebarOrderKey, ["folder:客戶", "folder:例會"]);
+        controller.CommitRename(new RenameTarget.Folder("客戶"), "客戶 A");
+        Assert.Equal(["客戶 A"], db.MeetingRows().Select(r => r.Meeting.Folder).Distinct());
+        Assert.Equal(["folder:客戶 A", "folder:例會"], settings.StringList(AppSettings.SidebarOrderKey));
+        controller.DeleteFolder("客戶 A");
+        Assert.Equal(["folder:例會"], settings.StringList(AppSettings.SidebarOrderKey));
+
+        long amy = 0, ming = 0;
+        db.Write(d =>
+        {
+            d.Execute("INSERT INTO people (name, created_at) VALUES (?, ?)", "Amy", Clock.Now());
+            amy = d.LastInsertRowId;
+            d.Execute("INSERT INTO people (name, created_at) VALUES (?, ?)", "王小明", Clock.Now());
+            ming = d.LastInsertRowId;
+        });
+        Assert.Equal("王小明", controller.CurrentName(new RenameTarget.Person(ming)));
+        controller.CommitRename(new RenameTarget.Person(ming), "AMY");
+        Assert.Equal([(amy, "Amy")], db.PeopleOverview().Select(p => (p.Id, p.Name)));
+
+        // 「+」建空的資料夾（R104）：資料夾表多一個、提示；同名的不建；會議都移走了還在
+        var notices = new List<string>();
+        controller.Notice += notices.Add;
+        controller.CommitRename(new RenameTarget.NewFolder([]), " 空的資料夾 ");
+        Assert.Contains("空的資料夾", db.FolderNames());
+        Assert.Equal("已建立資料夾「空的資料夾」", notices[^1]);
+        controller.MoveToFolder([b], "設計");
+        notices.Clear();
+        controller.CreateFolder("設計");
+        Assert.Empty(notices);
+        controller.MoveToFolder([b], "");
+        Assert.Contains("設計", db.FolderNames());
+
+        db.AddBookmark(b, 754, "");
+        var mark = db.Bookmarks(b).Single();
+        Assert.Equal("", controller.CurrentName(new RenameTarget.Bookmark(mark.Id!.Value)));
+        controller.CommitRename(new RenameTarget.Bookmark(mark.Id!.Value), "報價");
+        Assert.Equal("報價", db.Bookmark(mark.Id!.Value)!.Label);
+        // 空白不存
+        controller.CommitRename(new RenameTarget.Bookmark(mark.Id!.Value), "  ");
+        Assert.Equal("報價", db.Bookmark(mark.Id!.Value)!.Label);
+    }
+
+    /// <summary>
+    /// 會議拖到列表的標題（R103.1、M§77）：在看資料夾＝移進去、「其他會議」＝移出資料夾；都不在資料夾裡時說一聲
+    /// </summary>
+    [Fact]
+    public void DropOnListHeaderMovesMeetings()
+    {
+        var controller = Controller(AppSettings.InMemory(), out _);
+        var notices = new List<string>();
+        controller.Notice += notices.Add;
+        var a = db.InsertMeeting(new Meeting { SourceFilename = "a", MeetingDate = "2026-11-02" }, null).Id!.Value;
+        var b = db.InsertMeeting(new Meeting { SourceFilename = "b", MeetingDate = "2026-11-09" }, null).Id!.Value;
+        controller.DropOnListHeader([a, b], "客戶", othersOnly: false);
+        Assert.Equal(["客戶", "客戶"], new[] { a, b }.Select(id => db.Meeting(id)!.Folder));
+        controller.DropOnListHeader([a, b], null, othersOnly: true);
+        Assert.All(new[] { a, b }.Select(id => db.Meeting(id)!), m => Assert.Equal("", m.Folder));
+        Assert.Equal("已把 2 場會議移出資料夾", notices[^1]);
+        controller.DropOnListHeader([a], null, othersOnly: true);
+        Assert.Equal("這場會議沒有在任何資料夾裡", notices[^1]);
+        controller.DropOnListHeader([a, b], null, othersOnly: true);
+        Assert.Equal("這些會議都沒有在資料夾裡", notices[^1]);
+        // 看所有會議時（不是其他會議）不動
+        controller.DropOnListHeader([a], null, othersOnly: false);
+        Assert.Equal("", db.Meeting(a)!.Folder);
+    }
+
+    /// <summary>
+    /// 每一種東西都能直接改、刪（R100、M§74）：就地改一條紀錄（待辦只改事項、時間點不變、留一個版本、空的和沒改的不存）、
+    /// 刪除一條（不確認、提示怎麼復原、復原上一版拿回來）；標記重新命名；詞改成已經有的詞時合併
+    /// </summary>
+    [Fact]
+    public void EditAndDeleteThingsInPlace()
+    {
+        var controller = Controller(AppSettings.InMemory(), out _);
+        var notices = new List<string>();
+        controller.Notice += notices.Add;
+        var id = db.InsertMeeting(new Meeting { SourceFilename = "a", Title = "週會" }, null).Id!.Value;
+        var notes = new MeetingNotes
+        {
+            Summary = [new("決定省錢", "00:01"), new("下週上線", "00:05")], ActionItems = [new("小明", "寄信", "2026-11-20", "00:10")],
+            Topics = [new("進度", "00:00", [new("快取", "00:02")])], People = [new("小明", [new("報告進度", "00:03")])],
+        };
+        db.SaveNotes(id, notes, "claude", "整理", NotesSource.Generated);
+        Assert.Equal("寄信", notes.TextAt(NoteItemRef.ActionItems(0)));
+        Assert.Null(notes.TextAt(NoteItemRef.Summary(5)));
+        Assert.Same(notes, notes.WithText(NoteItemRef.TopicPoint(1, 0), "x"));
+
+        controller.EditNoteItem(id, NoteItemRef.ActionItems(0), " 寄信給客戶\r ");
+        controller.EditNoteItem(id, NoteItemRef.TopicPoint(0, 0), "Redis 快取");
+        controller.EditNoteItem(id, NoteItemRef.Summary(0), "  ");
+        controller.EditNoteItem(id, NoteItemRef.Person(0, 0), "報告進度");
+        var edited = db.Meeting(id)!.DecodedNotes!;
+        Assert.Equal(new MeetingNotes.ActionItem("小明", "寄信給客戶", "2026-11-20", "00:10"), edited.ActionItems[0]);
+        Assert.Equal(("Redis 快取", "00:02"), (edited.Topics[0].Points[0].Text, edited.Topics[0].Points[0].Time));
+        Assert.Equal("決定省錢", edited.Summary[0].Text);
+        Assert.Equal(2, db.VersionCount(id));
+
+        controller.DeleteNoteItem(id, NoteItemRef.Summary(0));
+        Assert.Equal(["下週上線"], db.Meeting(id)!.DecodedNotes!.Summary.Select(i => i.Text));
+        Assert.Equal(["已刪除一條紀錄，可以按紀錄分頁「編輯」旁的「復原上一版」還原"], notices);
+        controller.DeleteNoteItem(id, NoteItemRef.Summary(9));
+        Assert.Single(notices);
+        controller.UndoNotes(id);
+        Assert.Equal(["決定省錢", "下週上線"], db.Meeting(id)!.DecodedNotes!.Summary.Select(i => i.Text));
+
+        db.AddBookmark(id, 12, "重點");
+        var bookmark = db.Bookmarks(id)[0];
+        controller.RenameBookmark(id, bookmark.Id!.Value, " 決議 ");
+        Assert.Equal("決議", db.Bookmarks(id)[0].Label);
+
+        controller.AddTerms("Redis\nRedls\nKubernetes");
+        long Term(string t) => db.Glossary().First(x => x.Term == t).Id!.Value;
+        controller.RenameTerm(Term("Kubernetes"), " K8s ");
+        controller.RenameTerm(Term("Redls"), "Redis");
+        controller.RenameTerm(Term("K8s"), "  ");
+        Assert.Equal(["Redis", "K8s"], db.Glossary().Select(t => t.Term));
     }
 
     /// <summary>「人物」的「產生每個人的重點」（R92.4、M§66）：排 summarize，payload 只多 people；沒設整理工具時不排、說原因。草稿的 payload 跟以前一字不差</summary>

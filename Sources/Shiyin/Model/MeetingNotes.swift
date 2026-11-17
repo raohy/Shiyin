@@ -154,7 +154,8 @@ struct MeetingNotes: Codable, Hashable {
         people = (try? c.decode([Person].self, forKey: .people)) ?? []
     }
 
-    /// people 是空的时不写（design §66）：以前的会议记录、没有这一段的会议记录存起来跟以前一字不差
+    /// people 是空的时不写（design §66）：以前的会议记录、没有这一段的会议记录存起来跟以前一字不差。
+    /// 以前定期会议的 followUps（design §73，D177 拿掉）不读不写
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(title, forKey: .title)
@@ -242,6 +243,49 @@ struct MeetingNotes: Codable, Hashable {
             + #","custom":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["title","items"],"properties":{"title":{"type":"string"},"items":"# + items + #"}}}"#
             + #","reviewItems":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["time","question","yesNo"],"properties":{"time":{"type":"string"},"question":{"type":"string"},"yesNo":{"type":"boolean"}}}}}}"#
     }()
+}
+
+extension MeetingNotes {
+    /// 一条记录的文字（待办是事项）；位置不在了是 nil（R100、design §74）
+    func text(at ref: NoteItemRef) -> String? {
+        switch ref {
+        case .summary(let i): return summary.indices.contains(i) ? summary[i].text : nil
+        case .decisions(let i): return decisions.indices.contains(i) ? decisions[i].text : nil
+        case .actionItems(let i): return actionItems.indices.contains(i) ? actionItems[i].task : nil
+        case .openQuestions(let i): return openQuestions.indices.contains(i) ? openQuestions[i].text : nil
+        case .topicPoint(let t, let p): return topics.indices.contains(t) && topics[t].points.indices.contains(p) ? topics[t].points[p].text : nil
+        case .custom(let c, let i): return custom.indices.contains(c) && custom[c].items.indices.contains(i) ? custom[c].items[i].text : nil
+        case .person(let p, let i): return people.indices.contains(p) && people[p].points.indices.contains(i) ? people[p].points[i].text : nil
+        }
+    }
+
+    /// 改一条记录的文字（时间点不变）
+    mutating func setText(_ text: String, at ref: NoteItemRef) {
+        guard self.text(at: ref) != nil else { return }
+        switch ref {
+        case .summary(let i): summary[i].text = text
+        case .decisions(let i): decisions[i].text = text
+        case .actionItems(let i): actionItems[i].task = text
+        case .openQuestions(let i): openQuestions[i].text = text
+        case .topicPoint(let t, let p): topics[t].points[p].text = text
+        case .custom(let c, let i): custom[c].items[i].text = text
+        case .person(let p, let i): people[p].points[i].text = text
+        }
+    }
+
+    /// 删掉一条记录
+    mutating func remove(at ref: NoteItemRef) {
+        guard text(at: ref) != nil else { return }
+        switch ref {
+        case .summary(let i): summary.remove(at: i)
+        case .decisions(let i): decisions.remove(at: i)
+        case .actionItems(let i): actionItems.remove(at: i)
+        case .openQuestions(let i): openQuestions.remove(at: i)
+        case .topicPoint(let t, let p): topics[t].points.remove(at: p)
+        case .custom(let c, let i): custom[c].items.remove(at: i)
+        case .person(let p, let i): people[p].points.remove(at: i)
+        }
+    }
 }
 
 /// 一条记录的位置（design §31.1）：待确认的题目对应到哪一条

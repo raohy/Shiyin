@@ -50,7 +50,7 @@ public static class ExportItems
 /// 會議的操作（同 Mac 的 AppModel，不含畫面的狀態）：匯入、錄音存檔、當掉後復原、垃圾桶、重新轉錄、說話者的修正、整理、校正。
 /// 畫面（ViewModel）傳入要操作哪一場會議；結果用 Notice、Error 事件告訴使用者，資料改了用 Changed 通知重讀
 /// </summary>
-public sealed class AppController
+public sealed partial class AppController
 {
     public AppDatabase Db { get; }
     public AppSettings Settings { get; }
@@ -116,6 +116,8 @@ public sealed class AppController
         runner.EditedDraftReplaced += _ =>
             Notice?.Invoke(L.T("正式版的會議紀錄好了；你改過的草稿留在版本紀錄裡，按紀錄分頁「編輯」旁的「復原上一版」可以找回"));
         runner.Changed += () => Changed?.Invoke(null);
+        // 自動放進資料夾了（M§72）
+        runner.Organized += Organized;
     }
 
     /// <summary>啟動時：內建範本、清掉上次的暫存、過期的垃圾桶、復原錄音、開始工作佇列（同 Mac 的 AppModel.start）</summary>
@@ -199,11 +201,30 @@ public sealed class AppController
     {
         var name = newName.Trim();
         if (name.Length == 0 || name == old) return;
+        // 側欄展開的資料夾、排序的鍵跟著改名（R101、R103，design-windows §11.34、§11.36）
+        SidebarCollapse.RenameFolder(Settings, old, name);
+        SidebarDrag.RenameFolder(Settings, old, name);
         Perform(null, () => Db.RenameFolder(old, name));
     }
 
-    /// <summary>刪除資料夾：會議留著，移回「不在資料夾」</summary>
-    public void DeleteFolder(string name) => Perform(null, () => Db.RenameFolder(name, ""));
+    /// <summary>
+    /// 建一個空的資料夾（R104、M§78，「資料夾」標題的「+」、DEBUG 的 foldernew）：已經有同名的資料夾（資料夾表、會議的資料夾、自動加入條件）時不建
+    /// </summary>
+    public void CreateFolder(string name)
+    {
+        var trimmed = name.Trim();
+        if (trimmed.Length == 0 || Organizing.Folders(Db.MeetingRows(), Db.FolderRules(), Db.FolderNames()).Any(f => f.Name == trimmed)) return;
+        Perform(null, () => Db.CreateFolder(trimmed));
+        Notice?.Invoke(L.F("已建立資料夾「%@」", trimmed));
+    }
+
+    /// <summary>刪除資料夾：會議留著，移回「不在資料夾」；側欄展開、排序的鍵拿掉（R101、R103）</summary>
+    public void DeleteFolder(string name)
+    {
+        SidebarCollapse.SetRow(Settings, SidebarCollapse.FolderKey(name), false);
+        SidebarDrag.Remove(Settings, SidebarCollapse.FolderKey(name));
+        Perform(null, () => Db.RenameFolder(name, ""));
+    }
 
     // MARK: 匯入（R3）
 
@@ -947,6 +968,33 @@ public sealed class AppController
     }
 
     /// <summary>「人物」的「產生每個人的重點」（R92、M§66）：只補上這一段，摘要、決議、待辦這些段落不動</summary>
+    /// <summary>
+    /// 逐字稿「精簡」的「產生精簡版」（R96、M§70）：擋法和訊息同「產生每個人的重點」；在輔助線跑，不發通知。
+    /// 已經在產生（排隊或進行中）時不再排
+    /// </summary>
+    public void GenerateCleanTranscript(long id)
+    {
+        if (!ReadyForAction(id)) return;
+        if (Settings.Provider == LLMProvider.None)
+        {
+            Error?.Invoke(Settings.NeedsProviderSetup ? L.T("還沒設定整理工具，請先到設定選擇 Claude、Codex 或 API")
+                : L.T("整理工具設定為「不整理」，請先到設定改成 Claude、Codex 或 API"));
+            return;
+        }
+        if (Settings.SummarizerProblem is { } problem) { Error?.Invoke(problem.Message); return; }
+        if (Db.HasActiveJob(id, JobKind.Clean)) return;
+        Perform(id, () => Db.Enqueue(id, JobKind.Clean));
+        Runner.Wake();
+    }
+
+    /// <summary>正在產生這場會議的精簡版（Active）和進度（0～1，排隊中、第一批還沒回來是 null）</summary>
+    public (bool Active, double? Progress) CleaningProgress(long meetingId)
+    {
+        if (Runner.Running(JobLane.Assist) is { } running && running.Job.Kind == JobKind.Clean && running.Job.MeetingId == meetingId)
+            return (true, running.Progress);
+        return (Db.HasActiveJob(meetingId, JobKind.Clean), null);
+    }
+
     public void GeneratePeopleNotes(long id)
     {
         if (!ReadyForAction(id)) return;
@@ -1190,6 +1238,30 @@ public sealed class AppController
     }
 
     public void AddTerm(string term) => Perform(null, () => Db.AddTerm(term));
+
+    /// <summary>
+    /// 新增詞彙（R94.1、M§68）：一次貼上好幾個時用換行、逗號、頓號、分號分開，已經有的跳過。
+    /// 一個詞而且已經有、或一次好幾個時說明結果（Notice，同 Mac 的 noticeMessage）；回傳同一句（設定頁也寫在輸入框下面），沒有要說的是 null
+    /// </summary>
+    public string? AddTerms(string text)
+    {
+        var terms = GlossaryInput.Split(text);
+        if (terms.Count == 0) return null;
+        var added = 0;
+        Perform(null, () => added = Db.AddTerms(terms));
+        string? message = null;
+        if (terms.Count == 1 && added == 0) message = L.F("「%@」已經在詞彙表裡了", terms[0]);
+        else if (terms.Count > 1)
+            message = added == terms.Count ? L.F("已加入 %lld 個詞彙", (long)added) : L.F("已加入 %lld 個詞彙，%lld 個已經有了", (long)added, (long)(terms.Count - added));
+        if (message is not null) Notice?.Invoke(message);
+        return message;
+    }
+
+    /// <summary>刪除勾選的詞彙（R94.3）</summary>
+    public void DeleteTerms(IReadOnlyCollection<long> ids)
+    {
+        if (ids.Count > 0) Perform(null, () => Db.DeleteTerms(ids));
+    }
     public void DismissGlossarySuggestion(string term) => Perform(null, () => Db.DismissGlossarySuggestion(term));
     public void DeleteTerm(long id) => Perform(null, () => Db.DeleteTerm(id));
     public void SaveTemplate(TemplateRecord template) => Perform(null, () => Db.SaveTemplate(template));
@@ -1292,33 +1364,4 @@ public sealed class AppController
     // MARK: 搜尋（R9.1）
 
     public List<SearchHit> Search(string query) => query.Trim().Length == 0 ? [] : Db.Search(query);
-}
-
-/// <summary>名稱排序跟 Finder 一樣：數字照大小（「第 2 週」排在「第 10 週」前面）</summary>
-public sealed class NaturalComparer : IComparer<string>
-{
-    public static readonly NaturalComparer Instance = new();
-
-    public int Compare(string? x, string? y)
-    {
-        if (x is null || y is null) return string.Compare(x, y, StringComparison.Ordinal);
-        int i = 0, j = 0;
-        while (i < x.Length && j < y.Length)
-        {
-            if (char.IsAsciiDigit(x[i]) && char.IsAsciiDigit(y[j]))
-            {
-                var si = i; while (i < x.Length && char.IsAsciiDigit(x[i])) i++;
-                var sj = j; while (j < y.Length && char.IsAsciiDigit(y[j])) j++;
-                var a = x[si..i].TrimStart('0');
-                var b = y[sj..j].TrimStart('0');
-                var c = a.Length != b.Length ? a.Length.CompareTo(b.Length) : string.CompareOrdinal(a, b);
-                if (c != 0) return c;
-                continue;
-            }
-            var d = string.Compare(x[i].ToString(), y[j].ToString(), System.Globalization.CultureInfo.CurrentCulture, System.Globalization.CompareOptions.IgnoreCase);
-            if (d != 0) return d;
-            i++; j++;
-        }
-        return (x.Length - i).CompareTo(y.Length - j);
-    }
 }
