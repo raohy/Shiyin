@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CATALOG = ROOT / "Resources" / "Localizable.xcstrings"
 SOURCES = ROOT / "Sources" / "Shiyin"
-SCRATCH = Path.home() / "Library" / "Caches" / "ShiyinBuild-l10n"
+SCRATCH = Path(os.environ.get("SHIYIN_L10N_SCRATCH") or Path.home() / "Library" / "Caches" / "ShiyinBuild-l10n")
 CJK = re.compile("[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]")  # 中文字和全形標點
 
 # 不顯示在介面上的中文：DEBUG 控制通道、送給 LLM 的提示詞（會議紀錄、逐字稿校正）、各語言分開寫好的內容

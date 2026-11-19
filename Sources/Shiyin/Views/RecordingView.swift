@@ -202,14 +202,7 @@ struct RecordingPanel: View {
                             .foregroundStyle(.secondary)
                     }
                     ForEach(recorder.liveLines) { line in
-                        HStack(alignment: .firstTextBaseline, spacing: 12) {
-                            Text(TimeFormat.string(line.start)).contentFont(.callout, monospacedDigit: true).foregroundStyle(Color.celadon)
-                                .frame(width: 52 * scale, alignment: .trailing)
-                            Text(line.text).textSelection(.enabled).fixedSize(horizontal: false, vertical: true).meetingText()
-                            if starred.contains(line.id) {
-                                Image(systemName: "star.fill").foregroundStyle(Color.signal).contentFont(.caption)
-                            }
-                        }
+                        LiveTranscriptLineView(line: line, starred: starred.contains(line.id))
                         .id(line.id)
                     }
                     // 还没定稿的文字一直在变，只让这一行重算，不拖着整份实时逐字稿（design §21.12）
@@ -244,7 +237,7 @@ struct RecordingPanel: View {
                     if followLatest { followLatest = false }
                 }
             }
-            .onChange(of: recorder.liveLines.count) { _, _ in
+            .onChange(of: recorder.liveLines) { _, _ in
                 guard followLatest else { return }
                 if reduceMotion { proxy.scrollTo("bottom", anchor: .bottom) }
                 else { withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom", anchor: .bottom) } }
@@ -380,6 +373,22 @@ struct UserNotesDisclosure: View {
                 .padding(.bottom, 12)
                 .frame(maxWidth: 760, alignment: .leading)
             }
+        }
+    }
+}
+
+struct LiveTranscriptLineView: View {
+    @Environment(\.textScale) private var scale
+    let line: LiveTranscriptDisplay.Line
+    let starred: Bool
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(TimeFormat.string(line.start)).contentFont(.callout, monospacedDigit: true).foregroundStyle(Color.celadon)
+                .frame(width: 52 * scale, alignment: .trailing)
+            Text(line.text).textSelection(.enabled).fixedSize(horizontal: false, vertical: true).meetingText()
+            if line.reviewed { Text("已复核").font(.caption2).foregroundStyle(.secondary) }
+            if starred { Image(systemName: "star.fill").foregroundStyle(Color.signal).contentFont(.caption) }
         }
     }
 }

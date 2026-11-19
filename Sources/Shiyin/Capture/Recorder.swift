@@ -15,13 +15,6 @@ final class Recorder {
         var idleSince: Double? = nil
     }
 
-    struct LiveLine: Identifiable, Hashable {
-        let id = UUID()
-        var start: Double
-        var end: Double
-        var text: String
-    }
-
     private(set) var isRecording = false
     private(set) var isPaused = false
     private(set) var meetingId: Int64?
@@ -35,7 +28,8 @@ final class Recorder {
     @ObservationIgnored private(set) var micLevel: Float = 0
     @ObservationIgnored private(set) var systemLevel: Float = 0
     private(set) var source = "mic"            // mic / system / both
-    private(set) var liveLines: [LiveLine] = []
+    @ObservationIgnored private var liveDisplay = LiveTranscriptDisplay()
+    private(set) var liveLines: [LiveTranscriptDisplay.Line] = []
     private(set) var volatileText = ""
     private(set) var liveStatus = ""
     /// 系统声音一直是静音：可能没有允许「录制系统音频」或没有东西在播
@@ -476,8 +470,7 @@ final class Recorder {
             lastSpeechAt = 0
             liveActive = false
             idlePrompt = false
-            liveLines = []
-            volatileText = ""
+            resetLiveDisplay()
             systemSilent = false
             isPaused = false
             isRecording = true
@@ -512,7 +505,9 @@ final class Recorder {
         reviewStatus = String(localized: "等待音频复核…")
         liveStatus = String(localized: "正在准备实时逐字稿…")
         liveActive = false
-        live.onVolatile = { [weak self, weak live] text in
+        // 中途重新开始时，新的识别从 0 秒算，要加上接上音频时已经录了多久。
+        let offset = LiveOffset()
+        live.onVolatile = { [weak self, weak live] start, end, text in
             #if DEBUG
             DebugMetrics.bump("volatileUpdate")
             #endif
@@ -520,20 +515,15 @@ final class Recorder {
             // 有新的字就是有人在说话（design §35.1）
             // 中文会议用简体时转成简体（design §47.2）
             let text = AppSettings.script(text, for: language)
-            if !text.isEmpty && text != self.volatileText { self.markSpeech() }
-            self.volatileText = text
+            if !text.isEmpty && text != self.liveDisplay.previewText { self.markSpeech() }
+            self.setLivePreview(start: start + offset.seconds, end: end + offset.seconds, text: text)
         }
-        // 中途重新开始时，新的识别从 0 秒算，要加上接上音频时已经录了多久
-        let offset = LiveOffset()
         live.onFinal = { [weak self, weak live] start, end, text in
             guard let self else { return }
             let (start, end) = (start + offset.seconds, end + offset.seconds)
             let text = AppSettings.script(text, for: language)
-            if let live, self.live === live {
-                self.liveLines.append(LiveLine(start: start, end: end, text: text))
-                if !text.isEmpty { self.markSpeech() }
-            }
-            self.onLiveFinal?(meetingId, start, end, text)
+            self.receiveLiveFinal(meetingId: meetingId, start: start, end: end, text: text,
+                                  current: live != nil && self.live === live)
         }
         var failed = false
         live.onFailure = { [weak self, weak live] error in
@@ -542,7 +532,7 @@ final class Recorder {
             // Qwen 的快稿失败时，独立复核仍可继续接收音频。
             if !(live is QwenLiveTranscriber) { self.tap.setLive(nil) }
             self.liveActive = false
-            self.volatileText = ""
+            self.setLivePreview(start: 0, end: 0, text: "")
             self.liveStatus = String(localized: "实时逐字稿已停止（\(error.localizedDescription)），录音照常进行，录完会正式转录")
         }
         // Qwen 冷启动期间先缓存音频，避免模型加载时漏掉开场；系统识别准备好后再接。
@@ -591,21 +581,77 @@ final class Recorder {
             guard let self else { return }
             let (start, end) = (start + offset.seconds, end + offset.seconds)
             let current = qwen != nil && (self.live === qwen || self.reviewer === qwen)
-            do {
-                try self.onReviewed?(meetingId, start, end, AppSettings.script(text, for: language))
-                if current {
-                    self.reviewedThrough = end
-                    self.reviewStatus = ""
-                }
-            } catch {
-                if current { self.reviewStatus = String(localized: "无法保存复核文字：\(error.localizedDescription)") }
-            }
+            self.receiveLiveReview(meetingId: meetingId, start: start, end: end,
+                                   text: AppSettings.script(text, for: language), current: current)
         }
         qwen.onReviewFailure = { [weak self, weak qwen] error in
             guard let self, let qwen, self.live === qwen || self.reviewer === qwen else { return }
             if self.reviewer === qwen { self.tap.setReview(nil) }
             self.reviewStatus = String(localized: "音频复核已停止（\(error.localizedDescription)），会中助手只分析已复核文字")
         }
+    }
+
+    func receiveLiveFinal(meetingId: Int64, start: Double, end: Double, text: String, current: Bool) {
+        if current {
+            addLiveDraft(start: start, end: end, text: text)
+            if !text.isEmpty { markSpeech() }
+        }
+        onLiveFinal?(meetingId, start, end, text)
+    }
+
+    func receiveLiveReview(meetingId: Int64, start: Double, end: Double, text: String, current: Bool) {
+        do {
+            try onReviewed?(meetingId, start, end, text)
+            if current {
+                addLiveReview(start: start, end: end, text: text)
+                reviewedThrough = end
+                reviewStatus = ""
+            }
+        } catch {
+            if current { reviewStatus = String(localized: "无法保存复核文字：\(error.localizedDescription)") }
+        }
+    }
+
+    #if DEBUG
+    /// 只允许模拟音频录音注入识别结果，供隔离应用的显示与数据库集成检查使用。
+    func simulateTranscriptResult(meetingId: Int64, kind: String, start: Double, end: Double, text: String) {
+        guard isRecording, self.meetingId == meetingId, sources[0] is FileSource else { return }
+        switch kind {
+        case "draft": receiveLiveFinal(meetingId: meetingId, start: start, end: end, text: text, current: true)
+        case "review": receiveLiveReview(meetingId: meetingId, start: start, end: end, text: text, current: true)
+        case "preview": setLivePreview(start: start, end: end, text: text)
+        default: break
+        }
+    }
+
+    var simulatedTranscriptState: [String: Any]? {
+        guard isRecording, sources[0] is FileSource else { return nil }
+        return ["lines": liveLines.map { ["start": $0.start, "end": $0.end, "text": $0.text, "reviewed": $0.reviewed] },
+                "preview": volatileText, "reviewedThrough": reviewedThrough]
+    }
+    #endif
+
+    /// 显示状态和原始快稿分开：迟到结果不能把已经复核的文字覆盖回去。
+    func addLiveDraft(start: Double, end: Double, text: String) {
+        if liveDisplay.addDraft(start: start, end: end, text: text) { liveLines = liveDisplay.lines }
+    }
+
+    func addLiveReview(start: Double, end: Double, text: String) {
+        if liveDisplay.addReview(start: start, end: end, text: text) {
+            liveLines = liveDisplay.lines
+            if volatileText != liveDisplay.visiblePreview { volatileText = liveDisplay.visiblePreview }
+        }
+    }
+
+    func setLivePreview(start: Double, end: Double, text: String) {
+        liveDisplay.setPreview(start: start, end: end, text: text)
+        if volatileText != liveDisplay.visiblePreview { volatileText = liveDisplay.visiblePreview }
+    }
+
+    func resetLiveDisplay() {
+        liveDisplay = LiveTranscriptDisplay()
+        liveLines = []
+        volatileText = ""
     }
 
     // MARK: 自动检测主要语言（design §18.8、R16、D21）
@@ -669,7 +715,7 @@ final class Recorder {
         oldReviewer?.cancel()
         reviewer = nil
         tap.setReview(nil)
-        volatileText = ""
+        setLivePreview(start: 0, end: 0, text: "")
         Task {
             await old?.finish()
             await oldReviewer?.finish()
@@ -974,7 +1020,7 @@ final class Recorder {
         isPaused = false
         micLevel = 0
         systemLevel = 0
-        volatileText = ""
+        setLivePreview(start: 0, end: 0, text: "")
         liveStatus = ""
         reviewStatus = ""
         reviewedThrough = 0

@@ -161,6 +161,43 @@ try:
             return False
     wait(server_ready, 'fake server HTTP')
     launch()
+    display_mid = preparation('实时复核显示检查')
+    ctl('select', display_mid)
+    ctl('record-sim', base / 'missing-audio.wav', 1, 0)
+    display_path = base / 'recording-display.json'
+
+    def display_state():
+        display_path.unlink(missing_ok=True)
+        ctl('recordtextshow', display_path)
+        return read_json(display_path)
+
+    wait(display_state, 'simulated recording display')
+    ctl('recordtext', display_mid, 'draft', 0, 6, '快稿误识别')
+    ctl('recordtext', display_mid, 'draft', 6, 10, '第二段快稿')
+    ctl('recordtext', display_mid, 'preview', 10, 18, '暂定快稿')
+    display = wait(lambda: (s if (s := display_state()) and len(s['lines']) == 2 and s['preview'] else None), 'quick transcript display')
+    check([line['text'] for line in display['lines']] == ['快稿误识别', '第二段快稿'], '录音中先显示实时快稿')
+    ctl('recordtext', display_mid, 'review', 0, 18, '复核后的文字')
+    display = wait(lambda: (s if (s := display_state()) and s['reviewedThrough'] == 18 else None), 'reviewed transcript display')
+    check([line['text'] for line in display['lines']] == ['复核后的文字']
+          and display['lines'][0]['reviewed'] and not display['preview'], '复核完成后替换对应快稿并隐藏已覆盖暂定文字')
+    check(query("SELECT kind, text FROM segments WHERE meeting_id=? ORDER BY id", (display_mid,)) == [
+        ('live', '快稿误识别'), ('live', '第二段快稿'), ('reviewed', '复核后的文字')], '显示替换不覆盖保存的快稿与复核稿')
+    ctl('recordtext', display_mid, 'draft', 17, 22, '横跨复核边界')
+    ctl('recordtext', display_mid + 9999, 'review', 18, 30, '其他会议迟到结果')
+    display = wait(lambda: (s if (s := display_state()) and len(s['lines']) == 2 else None), 'boundary draft')
+    check(display['lines'][1]['text'] == '横跨复核边界' and display['reviewedThrough'] == 18, '跨边界快稿保留且其他会议不能更改当前显示')
+    ctl('recordtext', display_mid, 'review', 18, 30, '第二段复核')
+    display = wait(lambda: (s if (s := display_state()) and s['reviewedThrough'] == 30 else None), 'adjacent review')
+    check([line['text'] for line in display['lines']] == ['复核后的文字', '第二段复核'], '后续复核完整覆盖后移除跨界快稿')
+    ctl('recordtext', display_mid, 'draft', 30, 35, '仍需保留的快稿')
+    ctl('recordtext', display_mid, 'review', 30, 36, ' ')
+    display = wait(lambda: (s if (s := display_state()) and s['reviewedThrough'] == 36 else None), 'empty review')
+    check(display['lines'][-1]['text'] == '仍需保留的快稿', '空复核结果不抹掉快稿')
+    ctl('snapshot', base / 'recording-reviewed.png', 'light', 'recording-lines')
+    wait(lambda: (base / 'recording-reviewed.png').exists(), 'reviewed transcript snapshot')
+    ctl('record', 'stop')
+    wait(lambda: query('SELECT source FROM meetings WHERE id=?', (display_mid,))[0][0] == 'prepared', 'simulated recording stopped')
     mid = preparation()
     check(mid > 0 and query('SELECT source FROM meetings WHERE id=?', (mid,))[0][0] == 'prepared', '会前创建待录音会议')
     quit_app()

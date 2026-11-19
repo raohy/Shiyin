@@ -757,6 +757,13 @@ enum DebugControl {
             let channels = args.count > 3 ? args[3] : "0"
             model.startSimulatedRecording(file: URL(fileURLWithPath: args[1]), speed: Double(args[2]) ?? 1,
                                           both: channels == "1" || channels == "2", systemSilent: channels == "2")
+        case "recordtext" where args.count >= 6:
+            // recordtext <会议 id> <draft|review|preview> <开始> <结束> <文字>；只对模拟录音生效。
+            if let id, let start = Double(args[3]), let end = Double(args[4]) {
+                model.recorder.simulateTranscriptResult(meetingId: id, kind: args[2], start: start, end: end, text: args[5])
+            }
+        case "recordtextshow" where args.count >= 2:
+            if let state = model.recorder.simulatedTranscriptState { write(state, to: args[1]) }
         case "reminders": model.selection = id; model.addActionItemsToReminders()   // reminders <会议 id>：等于按「加到提醒事项」（design §52.2）
         case "reminderdone":   // reminderdone <会议 id> <第几项，0 开始>：假的提醒事项里把那场会议的第几项设成完成
             let matching = FakeReminders.shared.entries.indices.filter { Reminders.meetingAndKey(FakeReminders.shared.entries[$0].item.url)?.meetingId == id }
@@ -1653,6 +1660,11 @@ enum DebugControl {
         case "recording":
             guard let detail = model.detail else { return }
             content = AnyView(RecordingPanel(detail: detail).frame(width: 900, height: 520))
+        case "recording-lines":
+            guard model.recorder.simulatedTranscriptState != nil else { return }
+            content = AnyView(VStack(alignment: .leading, spacing: 8) {
+                ForEach(model.recorder.liveLines) { line in LiveTranscriptLineView(line: line, starred: false) }
+            }.contentFont().padding(20).frame(width: 600, alignment: .leading))
         case "coach":
             guard let detail = model.detail else { return }
             content = AnyView(MeetingAssistancePanel(meeting: detail.meeting, recording: false).padding(20).frame(width: 620))

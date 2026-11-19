@@ -110,7 +110,7 @@ final class QwenLiveTests: XCTestCase {
         var previews: [String] = []
         var failure: Error?
         live.onFinal = { finals.append(($0, $1, $2)) }
-        live.onVolatile = { if !$0.isEmpty { previews.append($0) } }
+        live.onVolatile = { _, _, text in if !text.isEmpty { previews.append(text) } }
         live.onFailure = { failure = $0 }
         live.onReviewed = { reviewed.append(($0, $1, $2)) }
         live.onReviewFailure = { failure = $0 }

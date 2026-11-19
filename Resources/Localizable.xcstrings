@@ -16311,6 +16311,23 @@
         }
       }
     },
+    "已复核": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已复核"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reviewed"
+          }
+        }
+      }
+    },
     "已安装，看不出登录状态": {
       "extractionState": "manual",
       "localizations": {

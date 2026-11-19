@@ -3,7 +3,7 @@
 拾音 Shiyin 是 macOS 原生的會議紀錄 app（SwiftUI，macOS 26）。Mac 当前为 4.9.0（build 29），新增 Qwen 实时快稿、延迟复核和提问进度反馈；Windows 维持 4.8.1。以下为此前的功能沿革（4.1 加上三個分頁的減法、待確認就地回答、收音提醒送通知、可選的 Qwen3-ASR 引擎，Windows 同步；4.1.1 整理工具設定好才用、失敗說清楚怎麼修；4.1.2 忘了停止錄音時提醒、自動停止；4.2 可以連公司的企業伺服器（在公司的伺服器轉錄、整理，公司詞彙表、加入連結）；4.2.1 企業伺服器的安全強化；4.2.2 只裝 Codex 桌面版也能整理、只有 Claude 桌面版時說明怎麼裝 Claude Code，Windows 加上 AMD 顯示卡加速、錄得到 Teams 的聲音；4.2.3 錄音按鈕和錄音畫面可以選、換麥克風，藍牙耳機的麥克風錄現場會議時提醒，會議內容的文字大小（⌘＋／⌘－），右上角的匯出按鈕；4.3 會議的參考文件（加入 PDF、Word、PowerPoint、圖片，整理和提問時一起參考、註明出處）、整理工具的額度用完時說清楚，Windows 只有 Intel 顯示卡的電腦也試著用顯示卡轉錄；4.5 會議語言加廣東話、韓文（實驗性），每種語言的做法寫在共用的語言檔（台語評估過、還沒加，design §41.9）；4.6 會議紀錄可以切換成心智圖（匯出 PNG、PDF、SVG、複製圖片；design §42）、播放條上的議題時間軸（design §43）；4.7 讓 AI 工具讀取會議（本地 MCP：Claude Code、Codex、Claude Desktop 可以列出、搜尋、讀會議，`Shiyin --mcp`、Windows 的 `shiyin-mcp.exe`；design §44）；4.7.1 更新下載時看得到進度、下載中結束先提醒，提問的回答缺欄位時照樣顯示；4.7.2 把一句拆成兩句（design §46）、中文逐字稿和會議紀錄可以用簡體（design §47），Mac 的麥克風被別的 app 的回音消除佔住時提醒（design §45）；4.8 簡體中文的介面（從繁體自動產生，design §48）；4.8.1 「麥克風＋電腦聲音」的錄音播放、匯出時兩耳都聽得到（design §49），錄音中麥克風一直重新連接時拉長間隔、Mac 在背景重新連接、接住 AVAudioEngine 的例外（design §50）；第三版加上英文版、開源準備、轉錄準確度、日文、更多整理工具、穩定性修正；3.5 加上草稿紀錄、聲紋、猜說話者、對會議提問、偵測會議；3.6 加上重新辨識說話者、合併和改句子的說話者、分不準的提醒、收音提醒，修正錄音中畫面卡住；4.0 加上 Windows 版、待確認的是非題、聲紋沒把握時先問、短句的說話者、沒有 claude／codex 時先不整理）：
 
 - 錄音：AVAudioEngine 收麥克風、Core Audio process tap 收電腦聲音，寫成雙聲道 WAV（`Sources/Shiyin/Capture/`）
-- 即時逐字稿：可选 Qwen3-ASR（词汇表与上下文）或系统 SpeechAnalyzer；Qwen 另行复核较长音频供会中助手分析（design §F51、§F52）。系统识别的语系（語系依會議語言，寫在語言檔的 `live.mac`：zh_CN、en_US、ja_JP、zh_HK（粵語）、ko_KR）
+- 即時逐字稿：可选 Qwen3-ASR（词汇表与上下文）或系统 SpeechAnalyzer；Qwen 另行复核较长音频供会中助手分析，并在录音画面替换已完整覆盖的快稿（design §F51、§F52）。系统识别的语系（語系依會議語言，寫在語言檔的 `live.mac`：zh_CN、en_US、ja_JP、zh_HK（粵語）、ko_KR）
 - 正式轉錄：預設 whisper.cpp（官方 XCFramework）+ Breeze ASR 25 GGML q8_0（聯發科），可以改用 macOS 內建（SpeechAnalyzer 讀檔），模型還沒下載好時也先用內建；4.1 起設定裡可選 Qwen3-ASR 1.7B（阿里巴巴開源；llama.cpp 官方 XCFramework，經 C 薄層 `Sources/QwenShim/` 進 Swift；輸出簡體；先辨識說話者再分段，每段 ≤ 15 秒，`Transcribe/QwenEngine.swift`；design §32，使用者決定預設維持 Breeze）；日文、韓文會議用 Whisper large-v3-turbo q5_0，粵語固定用 Qwen3-ASR（沒下載好時先用內建，不用 Breeze；簡轉繁後套語言檔的 `scriptFixes`，D142）；whisper 從檔案依序讀、每 10 分鐘一段（design §21.16）；說話者辨識：FluidAudio（`Sources/Shiyin/Transcribe/`），聲紋比對在 `Store/Voiceprints.swift`
 - 整理：claude CLI、codex CLI、Anthropic API、OpenAI API、Gemini API、OpenAI 相容 API，共同介面 `LLMBackend`（`Sources/Shiyin/Notes/`，各家在 `Notes/Backends/`，design §19）
 - 會議的參考文件（R61，4.3）：會議可以加 PDF、Word、PowerPoint、純文字、圖片，整理和對這場會議提問時當成「會議參考資料」送出；讀文字在 `IO/DocumentReader.swift`（PDFKit、Vision、`unzip -p`），提示詞在 `Notes/DocumentPrompt.swift`，原始檔在 `SHIYIN_HOME/documents/<id>/`；Windows 用 PdfPig＋Windows.Media.Ocr（design §39、design-windows §11.8）。驗證用 `shiyinctl docread`、`adddoc`
@@ -43,6 +43,7 @@ scripts/build-app.sh --install   # 建置並安裝到 ~/Applications
 scripts/build-app.sh --debug     # DEBUG 版：含驗證用控制通道（指令見 Sources/Shiyin/Debug/DebugControl.swift）
 scripts/make-dmg.sh              # release 建置並產生 DMG（dist/Shiyin-<版本>.dmg，含中英文安裝說明 PDF）
 scripts/dev/l10n.py check        # 抽出介面字串合併進翻譯表，列出缺英文的條目和沒查表的中文（有問題時 exit 1）
+# 隔离本地化构建时可设 SHIYIN_L10N_SCRATCH=/临时路径，不使用共用的 ShiyinBuild-l10n
 scripts/dev/make-third-party-licenses.sh   # 更新套件版本後重跑：產生 Resources/ThirdPartyLicenses.txt（「關於拾音」和 DMG 附的授權條款）
 scripts/dev/l10n.py apply <翻譯.json>   # 寫入英文翻譯：{"中文鍵": "English"}，複數用 {"one": …, "other": …}
 scripts/make-signing-cert.sh     # 建立自簽憑證；加 --trust 信任它（要使用者輸入登入密碼）

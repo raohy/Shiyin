@@ -2,7 +2,7 @@ import Foundation
 
 @MainActor
 final class QwenLiveTranscriber: LiveTranscribing {
-    var onVolatile: ((String) -> Void)?
+    var onVolatile: ((Double, Double, String) -> Void)?
     var onFinal: ((Double, Double, String) -> Void)?
     var onFailure: ((Error) -> Void)?
     var onReviewed: ((Double, Double, String) -> Void)?
@@ -120,9 +120,9 @@ final class QwenLiveTranscriber: LiveTranscribing {
         }
         if request.isFinal {
             if !text.isEmpty { onFinal?(request.start, request.end, text) }
-            onVolatile?("")
+            onVolatile?(request.start, request.end, "")
         } else {
-            onVolatile?(text)
+            onVolatile?(request.start, request.end, text)
         }
     }
 

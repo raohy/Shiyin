@@ -4,7 +4,7 @@ import Speech
 
 @MainActor
 protocol LiveTranscribing: AnyObject {
-    var onVolatile: ((String) -> Void)? { get set }
+    var onVolatile: ((Double, Double, String) -> Void)? { get set }
     var onFinal: ((Double, Double, String) -> Void)? { get set }
     var onFailure: ((Error) -> Void)? { get set }
     var buffersBeforeStart: Bool { get }
@@ -18,7 +18,7 @@ protocol LiveTranscribing: AnyObject {
 @MainActor
 final class LiveTranscriber: LiveTranscribing {
     let language: MeetingLanguage
-    var onVolatile: ((String) -> Void)?
+    var onVolatile: ((Double, Double, String) -> Void)?
     var onFinal: ((Double, Double, String) -> Void)?
     var onFailure: ((Error) -> Void)?
     let buffersBeforeStart = false
@@ -112,9 +112,9 @@ final class LiveTranscriber: LiveTranscribing {
                     let text = self?.language.outputScript(raw) ?? raw
                     if result.isFinal {
                         if !text.isEmpty { self?.onFinal?(result.range.start.seconds, result.range.end.seconds, text) }
-                        self?.onVolatile?("")
+                        self?.onVolatile?(result.range.start.seconds, result.range.end.seconds, "")
                     } else {
-                        self?.onVolatile?(text)
+                        self?.onVolatile?(result.range.start.seconds, result.range.end.seconds, text)
                     }
                 }
             } catch {
