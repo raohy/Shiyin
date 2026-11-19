@@ -50,11 +50,16 @@ struct ShiyinApp: App {
         .defaultSize(width: 680, height: 720)
         .defaultLaunchBehavior(.suppressed)
 
-        Settings {
+        // 设置（R108、design §82）：一般窗口才拉得大，SwiftUI 的 Settings 窗口固定大小（D185）
+        Window("设置", id: SettingsPage.windowID) {
             SettingsView()
                 .environment(AppModel.shared)
                 .chineseGlyphs()
         }
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 820, height: 620)
+        .restorationBehavior(.disabled)
+        .defaultLaunchBehavior(.suppressed)
 
         MenuBarExtra {
             MenuBarContent()
@@ -76,6 +81,11 @@ struct AppCommands: Commands {
     var body: some Commands {
         CommandGroup(after: .appInfo) {
             Button("检查更新…") { Task { await model.checkForUpdatesFromMenu() } }
+        }
+        // 设置是一般窗口（D185），菜单列的「设置⋯」、⌘, 自己接
+        CommandGroup(replacing: .appSettings) {
+            Button("设置⋯") { openWindow.settings() }
+                .keyboardShortcut(",")
         }
         CommandGroup(replacing: .newItem) {
             Button("准备会议…") { model.openMainWindow?(); model.openPreparation() }

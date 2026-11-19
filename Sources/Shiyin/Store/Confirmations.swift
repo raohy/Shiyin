@@ -33,8 +33,12 @@ extension AppModel {
         if let segment = splitMeetingRequest {
             let time = detail?.segments.first { $0.id == segment }.map { TimeFormat.string($0.start) } ?? ""
             return ConfirmRequest(id: "split:\(segment)", title: String(localized: "从 \(time) 这句开始分成另一场会议？"),
-                                  message: String(localized: "这句和之后的逐字稿、录音、标记重点变成新的一场，前面的留在这场；我的笔记、参考文件、提问留在这场。两场都要刷新会议记录。分开后没办法合并回来。"),
+                                  message: String(localized: "这句和之后的逐字稿、录音、标记重点变成新的一场，前面的留在这场；我的笔记、参考文件、提问留在这场。两场都要刷新会议记录。30 天内可以从「更多」还原。"),
                                   confirmTitle: String(localized: "分成两场"), destructive: false) { self.splitMeeting(at: segment) }
+        }
+        if let id = confirmRestoreEdit {
+            return ConfirmRequest(id: "restoreEdit:\(id)", title: String(localized: "还原成编辑前的样子？"), message: restoreEditMessage(id),
+                                  confirmTitle: String(localized: "还原"), destructive: false) { self.restoreMeetingEdit(id) }
         }
         if confirmDelete {
             let ids = deleteTargets
@@ -53,6 +57,7 @@ extension AppModel {
         if confirmPurge != nil { confirmPurge = nil }
         if confirmEmptyTrash { confirmEmptyTrash = false }
         if splitMeetingRequest != nil { splitMeetingRequest = nil }
+        if confirmRestoreEdit != nil { confirmRestoreEdit = nil }
         if confirmDelete { confirmDelete = false }
     }
 }

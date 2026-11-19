@@ -88,7 +88,7 @@ ${table(['做法', '中文', '費用', '錄音在哪裡', '其他人看得到嗎
   {
     slug: 'record-online-meetings-mac',
     published: '2026-10-21',
-    updated: '2026-10-21',
+    updated: '2026-11-18',
     zh: {
       title: 'Mac 怎麼錄 Zoom、Teams、Google Meet 會議？不用 BlackHole、不用機器人｜拾音 Shiyin',
       description: '在 Mac 上錄線上會議的幾種方法比較：會議軟體內建錄影、BlackHole 虛擬音效卡、會議機器人，以及直接錄系統音訊、邊錄邊出逐字稿的做法。',
@@ -100,7 +100,7 @@ ${table(['方法', '要做什麼', '缺點'], [
   ['會議軟體內建的錄影', '在 Zoom、Teams、Meet 裡按錄影', '通常要主辦人允許，有的要付費方案；錄完是影片檔，逐字稿要另外處理'],
   ['虛擬音效卡（BlackHole、Loopback）', '安裝音效驅動程式，在「音訊 MIDI 設定」建立多重輸出裝置', '設定步驟多；用多重輸出裝置時，鍵盤的音量鍵不能調音量'],
   ['雲端會議記錄服務的機器人', '把服務的機器人邀進會議', '所有人都看得到機器人；錄音上傳到服務商；有些公司不允許'],
-  ['直接錄系統音訊（拾音）', '第一次錄音時允許「錄製系統音訊」', '只有 Mac 版，要 macOS 26 和 Apple Silicon'],
+  ['直接錄系統音訊（拾音）', '第一次錄音時允許「錄製系統音訊」', '要 macOS 26 和 Apple Silicon'],
 ])}
 
 <h2>用拾音錄線上會議</h2>
@@ -145,7 +145,7 @@ ${table(['Method', 'What you do', 'Downsides'], [
   ['Built-in recording', 'Click Record in Zoom, Teams or Meet', 'Usually needs the host’s permission, sometimes a paid plan; you get a video file and still need a transcript'],
   ['Virtual audio driver (BlackHole, Loopback)', 'Install an audio driver and build a Multi-Output Device in Audio MIDI Setup', 'Fiddly setup; the volume keys don’t work while a Multi-Output Device is selected'],
   ['A meeting bot from a cloud note taker', 'Invite the bot to the call', 'Everyone sees the bot; audio goes to the vendor; some companies don’t allow it'],
-  ['Capture system audio directly (Shiyin)', 'Allow “System Audio Recording” the first time', 'Mac only; needs macOS 26 and Apple Silicon'],
+  ['Capture system audio directly (Shiyin)', 'Allow “System Audio Recording” the first time', 'Needs macOS 26 and Apple Silicon'],
 ])}
 
 <h2>Recording a call with Shiyin</h2>
@@ -183,7 +183,7 @@ ${table(['Method', 'What you do', 'Downsides'], [
   {
     slug: 'mandarin-english-transcription',
     published: '2026-10-21',
-    updated: '2026-10-21',
+    updated: '2026-11-18',
     zh: {
       title: '中英夾雜的會議逐字稿怎麼轉才準？在 Mac 本機用 Breeze ASR 25｜拾音 Shiyin',
       description: '台灣會議常常中文夾英文，一般語音辨識容易把英文聽成中文字。這篇整理 Breeze ASR 25 和 Whisper 的錯誤率比較，以及在 Mac 上用它轉錄、校正專有名詞的方法。',
@@ -221,7 +221,7 @@ ${table(['測試資料', 'Whisper large-v2', 'Breeze ASR 25', '差別'], [
 </ul>
 
 <h2>不適合的情況</h2>
-<p>拾音目前不支援台語和粵語。會議裡台語很多的話，可以考慮專門支援台語的服務，例如雅婷逐字稿。</p>
+<p>拾音目前不支援台語。會議裡台語很多的話，可以考慮專門支援台語的服務，例如雅婷逐字稿。</p>
 `,
       faq: [
         ['一定要網路嗎？', '只有第一次下載模型時要。之後轉錄、分說話者都在本機，不需要網路。'],
@@ -261,7 +261,7 @@ ${table(['步驟', '在哪裡做', '要網路嗎'], [
 
 <h2>完全不連網的設定</h2>
 <ol>
-<li>在有網路的時候先把轉錄模型下載好（第一次打開的引導，或設定的「錄音與轉錄」）。</li>
+<li>在有網路的時候先把轉錄模型下載好（第一次打開的引導，或設定的「模型與空間」）。</li>
 <li>在 Mac 上裝好 Ollama 或 LM Studio，下載一個本機模型。</li>
 <li>拾音的設定 → 整理工具，選「OpenAI 相容 API」，網址填 Ollama 或 LM Studio 的本機網址（不用 key）。</li>
 <li>或者整理工具選「不整理」，只留逐字稿。</li>
@@ -307,7 +307,7 @@ ${table(['Step', 'Where', 'Internet?'], [
 
 <h2>A fully offline setup</h2>
 <ol>
-<li>Download the transcription models while you’re online (during first launch, or in Settings → Recording & Transcription).</li>
+<li>Download the transcription models while you’re online (during first launch, or in Settings → Models & Storage).</li>
 <li>Install Ollama or LM Studio and download a local model.</li>
 <li>In Shiyin, open Settings → Summarizer, choose “OpenAI-compatible API” and enter the local Ollama or LM Studio address (no key needed).</li>
 <li>Or choose “Don’t summarize” and keep just the transcript.</li>

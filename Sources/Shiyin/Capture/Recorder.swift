@@ -58,7 +58,7 @@ final class Recorder {
         /// 录音画面、菜单列、通知都用同一句（R42）
         var text: String {
             switch self {
-            case .silent: return String(localized: "麦克风没有收到声音：可能被静音、被其他 app 占用，或选错了麦克风。可以在设置的「录音与转录」换一个。")
+            case .silent: return String(localized: "麦克风没有收到声音：可能被静音、被其他 app 占用，或选错了麦克风。可以在设置的「录音」换一个。")
             case .suppressed: return Self.suppressedText(nil)
             case .systemDenied: return String(localized: "拾音没有「录制系统音频」的权限，录不到电脑的声音（在线会议里其他人说话的声音）：请到「系统设置 → 隐私与安全性 → 录制屏幕与系统录音」允许拾音。")
             case .quiet: return String(localized: "声音有点小：手机或笔记本电脑放近说话的人一点。")

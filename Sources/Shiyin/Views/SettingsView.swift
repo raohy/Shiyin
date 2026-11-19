@@ -1,39 +1,221 @@
 import SwiftUI
 
-/// 设置窗口（T-F2）：整理工具与密钥、模板、词汇表、录音、模型与保存空间、高级
+/// 设置的每一页（R108、design §82、D184）：侧栏的顺序、分组、图标和颜色、搜索用的关键字
+enum SettingsPage: String, CaseIterable, Identifiable {
+    case provider, templates, recording, transcription, models, speakers, glossary, general, ai, enterprise, status
+
+    var id: String { rawValue }
+    static let storageKey = "settingsPage"
+    /// 设置窗口的 id（D185）
+    static let windowID = "settings"
+
+    var title: String {
+        switch self {
+        case .provider: String(localized: "整理工具")
+        case .templates: MeetingLanguage.ui(zh: "模板", en: "Templates")
+        case .recording: MeetingLanguage.ui(zh: "录音", en: "Recording")
+        case .transcription: MeetingLanguage.ui(zh: "转录", en: "Transcription")   // 「转录」在别处是动词（Transcribing）
+        case .models: String(localized: "模型与空间")
+        case .speakers: MeetingLanguage.ui(zh: "说话者", en: "Speakers")
+        case .glossary: String(localized: "词汇表")
+        case .general: String(localized: "一般")
+        case .ai: String(localized: "AI 工具")
+        case .enterprise: String(localized: "企业服务器")
+        case .status: String(localized: "检查与更新")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .provider: "sparkles"
+        case .templates: "doc.text.fill"
+        case .recording: "mic.fill"
+        case .transcription: "waveform"
+        case .models: "internaldrive.fill"
+        case .speakers: "person.2.fill"
+        case .glossary: "character.book.closed.fill"
+        case .general: "gearshape.fill"
+        case .ai: "puzzlepiece.extension.fill"
+        case .enterprise: "building.2.fill"
+        case .status: "checkmark.seal.fill"
+        }
+    }
+
+    /// 图标的底色（同系统设置的彩色方块，深浅色都用同一个）
+    var color: Color {
+        switch self {
+        case .provider: Color(red: 0.55, green: 0.36, blue: 0.85)
+        case .templates: Color(red: 0.95, green: 0.55, blue: 0.16)
+        case .recording: Color(red: 0.92, green: 0.26, blue: 0.26)
+        case .transcription: Color(red: 0.16, green: 0.48, blue: 0.95)
+        case .models, .general: Color(red: 0.52, green: 0.53, blue: 0.57)
+        case .speakers: Color(red: 0.11, green: 0.66, blue: 0.68)
+        case .glossary: Color(red: 0.62, green: 0.44, blue: 0.28)
+        case .ai: Color(red: 0.35, green: 0.35, blue: 0.86)
+        case .enterprise: Color(red: 0.33, green: 0.45, blue: 0.62)
+        case .status: Color(red: 0.2, green: 0.68, blue: 0.36)
+        }
+    }
+
+    /// 侧栏的分组（组和组之间空一点）
+    static let groups: [[SettingsPage]] = [[.provider, .templates], [.recording, .transcription, .models], [.speakers, .glossary],
+                                           [.general, .ai, .enterprise, .status]]
+
+    /// 搜索用（R108.4）：那一页项目的名称，加上常用的说法
+    var keywords: [String] {
+        switch self {
+        case .provider:
+            [String(localized: "转录完成后自动整理成会议记录"), String(localized: "转录完成后检查可能听错的字"), String(localized: "模型"),
+             String(localized: "测试整理工具"), "Claude", "Codex", "ChatGPT", "OpenAI", "Gemini", "Anthropic", "API key"]
+        case .templates: [String(localized: "要产生的段落"), String(localized: "自订段落"), String(localized: "设为默认模板")]
+        case .recording:
+            [String(localized: "录音来源"), String(localized: "麦克风"), String(localized: "麦克风权限设置"), String(localized: "系统录音权限设置"),
+             String(localized: "检测到在线会议时提醒录音"), String(localized: "会议结束时自动停止录音"), String(localized: "在屏幕上方显示录音岛"),
+             String(localized: "提醒与快捷键"), "Zoom", "Teams", "Google Meet"]
+        case .transcription:
+            [String(localized: "正式转录"), String(localized: "转录时识别说话者"), String(localized: "说话者识别的模型"),
+             String(localized: "录音中显示实时逐字稿"), String(localized: "默认会议语言"), String(localized: "实时转录引擎"),
+             String(localized: "自动检测会议语言"), "Breeze", "Qwen", "Whisper", "Nemotron"]
+        case .models:
+            [String(localized: "模型"), String(localized: "保存空间"), String(localized: "资料位置"),
+             String(localized: "转录完成后把录音压缩成 m4a（约每小时 10～30 MB）"), "Breeze", "Qwen", "Whisper"]
+        case .speakers: [String(localized: "记住说话者的声音，之后的会议自动带入名字"), String(localized: "我的声音"), String(localized: "认识的人")]
+        case .glossary: [String(localized: "添加词汇")]
+        case .general:
+            [String(localized: "会议内容的文字大小"), String(localized: "分享画面时藏起拾音的窗口"), String(localized: "重新显示首次使用引导"),
+             String(localized: "重建搜索索引"), String(localized: "匿名使用统计")]
+        case .ai: [String(localized: "让 AI 工具读取会议"), "MCP", "Claude Code", "Claude Desktop", "Codex"]
+        case .enterprise: [String(localized: "网址"), String(localized: "登录")]
+        case .status: [String(localized: "更新"), String(localized: "检查更新"), String(localized: "目前版本"), String(localized: "环境检查")]
+        }
+    }
+
+    func matches(_ query: String) -> Bool {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        return q.isEmpty || ([title] + keywords).contains { $0.localizedCaseInsensitiveContains(q) }
+    }
+}
+
+extension OpenWindowAction {
+    /// 打开设置（R108；设置是一般窗口，D185）。给页面就停在那一页（设置会记住上次的页面，R108.5；已经开着时跟着换页）
+    func settings(_ page: SettingsPage? = nil) {
+        if let page { UserDefaults.standard.set(page.rawValue, forKey: SettingsPage.storageKey) }
+        callAsFunction(id: SettingsPage.windowID)
+    }
+}
+
+/// 设置窗口（R108、design §82）：左边侧栏、右边那一页
 struct SettingsView: View {
     #if DEBUG
-    /// shiyinctl preview settings <标签页>：预览窗口一开始停在哪个标签页（0 整理工具、1 录音与转录、2 说话者与词汇、3 高级）
-    nonisolated(unsafe) static var previewTab = 0
-    /// shiyinctl preview settings <标签页> height=<点>：拉高看下面的段落（桌面层的预览窗口卷不了）
-    nonisolated(unsafe) static var previewHeight: CGFloat = 520
+    /// shiyinctl preview settings <页面>：预览窗口一开始停在哪一页（代号或 0～10）
+    nonisolated(unsafe) static var previewPage: SettingsPage?
+    /// shiyinctl preview settings <页面> height=<点>：拉高看下面的段落（桌面层的预览窗口卷不了）
+    nonisolated(unsafe) static var previewHeight: CGFloat?
     #endif
-    @State private var tab: Int = {
-        #if DEBUG
-        return SettingsView.previewTab
-        #else
-        return 0
-        #endif
-    }()
+    @AppStorage(SettingsPage.storageKey) private var storedPage = SettingsPage.provider.rawValue
+    @State private var page: SettingsPage
+    @State private var query = ""
 
-    private static var height: CGFloat {
+    init() {
+        // 上次停在哪一页（R108.5）；DEBUG 的预览指定起始页，不写进设置
+        var start = SettingsPage(rawValue: UserDefaults.standard.string(forKey: SettingsPage.storageKey) ?? "") ?? .provider
         #if DEBUG
-        return previewHeight
-        #else
-        return 520
+        if let previewPage = Self.previewPage { start = previewPage }
         #endif
+        _page = State(initialValue: start)
+    }
+
+    private func select(_ value: SettingsPage) {
+        page = value
+        storedPage = value.rawValue
     }
 
     var body: some View {
-        // 四个标签页（R44.5，design §33.3、D110）：只搬位置、加分组，每个项目和存的键都没变
-        TabView(selection: $tab) {
-            ProviderSettings().tabItem { Label("整理工具", systemImage: "sparkles") }.tag(0)
-            RecordingSettings().tabItem { Label("录音与转录", systemImage: "mic") }.tag(1)
-            NamesSettings().tabItem { Label("说话者与词汇", systemImage: "person.text.rectangle") }.tag(2)
-            AdvancedSettings().tabItem { Label("高级", systemImage: "gearshape.2") }.tag(3)
+        NavigationSplitView {
+            List(selection: Binding(get: { page }, set: { if let value = $0 { select(value) } })) {
+                ForEach(Array(SettingsPage.groups.enumerated()), id: \.offset) { _, group in
+                    let pages = group.filter { $0.matches(query) }
+                    if !pages.isEmpty {
+                        Section {
+                            ForEach(pages) { item in
+                                Label { Text(item.title) } icon: { SettingsIcon(page: item) }
+                                    // 选到的列灰底、字照常（同主窗口的侧栏，R101.4），不用系统青瓷绿的一整块
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .sidebarSelectableRow(selected: item == page)
+                                    .tag(item)
+                            }
+                        }
+                    }
+                }
+            }
+            .listStyle(.sidebar)
+            .searchable(text: $query, placement: .sidebar, prompt: Text("搜索设置"))
+            .onChange(of: query) { _, value in
+                // 只剩一页时直接选它（R108.4）
+                let found = SettingsPage.allCases.filter { $0.matches(value) }
+                if !value.isEmpty, found.count == 1, let only = found.first { select(only) }
+            }
+            .onChange(of: storedPage) { _, value in
+                // 从会议页的「打开设置」指定页面时，开着的设置窗口跟着换
+                // 侧栏还留着搜索的字、筛掉了要去的那页时清掉搜索
+                if let target = SettingsPage(rawValue: value), target != page {
+                    page = target
+                    if !target.matches(query) { query = "" }
+                }
+            }
+            .navigationSplitViewColumnWidth(min: 210, ideal: 220, max: 260)
+            .frame(minWidth: 210)   // 栏宽有时候不生效（设置窗口第一次打开），清单自己也要撑开
+            .toolbar(removing: .sidebarToggle)
+        } detail: {
+            SettingsPageView(page: page)
+                .navigationTitle(page.title)
         }
-        .frame(width: 640, height: Self.height)
+        .frame(minWidth: 720, idealWidth: 820, minHeight: 500, idealHeight: Self.idealHeight)
         .tint(.celadon)
+    }
+
+    private static var idealHeight: CGFloat {
+        #if DEBUG
+        return previewHeight ?? 620
+        #else
+        return 620
+        #endif
+    }
+}
+
+/// 侧栏的图标：彩色圆角方块加白色符号（同系统设置）
+struct SettingsIcon: View {
+    let page: SettingsPage
+
+    var body: some View {
+        Image(systemName: page.symbol)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 20, height: 20)
+            .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(page.color.gradient))
+            .accessibilityHidden(true)
+    }
+}
+
+/// 右边的那一页：原本的段落照搬（R108.6，项目和存的键都没变）
+struct SettingsPageView: View {
+    let page: SettingsPage
+
+    var body: some View {
+        switch page {
+        case .provider: ProviderSettings()
+        case .templates:
+            Form { Section { TemplateSettings().frame(minHeight: 460) } }.formStyle(.grouped)
+        case .recording: RecordingSettings(part: .recording)
+        case .transcription: RecordingSettings(part: .transcription)
+        case .models: ModelsSettings()
+        case .speakers: Form { Section { SpeakerSettings() } }.formStyle(.grouped)
+        case .glossary: Form { Section { GlossarySettings() } }.formStyle(.grouped)
+        case .general: AdvancedSettings(part: .general)
+        case .ai: Form { Section { MCPSettings() } }.formStyle(.grouped)
+        case .enterprise: Form { Section { EnterpriseServerSettings() } }.formStyle(.grouped)
+        case .status: AdvancedSettings(part: .status)
+        }
     }
 }
 
@@ -207,10 +389,6 @@ struct ProviderSettings: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            // 模板是整理的一部分（R44.5、D110）：原本自己一个标签页
-            Section(MeetingLanguage.ui(zh: "模板", en: "Templates")) {
-                TemplateSettings().frame(height: 420)
-            }
         }
         .formStyle(.grouped)
         .onAppear(perform: load)
@@ -307,7 +485,7 @@ struct ProviderSettings: View {
         case .notInstalled?, .notLoggedIn?: return String(localized: "设置好之前不会自动整理。")
         case .missingKey?: return String(localized: "还没有存 API key：粘贴之后按「保存 key」。设置好之前不会自动整理。")
         case .incomplete?: return String(localized: "还没有填网址或模型。设置好之前不会自动整理。")
-        case .enterpriseSignedOut?: return String(localized: "公司的服务器还没登录或登录已失效：到「高级 → 企业服务器」登录。设置好之前不会自动整理。")
+        case .enterpriseSignedOut?: return String(localized: "公司的服务器还没登录或登录已失效：到「企业服务器」那一页登录。设置好之前不会自动整理。")
         case .enterpriseNoModels?: return String(localized: "公司的服务器还没有提供整理用的模型：请管理者在服务器后台的「整理模型」加上模型。")
         case .paused(_, let detail)?:
             let reason = MeetingLanguage.uiStored(detail.trimmingCharacters(in: CharacterSet(charactersIn: "。. ")))   // l10n-skip
@@ -622,18 +800,7 @@ struct TemplateSettings: View {
     }
 }
 
-// MARK: 词汇表（沿用第二版）
-
-/// 说话者与词汇（R44.5，design §33.3）：原本的「说话者」和「词汇表」两个标签页合成一页，各一个 Section
-struct NamesSettings: View {
-    var body: some View {
-        Form {
-            Section(MeetingLanguage.ui(zh: "说话者", en: "Speakers")) { SpeakerSettings() }
-            Section("词汇表") { GlossarySettings() }
-        }
-        .formStyle(.grouped)
-    }
-}
+// MARK: 说话者、词汇表（各自一页，R108）
 
 /// 说话者（design §21.4、R19.3）：记住说话者的声音，之后的会议自动带入名字；认识的人可以改名、删除。
 /// 是 Form 的一个 Section 的内容（R44.5）：认识的人一人一列，不用 List
@@ -985,6 +1152,9 @@ struct GlossarySettings: View {
 // MARK: 录音与转录（R1、R4、R10.3；R44.5 分成四组）
 
 struct RecordingSettings: View {
+    /// 录音一页（录音来源、提醒与快捷键）、转录一页（转录、语言），同一份状态（R108）
+    enum Part { case recording, transcription }
+    let part: Part
     @Environment(AppModel.self) private var model
     @AppStorage(AppSettings.transcriptionEngineKey) private var engine = "breeze"
 
@@ -1030,148 +1200,7 @@ struct RecordingSettings: View {
 
     var body: some View {
         Form {
-            Section("录音来源") {
-                Picker("录音来源", selection: $source) {
-                    Text("只录麦克风").tag("mic")
-                    Text("麦克风＋电脑声音（在线会议）").tag("both")
-                    Text("只录电脑声音").tag("system")
-                }
-                Picker("麦克风", selection: $device) {
-                    MicrophoneOptions(saved: device)
-                }
-                .disabled(source == "system")
-                // R58.6：其他换麦克风的地方、蓝牙耳机会把系统默认换掉
-                Text("录音按钮旁的箭头、录音画面也可以换麦克风。蓝牙耳机连着时，系统默认可能会自动变成耳机的麦克风，现场会议请选这台 Mac 的麦克风。")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Text("录在线会议时选「麦克风＋电脑声音」：你的声音和对方的声音会分别录在左右声道。第一次录电脑声音时，macOS 会询问「录制系统音频」的权限。")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                HStack {
-                    Button("麦克风权限设置") { Recorder.openPrivacySettings() }
-                    Button("系统录音权限设置") { Recorder.openPrivacySettings("Privacy_AudioCapture") }
-                }
-            }
-            Section("语言") {
-                // 会议语言（R12.4、design §16.3）
-                Picker("默认会议语言", selection: $meetingLanguage) {
-                    ForEach(MeetingLanguage.allCases) { Text($0.name).tag($0) }
-                }
-                Text("新的录音和导入默认用这个语言转录、整理会议记录；录音菜单、导入时和会议页都可以改。")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Toggle("自动检测会议语言", isOn: $autoDetect)
-                    .onChange(of: autoDetect) { _, on in if on { model.models.autoStart(.languageDetection) } }
-                if autoDetect && !model.models.isInstalled(.languageDetection) {
-                    // 模型没下载好（下载失败、暂停）就不会检测，要让人知道
-                    HStack {
-                        Text(model.models.state(.languageDetection).isBusy ? "正在下载语言检测模型…" : "语言检测模型还没下载，下载好之前录音不会自动检测")
-                            .font(.caption).foregroundStyle(Color.signal)
-                        Spacer()
-                        if !model.models.state(.languageDetection).isBusy {
-                            Button("下载") { model.models.start(.languageDetection) }.controlSize(.small)
-                        }
-                    }
-                }
-                Text("开始录音后听约 10 秒，判断是哪一种语言（\(MeetingLanguage.uiNames(MeetingLanguage.detectable))）；跟会议语言不同而且有把握时会自动切换，录音画面可以改回来。需要 60 MB 的语言检测模型。")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            Section("转录") {
-                // 正式转录引擎（R4.1、design §6.2.1、D11；Qwen3-ASR 见 §32.6）
-                Picker("正式转录", selection: $engine) {
-                    // 企业服务器（R50.1）：登录过才有
-                    if let account = EnterpriseServer.shared.account {
-                        Text("企业服务器（\(account.serverName)）").tag("server")
-                    }
-                    Text("Breeze ASR 25（联发科，建议）").tag("breeze")
-                    Text("Qwen3-ASR 1.7B（阿里巴巴）").tag("qwen")
-                    Text("macOS 内置").tag("system")
-                }
-                .onChange(of: engine) { _, _ in
-                    model.runner.wake()
-                    model.refreshEnvironment()
-                }
-                Text(verbatim: engineDescription)
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Toggle("转录时识别说话者", isOn: $diarize)
-                // 说话者识别的模型（design §61.2、R87）
-                Picker("说话者识别的模型", selection: $diarizationModel) {
-                    Text("标准").tag(Diarizer.Model.standard.rawValue)
-                    Text("Nemotron-3（实验性，英文会议比较准）").tag(Diarizer.Model.nemotron.rawValue)
-                }
-                .disabled(!diarize)
-                .onChange(of: diarizationModel) { _, value in
-                    if value == Diarizer.Model.nemotron.rawValue { model.models.prepareNemotron() }
-                }
-                if diarizationModel == Diarizer.Model.nemotron.rawValue {
-                    Text("NVIDIA 的模型，最多分 8 人。英文会议的测试（AMI）中，没被插话的句子标对 77% → 90%；中文会议会分出比较多人，还在观察。超过 8 人的会议、模型还没下载好时用标准的。")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                Toggle("录音中显示实时逐字稿", isOn: $live)
-                Picker("实时转录引擎", selection: $liveEngine) {
-                    Text("macOS 系统识别（低延迟）").tag("system")
-                    Text("Qwen3-ASR（上下文优先）").tag("qwen")
-                }
-                .disabled(!live || model.recorder.isRecording)
-                .onChange(of: liveEngine) { _, value in
-                    if value == "qwen" {
-                        for file in ModelStore.files(of: .qwen) { model.models.autoStart(file) }
-                    }
-                }
-                if liveEngine == "qwen" {
-                    Text("全程本机识别，参考词汇表，保留前一段音频与文字作为上下文。当前句子会持续修订，停顿后定稿；出字可能更慢，占用更多内存和 GPU。更改在下次录音生效。")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    if model.models.combinedState(.qwen) != .installed {
-                        Text("请在下方下载 Qwen3-ASR 模型和音频编码器（约 2.5 GB）。下载完成前无法使用 Qwen 实时逐字稿，录音仍可正常进行。")
-                            .font(.caption).foregroundStyle(Color.signal).fixedSize(horizontal: false, vertical: true)
-                    }
-                } else {
-                    Text("使用 macOS 系统语音识别，出字快、资源占用低；当前不参考词汇表。更改在下次录音生效。")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                Text("实时快稿保留原样；Qwen3-ASR 会另行复核约 18～30 秒的音频，供会中助手分析。两种实时引擎都需要已下载的 Qwen 模型才能复核；复核会额外使用本机 GPU，实际延迟取决于电脑速度。")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                // 模型清单（原「模型与保存空间」标签页，R44.5）
-                ModelRows()
-            }
-            Section("提醒与快捷键") {
-                // 检测在线会议（design §21.7、R19.4）
-                Toggle("检测到在线会议时提醒录音", isOn: $meetingDetection)
-                // 会议结束时倒数自动停止（design §69、R95）
-                Toggle("会议结束时自动停止录音", isOn: $autoStopOnMeetingEnd)
-                    .disabled(!meetingDetection)
-                // 录音岛（design §57、R81.8）
-                Toggle("在屏幕上方显示录音岛", isOn: $recordingIsland)
-                Text("录音中在屏幕上方正中间（有浏海的 Mac 接在浏海两侧）显示录音的时间和提醒，全屏幕开会、分享画面时也看得到，分享画面拍不到它。检测到在线会议时的「要开始录音吗？」也在这里。")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Text("Zoom、Teams、Webex、Google Meet（浏览器）等开始用麦克风、拾音没在录音时提醒你，不会自动开始录音。会议 app 停止用麦克风时倒数 60 秒，没按「继续录」就停止并转录；关掉「自动停止」时只问要不要停止。")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                ForEach(mutedApps, id: \.self) { bundle in
-                    HStack {
-                        Text("不提醒：\(MeetingDetector.displayName(bundle))").font(.callout)
-                        Spacer()
-                        Button("恢复提醒") {
-                            MeetingDetector.unmute(bundle)
-                            mutedApps = MeetingDetector.muted
-                        }
-                        .buttonStyle(.link)
-                    }
-                }
-                // 忘了停止录音（design §35、R48.5）
-                Toggle("很久没人说话时提醒，30 分钟后自动停止", isOn: $idleStop)
-                Text("录音中 15 分钟没人说话时提醒你；再 15 分钟还是没人说话就自动停止，只转录到最后有人说话的地方，录音档完整保留。")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Toggle("全域快捷键 \(GlobalHotKey.display)：在其他 app 里也能开始或停止录音", isOn: $hotKey)
-                    .onChange(of: hotKey) { _, enabled in
-                        GlobalHotKey.shared.setEnabled(enabled)
-                        hotKeyFailed = enabled && !GlobalHotKey.shared.isRegistered
-                    }
-                if hotKeyFailed {
-                    Text("没办法注册 \(GlobalHotKey.display)，可能已经被其他 app 使用。")
-                        .font(.caption).foregroundStyle(.red)
-                }
-                Toggle("录音中按 \(GlobalHotKey.bookmarkDisplay) 标记重点（在其他 app 里也能用）", isOn: $bookmarkHotKey)
-                    .onChange(of: bookmarkHotKey) { _, enabled in
-                        GlobalHotKey.shared.setBookmarkEnabled(enabled && model.recorder.isRecording)
-                    }
-            }
+            if part == .recording { recordingSections } else { transcriptionSections }
         }
         .formStyle(.grouped)
         .onAppear {
@@ -1179,9 +1208,177 @@ struct RecordingSettings: View {
             mutedApps = MeetingDetector.muted
         }
     }
+
+    @ViewBuilder
+    private var recordingSections: some View {
+        Section("录音来源") {
+            Picker("录音来源", selection: $source) {
+                Text("只录麦克风").tag("mic")
+                Text("麦克风＋电脑声音（在线会议）").tag("both")
+                Text("只录电脑声音").tag("system")
+            }
+            Picker("麦克风", selection: $device) {
+                MicrophoneOptions(saved: device)
+            }
+            .disabled(source == "system")
+            // R58.6：其他换麦克风的地方、蓝牙耳机会把系统默认换掉
+            Text("录音按钮旁的箭头、录音画面也可以换麦克风。蓝牙耳机连着时，系统默认可能会自动变成耳机的麦克风，现场会议请选这台 Mac 的麦克风。")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text("录在线会议时选「麦克风＋电脑声音」：你的声音和对方的声音会分别录在左右声道。第一次录电脑声音时，macOS 会询问「录制系统音频」的权限。")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("麦克风权限设置") { Recorder.openPrivacySettings() }
+                Button("系统录音权限设置") { Recorder.openPrivacySettings("Privacy_AudioCapture") }
+            }
+        }
+        Section("提醒与快捷键") {
+            // 检测在线会议（design §21.7、R19.4）
+            Toggle("检测到在线会议时提醒录音", isOn: $meetingDetection)
+            // 会议结束时倒数自动停止（design §69、R95）
+            Toggle("会议结束时自动停止录音", isOn: $autoStopOnMeetingEnd)
+                .disabled(!meetingDetection)
+            // 录音岛（design §57、R81.8）
+            Toggle("在屏幕上方显示录音岛", isOn: $recordingIsland)
+            Text("录音中在屏幕上方正中间（有浏海的 Mac 接在浏海两侧）显示录音的时间和提醒，全屏幕开会、分享画面时也看得到，分享画面拍不到它。检测到在线会议时的「要开始录音吗？」也在这里。")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text("Zoom、Teams、Webex、Google Meet（浏览器）等开始用麦克风、拾音没在录音时提醒你，不会自动开始录音。会议 app 停止用麦克风时倒数 60 秒，没按「继续录」就停止并转录；关掉「自动停止」时只问要不要停止。")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            ForEach(mutedApps, id: \.self) { bundle in
+                HStack {
+                    Text("不提醒：\(MeetingDetector.displayName(bundle))").font(.callout)
+                    Spacer()
+                    Button("恢复提醒") {
+                        MeetingDetector.unmute(bundle)
+                        mutedApps = MeetingDetector.muted
+                    }
+                    .buttonStyle(.link)
+                }
+            }
+            // 忘了停止录音（design §35、R48.5）
+            Toggle("很久没人说话时提醒，30 分钟后自动停止", isOn: $idleStop)
+            Text("录音中 15 分钟没人说话时提醒你；再 15 分钟还是没人说话就自动停止，只转录到最后有人说话的地方，录音档完整保留。")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Toggle("全域快捷键 \(GlobalHotKey.display)：在其他 app 里也能开始或停止录音", isOn: $hotKey)
+                .onChange(of: hotKey) { _, enabled in
+                    GlobalHotKey.shared.setEnabled(enabled)
+                    hotKeyFailed = enabled && !GlobalHotKey.shared.isRegistered
+                }
+            if hotKeyFailed {
+                Text("没办法注册 \(GlobalHotKey.display)，可能已经被其他 app 使用。")
+                    .font(.caption).foregroundStyle(.red)
+            }
+            Toggle("录音中按 \(GlobalHotKey.bookmarkDisplay) 标记重点（在其他 app 里也能用）", isOn: $bookmarkHotKey)
+                .onChange(of: bookmarkHotKey) { _, enabled in
+                    GlobalHotKey.shared.setBookmarkEnabled(enabled && model.recorder.isRecording)
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var transcriptionSections: some View {
+        Section("转录") {
+            // 正式转录引擎（R4.1、design §6.2.1、D11；Qwen3-ASR 见 §32.6）
+            Picker("正式转录", selection: $engine) {
+                // 企业服务器（R50.1）：登录过才有
+                if let account = EnterpriseServer.shared.account {
+                    Text("企业服务器（\(account.serverName)）").tag("server")
+                }
+                Text("Breeze ASR 25（联发科，建议）").tag("breeze")
+                Text("Qwen3-ASR 1.7B（阿里巴巴）").tag("qwen")
+                Text("macOS 内置").tag("system")
+            }
+            .onChange(of: engine) { _, _ in
+                model.runner.wake()
+                model.refreshEnvironment()
+            }
+            Text(verbatim: engineDescription)
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Toggle("转录时识别说话者", isOn: $diarize)
+            // 说话者识别的模型（design §61.2、R87）
+            Picker("说话者识别的模型", selection: $diarizationModel) {
+                Text("标准").tag(Diarizer.Model.standard.rawValue)
+                Text("Nemotron-3（实验性，英文会议比较准）").tag(Diarizer.Model.nemotron.rawValue)
+            }
+            .disabled(!diarize)
+            .onChange(of: diarizationModel) { _, value in
+                if value == Diarizer.Model.nemotron.rawValue { model.models.prepareNemotron() }
+            }
+            if diarizationModel == Diarizer.Model.nemotron.rawValue {
+                Text("NVIDIA 的模型，最多分 8 人。英文会议的测试（AMI）中，没被插话的句子标对 77% → 90%；中文会议会分出比较多人，还在观察。超过 8 人的会议、模型还没下载好时用标准的。")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Toggle("录音中显示实时逐字稿", isOn: $live)
+            Picker("实时转录引擎", selection: $liveEngine) {
+                Text("macOS 系统识别（低延迟）").tag("system")
+                Text("Qwen3-ASR（上下文优先）").tag("qwen")
+            }
+            .disabled(!live || model.recorder.isRecording)
+            .onChange(of: liveEngine) { _, value in
+                if value == "qwen" {
+                    for file in ModelStore.files(of: .qwen) { model.models.autoStart(file) }
+                }
+            }
+            if liveEngine == "qwen" {
+                Text("全程本机识别，参考词汇表，保留前一段音频与文字作为上下文。当前句子会持续修订，停顿后定稿；出字可能更慢，占用更多内存和 GPU。更改在下次录音生效。")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if model.models.combinedState(.qwen) != .installed {
+                    Text("请在「模型与空间」下载 Qwen3-ASR 模型和音频编码器（约 2.5 GB）。下载完成前无法使用 Qwen 实时逐字稿，录音仍可正常进行。")
+                        .font(.caption).foregroundStyle(Color.signal).fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                Text("使用 macOS 系统语音识别，出字快、资源占用低；当前不参考词汇表。更改在下次录音生效。")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Text("实时快稿保留原样；Qwen3-ASR 会另行复核约 18～30 秒的音频，供会中助手分析。两种实时引擎都需要已下载的 Qwen 模型才能复核；复核会额外使用本机 GPU，实际延迟取决于电脑速度。")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        Section("语言") {
+            // 会议语言（R12.4、design §16.3）
+            Picker("默认会议语言", selection: $meetingLanguage) {
+                ForEach(MeetingLanguage.allCases) { Text($0.name).tag($0) }
+            }
+            Text("新的录音和导入默认用这个语言转录、整理会议记录；录音菜单、导入时和会议页都可以改。")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Toggle("自动检测会议语言", isOn: $autoDetect)
+                .onChange(of: autoDetect) { _, on in if on { model.models.autoStart(.languageDetection) } }
+            if autoDetect && !model.models.isInstalled(.languageDetection) {
+                // 模型没下载好（下载失败、暂停）就不会检测，要让人知道
+                HStack {
+                    Text(model.models.state(.languageDetection).isBusy ? "正在下载语言检测模型…" : "语言检测模型还没下载，下载好之前录音不会自动检测")
+                        .font(.caption).foregroundStyle(Color.signal)
+                    Spacer()
+                    if !model.models.state(.languageDetection).isBusy {
+                        Button("下载") { model.models.start(.languageDetection) }.controlSize(.small)
+                    }
+                }
+            }
+            Text("开始录音后听约 10 秒，判断是哪一种语言（\(MeetingLanguage.uiNames(MeetingLanguage.detectable))）；跟会议语言不同而且有把握时会自动切换，录音画面可以改回来。需要 60 MB 的语言检测模型。")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+    }
 }
 
-/// 模型清单（R10.3；R44.5 从「模型与保存空间」搬到「录音与转录 → 转录」）
+/// 模型与空间（R108）：模型清单、保存空间、第二版留下的文件
+struct ModelsSettings: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Form {
+            Section("模型") { ModelRows() }
+            Section("保存空间") { StorageSection() }
+            if model.legacyBytes > 0 {
+                Section("第二版留下的文件") {
+                    Text("第二版用的 Python 环境和旧模型已经用不到了，占用 \(ByteCountFormatter.string(fromByteCount: model.legacyBytes, countStyle: .file))。")
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("删除第二版的 Python 环境和旧模型", role: .destructive) { model.deleteLegacyItems() }
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+/// 模型清单（R10.3；R108 在「模型与空间」一页）
 struct ModelRows: View {
     @Environment(AppModel.self) private var model
 
@@ -1301,6 +1498,9 @@ struct ModelRow: View {
 // MARK: 高级：环境检查
 
 struct AdvancedSettings: View {
+    /// 一般一页（显示、引导、搜索索引、匿名统计）、检查与更新一页（更新、环境检查），同一份状态（R108）
+    enum Part { case general, status }
+    let part: Part
     @Environment(AppModel.self) private var model
     @AppStorage(AppSettings.textSizeKey) private var textSize = 0
     @AppStorage(AppSettings.hideFromScreenSharingKey) private var hideFromScreenSharing = false
@@ -1311,84 +1511,76 @@ struct AdvancedSettings: View {
 
     var body: some View {
         Form {
-            // 企业服务器（R49、design §36.3）：放在最上面，公司的人照「高级 → 企业服务器」找得到
-            Section("企业服务器") { EnterpriseServerSettings() }
-            // 会议内容的文字大小（design §38.5、R59）
-            Section("显示") {
-                Picker("会议内容的文字大小", selection: $textSize) {
-                    ForEach(TextSize.levels, id: \.self) { Text(TextSize.label($0)).tag($0) }
-                }
-                Text("记录、逐字稿、提问、实时逐字稿和我的笔记的文字。也可以用 ⌘＋、⌘－ 调整，⌘0 回到标准大小。")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                // 分享画面时藏起拾音的窗口（design §53、R77）
-                Toggle("分享画面时藏起拾音的窗口", isOn: $hideFromScreenSharing)
-                Text("打开后，用 Zoom、Teams、Google Meet 分享整个屏幕时，别人看不到拾音（例如其他会议的记录）。截屏、屏幕录像也拍不到拾音。")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            // 让 AI 工具读取会议（本地 MCP，design §44.4、R69）
-            Section("AI 工具（MCP）") { MCPSettings() }
-            // app 内更新（R10.6）
-            Section("更新") {
-                LabeledContent("目前版本", value: Updater.currentVersion)
-                TextField("更新网址", text: $updateURL,
-                          prompt: Text(Bundle.main.object(forInfoDictionaryKey: "ShiyinUpdateURL") as? String ?? "https://…/shiyin-update.json"))
-                Text("发布拾音的人会给你这个网址（shiyin-update.json）。留空就用安装版本内置的网址；都没有的话不会检查更新。")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                HStack {
-                    Button("检查更新") { Task { await model.updater.check(userInitiated: true) } }
-                        .disabled(model.updater.state == .checking || model.updater.state == .downloading || model.updater.state == .installing)
-                    if case .available(let manifest) = model.updater.state {
-                        Button("下载并更新到 \(manifest.version)") { Task { await model.updater.install(manifest, model: model) } }
-                            .buttonStyle(.borderedProminent)
+            switch part {
+            case .general:
+                // 会议内容的文字大小（design §38.5、R59）
+                Section("显示") {
+                    Picker("会议内容的文字大小", selection: $textSize) {
+                        ForEach(TextSize.levels, id: \.self) { Text(TextSize.label($0)).tag($0) }
                     }
-                    Text(model.updater.progress?.text ?? model.updater.state.label)
-                        .font(.callout)
-                        .foregroundStyle(isFailure ? .red : .secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text("记录、逐字稿、提问、实时逐字稿和我的笔记的文字。也可以用 ⌘＋、⌘－ 调整，⌘0 回到标准大小。")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    // 分享画面时藏起拾音的窗口（design §53、R77）
+                    Toggle("分享画面时藏起拾音的窗口", isOn: $hideFromScreenSharing)
+                    Text("打开后，用 Zoom、Teams、Google Meet 分享整个屏幕时，别人看不到拾音（例如其他会议的记录）。截屏、屏幕录像也拍不到拾音。")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
-                // 下载的进度（design §12，4.7.1）
-                if let progress = model.updater.progress {
-                    if let fraction = progress.fraction { ProgressView(value: fraction).tint(.signal) } else { ProgressView().progressViewStyle(.linear) }
+                Section {
+                    Button("重新显示首次使用引导") {
+                        hasCompletedOnboarding = false
+                        openWindow(id: "onboarding")
+                    }
+                    Button("重建搜索索引") {
+                        model.perform { try model.db.rebuildSearchIndex() }
+                        model.noticeMessage = String(localized: "搜索索引已重建")
+                    }
                 }
-            }
-            Section("环境检查") {
-                ForEach(model.environment.items) { item in
-                    HStack(alignment: .firstTextBaseline) {
-                        Image(systemName: item.ok ? "checkmark.circle.fill" : "minus.circle")
-                            .foregroundStyle(item.ok ? Color.celadon : .secondary)
-                        VStack(alignment: .leading) {
-                            Text(item.name)
-                            Text(item.ok ? item.detail : item.fix).font(.caption).foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                // 匿名使用统计（design §30.5、R40.4）：有统计网址的版本才有。放在最下面、只留一行，开关收在「详细…」里
+                if UsageStats.isOffered {
+                    Section {
+                        LabeledContent("匿名使用统计") {
+                            Button("详细…") { showingUsageStats = true }
                         }
                     }
                 }
-                Button("重新检查") { model.refreshEnvironment() }
-            }
-            Section("保存空间") { StorageSection() }
-            if model.legacyBytes > 0 {
-                Section("第二版留下的文件") {
-                    Text("第二版用的 Python 环境和旧模型已经用不到了，占用 \(ByteCountFormatter.string(fromByteCount: model.legacyBytes, countStyle: .file))。")
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button("删除第二版的 Python 环境和旧模型", role: .destructive) { model.deleteLegacyItems() }
-                }
-            }
-            Section {
-                Button("重新显示首次使用引导") {
-                    hasCompletedOnboarding = false
-                    openWindow(id: "onboarding")
-                }
-                Button("重建搜索索引") {
-                    model.perform { try model.db.rebuildSearchIndex() }
-                    model.noticeMessage = String(localized: "搜索索引已重建")
-                }
-            }
-            // 匿名使用统计（design §30.5、R40.4）：有统计网址的版本才有。放在最下面、只留一行，开关收在「详细…」里
-            if UsageStats.isOffered {
-                Section {
-                    LabeledContent("匿名使用统计") {
-                        Button("详细…") { showingUsageStats = true }
+            case .status:
+                // app 内更新（R10.6）
+                Section("更新") {
+                    LabeledContent("目前版本", value: Updater.currentVersion)
+                    TextField("更新网址", text: $updateURL,
+                              prompt: Text(Bundle.main.object(forInfoDictionaryKey: "ShiyinUpdateURL") as? String ?? "https://…/shiyin-update.json"))
+                    Text("发布拾音的人会给你这个网址（shiyin-update.json）。留空就用安装版本内置的网址；都没有的话不会检查更新。")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Button("检查更新") { Task { await model.updater.check(userInitiated: true) } }
+                            .disabled(model.updater.state == .checking || model.updater.state == .downloading || model.updater.state == .installing)
+                        if case .available(let manifest) = model.updater.state {
+                            Button("下载并更新到 \(manifest.version)") { Task { await model.updater.install(manifest, model: model) } }
+                                .buttonStyle(.borderedProminent)
+                        }
+                        Text(model.updater.progress?.text ?? model.updater.state.label)
+                            .font(.callout)
+                            .foregroundStyle(isFailure ? .red : .secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    // 下载的进度（design §12，4.7.1）
+                    if let progress = model.updater.progress {
+                        if let fraction = progress.fraction { ProgressView(value: fraction).tint(.signal) } else { ProgressView().progressViewStyle(.linear) }
+                    }
+                }
+                Section("环境检查") {
+                    ForEach(model.environment.items) { item in
+                        HStack(alignment: .firstTextBaseline) {
+                            Image(systemName: item.ok ? "checkmark.circle.fill" : "minus.circle")
+                                .foregroundStyle(item.ok ? Color.celadon : .secondary)
+                            VStack(alignment: .leading) {
+                                Text(item.name)
+                                Text(item.ok ? item.detail : item.fix).font(.caption).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    Button("重新检查") { model.refreshEnvironment() }
                 }
             }
         }

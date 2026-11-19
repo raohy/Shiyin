@@ -60,6 +60,7 @@ struct MeetingDetailView: View {
                     }
                 }
             }
+            SettingsToolbarItem()
         }
     }
 }
@@ -343,11 +344,23 @@ struct TrashBanner: View {
 /// 工作进度、失败原因
 struct StatusBanner: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
     let detail: MeetingDetail
 
     var body: some View {
-        if let status = model.detailStatus, status != .recording, let content = content(status) {
+        if model.applyingEdit == detail.meeting.id {
+            // 编辑会议、分成两场、还原：接录音要几秒（design §81.5）
+            HStack(spacing: 10) {
+                ProgressView().controlSize(.small)
+                Text("正在套用编辑…")
+                Spacer(minLength: 12)
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+        } else if let status = model.detailStatus, status != .recording, let content = content(status) {
             HStack(spacing: 12) {
                 content
                 Spacer(minLength: 12)
@@ -437,7 +450,7 @@ struct StatusBanner: View {
                let problem = model.summarizerProblem {
                 Button(problem.actionTitle) {
                     switch problem.action {
-                    case .openSettings: openSettings()
+                    case .openSettings: openWindow.settings(problem.settingsPage)
                     case .login(let provider): CLILogin.openLogin(provider)
                     }
                 }
@@ -518,6 +531,9 @@ struct MoreMenu: View {
                 Button("重新转录（含说话者识别）", systemImage: "waveform") { model.retranscribe() }
                 Button("重新识别说话者…", systemImage: "person.2.wave.2") { model.requestRediarize() }
             }
+            // 编辑会议（R107.1）。菜单建立一次就不更新，「还原」一直在，没编辑过时按了说明（R107.8）
+            Button("编辑会议…", systemImage: "scissors") { if let id = model.selection { model.requestEditMeeting(id) } }
+            Button("还原成编辑前的样子…", systemImage: "arrow.uturn.backward") { if let id = model.selection { model.requestRestoreEdit(id) } }
             Divider()
             // 工具列的菜单创建一次就不会更新（禁用状态、按钮记住的会议），动作一律在按下时才看目前选中的会议
             FolderMenu()

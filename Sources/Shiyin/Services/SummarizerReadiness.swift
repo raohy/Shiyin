@@ -34,7 +34,7 @@ enum SummarizerProblem: Equatable {
                 : String(localized: "Claude Code 还没登录，登录之后才能整理（终端命令：claude auth login）。")
         case .missingKey(let provider): return String(localized: "还没有填 \(provider.shortLabel) 的 API key，请到设置 → 整理工具填写")
         case .incomplete: return String(localized: "还没有填 OpenAI 兼容 API 的网址或模型，请到设置 → 整理工具填写")
-        case .enterpriseSignedOut: return String(localized: "公司的服务器还没登录或登录已失效，请到设置 → 高级 → 企业服务器登录")
+        case .enterpriseSignedOut: return String(localized: "公司的服务器还没登录或登录已失效，请到设置 → 企业服务器登录")
         case .enterpriseNoModels: return String(localized: "公司的服务器还没有提供整理用的模型，请通知管理者")
         case .paused(_, let detail): return detail
         }
@@ -48,6 +48,9 @@ enum SummarizerProblem: Equatable {
         default: return .openSettings
         }
     }
+
+    /// 「打开设置」开到哪一页（设置会记住上次的页面，R108.5）：公司服务器没登录时是企业服务器，其他是整理工具
+    var settingsPage: SettingsPage { self == .enterpriseSignedOut ? .enterprise : .provider }
 
     var actionTitle: String {
         switch action {

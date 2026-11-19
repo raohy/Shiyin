@@ -371,6 +371,20 @@ final class AppDatabase: @unchecked Sendable {
                 """)
             if !names.isEmpty { Self.replaceSeriesKeys(names) }
         }
+        // 编辑会议的快照（R107.8、design §81.3）：第一次编辑前的样子，最后一次编辑后留 30 天
+        migrator.registerMigration("v16") { db in
+            try db.execute(sql: """
+                CREATE TABLE meeting_edits (
+                  meeting_id  INTEGER PRIMARY KEY REFERENCES meetings(id) ON DELETE CASCADE,
+                  snapshot    TEXT NOT NULL,
+                  audio_file  TEXT NOT NULL,
+                  split_into  TEXT NOT NULL DEFAULT '[]',
+                  merged_from TEXT NOT NULL DEFAULT '[]',
+                  created_at  TEXT NOT NULL,
+                  edited_at   TEXT NOT NULL
+                );
+                """)
+        }
         return migrator
     }
 
@@ -539,63 +553,66 @@ final class AppDatabase: @unchecked Sendable {
     /// 只在新的一场说话的人，声纹改指新的一场。audioExtension 是切好的录音的扩展名（两场相同，原本那场的文件名跟着换，D172）。
     /// 回传新的一场（录音文件名已经给好，文件由调用的人搬）
     func splitMeeting(_ id: Int64, at cut: Double, title: String, audioExtension: String?) throws -> Meeting? {
-        try pool.write { db in
-            guard var original = try Meeting.fetchOne(db, key: id) else { return nil }
-            var meeting = original
-            meeting.id = nil
-            meeting.title = title
-            meeting.audioFile = ""
-            meeting.notes = nil
-            meeting.notesBy = nil
-            meeting.notesDraft = 0
-            meeting.userNotes = ""
-            meeting.speakerHintDismissed = false
-            meeting.durationSeconds = original.durationSeconds.map { max(0, $0 - Int(cut.rounded())) }
-            let started = ISO8601DateFormatter().date(from: original.createdAt) ?? Date()
-            meeting.createdAt = ISO8601DateFormatter().string(from: started.addingTimeInterval(cut))
-            meeting.updatedAt = Clock.now()
-            try meeting.insert(db)
-            let newId = meeting.id!
-            if let audioExtension {
-                meeting.audioFile = "\(newId).\(audioExtension)"
-                try meeting.update(db)
-            }
-            try Self.index(db, meetingId: newId, kind: .title, ref: 0, text: meeting.displayTitle)
+        try pool.write { db in try Self.splitMeeting(db, id, at: cut, title: title, audioExtension: audioExtension) }
+    }
 
-            let moved = try Segment.filter(Column("meeting_id") == id && Column("start") >= cut).order(Column("seq")).fetchAll(db).compactMap(\.id)
-            for (seq, segmentId) in moved.enumerated() {
-                try db.execute(sql: "UPDATE segments SET meeting_id = ?, seq = ?, start = MAX(0, start - ?), end = MAX(0, end - ?) WHERE id = ?",
-                               arguments: [newId, seq, cut, cut, segmentId])
-            }
-            for chunk in stride(from: 0, to: moved.count, by: 500).map({ Array(moved[$0..<min($0 + 500, moved.count)]) }) {
-                let marks = chunk.map { _ in "?" }.joined(separator: ",")
-                try db.execute(sql: "UPDATE corrections SET meeting_id = ? WHERE segment_id IN (\(marks))", arguments: StatementArguments([newId] + chunk))
-                try db.execute(sql: "UPDATE search SET meeting_id = ? WHERE rowid IN (\(marks))", arguments: StatementArguments([newId] + chunk))
-            }
-            try db.execute(sql: "UPDATE bookmarks SET meeting_id = ?, time = MAX(0, time - ?) WHERE meeting_id = ? AND time >= ?",
-                           arguments: [newId, cut, id, cut])
-
-            func speaks(_ meetingId: Int64, _ idx: Int) throws -> Bool {
-                try Bool.fetchOne(db, sql: "SELECT EXISTS (SELECT 1 FROM segments WHERE meeting_id = ? AND speaker = ?)", arguments: [meetingId, idx]) ?? false
-            }
-            for var speaker in try SpeakerName.filter(Column("meeting_id") == id).fetchAll(db) {
-                if try !speaks(id, speaker.idx), try speaks(newId, speaker.idx) {
-                    try db.execute(sql: "UPDATE voiceprints SET meeting_id = ? WHERE meeting_id = ? AND speaker_idx = ?", arguments: [newId, id, speaker.idx])
-                }
-                speaker.meetingId = newId
-                try speaker.insert(db)
-            }
-            try Self.removeEmptySpeakers(db, meetingId: id)
-            try Self.removeEmptySpeakers(db, meetingId: newId)
-
-            original.durationSeconds = Int(cut.rounded())
-            if let audioExtension { original.audioFile = "\(id).\(audioExtension)" }
-            original.updatedAt = Clock.now()
-            try original.update(db)
-            // 段落换了，说话者的复原对不上（design §24.2）
-            try db.execute(sql: "DELETE FROM speaker_undo WHERE meeting_id = ?", arguments: [id])
-            return meeting
+    /// 同上，在调用的人的交易里（编辑会议套用时一起分，design §81.1）
+    static func splitMeeting(_ db: Database, _ id: Int64, at cut: Double, title: String, audioExtension: String?) throws -> Meeting? {
+        guard var original = try Meeting.fetchOne(db, key: id) else { return nil }
+        var meeting = original
+        meeting.id = nil
+        meeting.title = title
+        meeting.audioFile = ""
+        meeting.notes = nil
+        meeting.notesBy = nil
+        meeting.notesDraft = 0
+        meeting.userNotes = ""
+        meeting.speakerHintDismissed = false
+        meeting.durationSeconds = original.durationSeconds.map { max(0, $0 - Int(cut.rounded())) }
+        let started = ISO8601DateFormatter().date(from: original.createdAt) ?? Date()
+        meeting.createdAt = ISO8601DateFormatter().string(from: started.addingTimeInterval(cut))
+        meeting.updatedAt = Clock.now()
+        try meeting.insert(db)
+        let newId = meeting.id!
+        if let audioExtension {
+            meeting.audioFile = "\(newId).\(audioExtension)"
+            try meeting.update(db)
         }
+        try index(db, meetingId: newId, kind: .title, ref: 0, text: meeting.displayTitle)
+
+        let moved = try Segment.filter(Column("meeting_id") == id && Column("start") >= cut).order(Column("seq")).fetchAll(db).compactMap(\.id)
+        for (seq, segmentId) in moved.enumerated() {
+            try db.execute(sql: "UPDATE segments SET meeting_id = ?, seq = ?, start = MAX(0, start - ?), end = MAX(0, end - ?) WHERE id = ?",
+                           arguments: [newId, seq, cut, cut, segmentId])
+        }
+        for chunk in stride(from: 0, to: moved.count, by: 500).map({ Array(moved[$0..<min($0 + 500, moved.count)]) }) {
+            let marks = chunk.map { _ in "?" }.joined(separator: ",")
+            try db.execute(sql: "UPDATE corrections SET meeting_id = ? WHERE segment_id IN (\(marks))", arguments: StatementArguments([newId] + chunk))
+            try db.execute(sql: "UPDATE search SET meeting_id = ? WHERE rowid IN (\(marks))", arguments: StatementArguments([newId] + chunk))
+        }
+        try db.execute(sql: "UPDATE bookmarks SET meeting_id = ?, time = MAX(0, time - ?) WHERE meeting_id = ? AND time >= ?",
+                       arguments: [newId, cut, id, cut])
+
+        func speaks(_ meetingId: Int64, _ idx: Int) throws -> Bool {
+            try Bool.fetchOne(db, sql: "SELECT EXISTS (SELECT 1 FROM segments WHERE meeting_id = ? AND speaker = ?)", arguments: [meetingId, idx]) ?? false
+        }
+        for var speaker in try SpeakerName.filter(Column("meeting_id") == id).fetchAll(db) {
+            if try !speaks(id, speaker.idx), try speaks(newId, speaker.idx) {
+                try db.execute(sql: "UPDATE voiceprints SET meeting_id = ? WHERE meeting_id = ? AND speaker_idx = ?", arguments: [newId, id, speaker.idx])
+            }
+            speaker.meetingId = newId
+            try speaker.insert(db)
+        }
+        try removeEmptySpeakers(db, meetingId: id)
+        try removeEmptySpeakers(db, meetingId: newId)
+
+        original.durationSeconds = Int(cut.rounded())
+        if let audioExtension { original.audioFile = "\(id).\(audioExtension)" }
+        original.updatedAt = Clock.now()
+        try original.update(db)
+        // 段落换了，说话者的复原对不上（design §24.2）
+        try db.execute(sql: "DELETE FROM speaker_undo WHERE meeting_id = ?", arguments: [id])
+        return meeting
     }
 
     /// 这场会议有没有排队中或执行中的工作（任何种类，含压缩、校正这些辅助工作）
@@ -920,7 +937,7 @@ final class AppDatabase: @unchecked Sendable {
     }
 
     /// 源文件放在 documents/<id>/ 底下，整个文件夹删掉。标准答案的暂存数据库不碰文件（documentsRoot 是 nil）
-    private func removeDocumentFile(_ file: String) {
+    func removeDocumentFile(_ file: String) {
         guard let documentsRoot, let folder = file.split(separator: "/").first, Int64(folder) != nil else { return }
         try? FileManager.default.removeItem(at: documentsRoot.appendingPathComponent(String(folder), isDirectory: true))
     }
@@ -1085,18 +1102,18 @@ final class AppDatabase: @unchecked Sendable {
     }
 
     /// 删掉这场会议所有段落的索引（段落还在数据库里的时候调用）
-    private static func unindexSegments(_ db: Database, meetingId: Int64) throws {
+    static func unindexSegments(_ db: Database, meetingId: Int64) throws {
         try db.execute(sql: "DELETE FROM search WHERE rowid IN (SELECT id FROM segments WHERE meeting_id = ?)", arguments: [meetingId])
     }
 
     /// 删掉这场会议的标题、会议记录、笔记的索引
-    private static func unindexMeeting(_ db: Database, meetingId: Int64) throws {
+    static func unindexMeeting(_ db: Database, meetingId: Int64) throws {
         let ids = [SearchHit.Kind.title, .notes, .userNotes].map { searchRowid(meetingId: meetingId, kind: $0) }
         try db.execute(sql: "DELETE FROM search WHERE rowid IN (?, ?, ?)", arguments: StatementArguments(ids))
     }
 
     /// 标题、会议记录、笔记（ref 是 0）
-    private static func index(_ db: Database, meetingId: Int64, kind: SearchHit.Kind, ref: Int64, text: String) throws {
+    static func index(_ db: Database, meetingId: Int64, kind: SearchHit.Kind, ref: Int64, text: String) throws {
         let rowid = searchRowid(meetingId: meetingId, kind: kind)
         try db.execute(sql: "DELETE FROM search WHERE rowid = ?", arguments: [rowid])
         guard !text.isEmpty else { return }

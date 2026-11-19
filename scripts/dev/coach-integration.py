@@ -107,6 +107,8 @@ def quit_app():
 
 def remove_organizing_migrations(connection):
     # 仅用于临时夹具：还原为本 fork 同步前的数据库结构。
+    connection.execute('DROP TABLE meeting_edits')
+    connection.execute("DELETE FROM grdb_migrations WHERE identifier='v16'")
     connection.execute('DROP INDEX meetings_series')
     connection.execute('ALTER TABLE meetings DROP COLUMN series_id')
     connection.execute('ALTER TABLE meetings DROP COLUMN folder_decided')
@@ -329,6 +331,25 @@ try:
           and bool(query("SELECT name FROM folders WHERE name='保留的旧文件夹'", target_home=v12_home)),
           '文件夹迁移到 v15 并保留旧会议分类')
     check(bool(list((v12_home / 'backups').glob('*before-v13.sqlite'))), 'v13 文件夹迁移前保留 v12 备份')
+    quit_app()
+    v15_home = base / 'v15-home'
+    v15_home.mkdir()
+    with sqlite3.connect(home / 'shiyin.sqlite') as source, sqlite3.connect(v15_home / 'shiyin.sqlite') as target:
+        source.backup(target)
+        target.execute('DROP TABLE meeting_edits')
+        target.execute("DELETE FROM grdb_migrations WHERE identifier='v16'")
+    launch(v15_home)
+    check(query('SELECT state FROM meeting_assistance WHERE meeting_id=?', (failure_id,), target_home=v15_home)[0][0]
+          == original_preparation, 'v15 升级保留助手状态')
+    check(bool(query("SELECT identifier FROM grdb_migrations WHERE identifier='v16'", target_home=v15_home))
+          and bool(query("SELECT name FROM sqlite_master WHERE name='meeting_edits'", target_home=v15_home)),
+          'v16 创建会议编辑快照表')
+    backups = list((v15_home / 'backups').glob('*before-v16.sqlite'))
+    check(bool(backups), 'v16 迁移前保留 v15 备份')
+    with sqlite3.connect(f'file:{backups[0]}?mode=ro', uri=True) as backup:
+        check(backup.execute('SELECT state FROM meeting_assistance WHERE meeting_id=?', (failure_id,)).fetchone()[0]
+              == original_preparation and not backup.execute("SELECT identifier FROM grdb_migrations WHERE identifier='v16'").fetchall(),
+              'v15 备份保留助手状态和原数据库版本')
     quit_app()
     tools = base / 'tools'
     tools.mkdir()

@@ -118,27 +118,33 @@ struct MainView: View {
     @AppStorage("hasSeenGuide") private var hasSeenGuide = false
     @State private var dropTargeted = false
 
+    /// 右边那一栏：人物页、多选、会议页或空白页
+    @ViewBuilder
+    private var detailContent: some View {
+        if model.sidebarMode == .people && !model.showTrash && model.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+            // 人物页（design §60.2）
+            if let person = model.peopleOverview.first(where: { $0.id == model.selectedPerson }) {
+                PersonPage(person: person).id(person.id)
+            } else {
+                PeopleEmptyView().toolbar { SettingsToolbarItem() }
+            }
+        } else if model.multiSelected.count > 1 {
+            MultiSelectionView(ids: model.multiSelected).toolbar { SettingsToolbarItem() }
+        } else if let detail = model.detail {
+            MeetingDetailView(detail: detail)
+                .id(detail.meeting.id)
+        } else {
+            EmptyDetailView().toolbar { SettingsToolbarItem() }
+        }
+    }
+
     var body: some View {
         @Bindable var model = model
         NavigationSplitView {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 380)
         } detail: {
-            if model.sidebarMode == .people && !model.showTrash && model.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
-                // 人物页（design §60.2）
-                if let person = model.peopleOverview.first(where: { $0.id == model.selectedPerson }) {
-                    PersonPage(person: person).id(person.id)
-                } else {
-                    PeopleEmptyView()
-                }
-            } else if model.multiSelected.count > 1 {
-                MultiSelectionView(ids: model.multiSelected)
-            } else if let detail = model.detail {
-                MeetingDetailView(detail: detail)
-                    .id(detail.meeting.id)
-            } else {
-                EmptyDetailView()
-            }
+            detailContent
         }
         .dropDestination(for: URL.self) { urls, _ in
             model.requestImport(urls)
@@ -184,10 +190,30 @@ struct MainView: View {
         }
         // 删除、移除、分成两场的确认（R106、design §80）：同一种弹窗，取代系统的确认对话框
         .sheet(item: Binding(get: { model.activeConfirmation }, set: { if $0 == nil { model.clearConfirmations() } })) { ConfirmSheet(request: $0) }
+        .sheet(item: Binding(get: { model.editingMeeting.map(EditingMeeting.init) }, set: { model.editingMeeting = $0?.id })) {
+            MeetingEditSheet(meetingId: $0.id)
+        }
     }
 }
 
 /// 选了两场以上的会议（R88、design §62）：能一起做的事
+/// 工具列最右边的齿轮：打开设置（R108.1，同菜单列的「设置⋯」、⌘,）。每一种页面在自己工具列的最后放一个：
+/// 挂在外层的话会排到「导出」「更多」前面
+struct SettingsToolbarItem: ToolbarContent {
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) { SettingsButton() }
+    }
+
+    private struct SettingsButton: View {
+        @Environment(\.openWindow) private var openWindow
+
+        var body: some View {
+            Button { openWindow.settings() } label: { Label("设置", systemImage: "gearshape") }
+                .help("设置（⌘,）")
+        }
+    }
+}
+
 struct MultiSelectionView: View {
     @Environment(AppModel.self) private var model
     let ids: [Int64]

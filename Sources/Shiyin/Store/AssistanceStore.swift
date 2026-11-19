@@ -11,12 +11,12 @@ extension AppDatabase {
         try pool.read { try Self.assistance($0, meetingId) }
     }
 
-    private static func assistance(_ db: Database, _ id: Int64) throws -> MeetingAssistance? {
+    static func assistance(_ db: Database, _ id: Int64) throws -> MeetingAssistance? {
         guard let text = try String.fetchOne(db, sql: "SELECT state FROM meeting_assistance WHERE meeting_id = ?", arguments: [id]) else { return nil }
         return try JSONDecoder().decode(MeetingAssistance.self, from: Data(text.utf8))
     }
 
-    private static func saveAssistance(_ db: Database, _ id: Int64, _ state: MeetingAssistance) throws {
+    static func saveAssistance(_ db: Database, _ id: Int64, _ state: MeetingAssistance) throws {
         let data = try JSONEncoder().encode(state)
         try db.execute(sql: "INSERT INTO meeting_assistance(meeting_id, state) VALUES (?, ?) ON CONFLICT(meeting_id) DO UPDATE SET state = excluded.state",
                        arguments: [id, String(decoding: data, as: UTF8.self)])

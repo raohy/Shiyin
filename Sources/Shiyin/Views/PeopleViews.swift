@@ -62,7 +62,10 @@ struct PersonPage: View {
         }
         .navigationTitle(person.name)
         // 改名、合并、删除放在工具列右上角的「更多」，跟会议页同一个位置
-        .toolbar { ToolbarItem(placement: .primaryAction) { moreMenu } }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) { moreMenu }
+            SettingsToolbarItem()
+        }
         .task(id: person) { load() }
     }
 

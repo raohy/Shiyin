@@ -23,7 +23,7 @@ public sealed record SummarizerProblem(SummarizerProblemKind Kind, LLMProvider P
             : L.T("Claude Code 還沒登入，登入之後才能整理（終端機指令：claude auth login）。"),
         SummarizerProblemKind.MissingKey => L.F("還沒有填 %@ 的 API key，請到設定 → 整理工具填寫", Provider.ShortLabel()),
         SummarizerProblemKind.Incomplete => L.T("還沒有填 OpenAI 相容 API 的網址或模型，請到設定 → 整理工具填寫"),
-        SummarizerProblemKind.EnterpriseSignedOut => L.T("公司的伺服器還沒登入或登入已失效，請到設定 → 進階 → 企業伺服器登入"),
+        SummarizerProblemKind.EnterpriseSignedOut => L.T("公司的伺服器還沒登入或登入已失效，請到設定 → 企業伺服器登入"),
         SummarizerProblemKind.EnterpriseNoModels => L.T("公司的伺服器還沒有提供整理用的模型，請通知管理者"),
         _ => Detail,
     };
@@ -35,6 +35,9 @@ public sealed record SummarizerProblem(SummarizerProblemKind Kind, LLMProvider P
     public string ActionTitle => !OffersLogin ? L.T("打開設定")
         : DesktopApp is { } app ? L.F("打開 %@ 登入", app)
         : L.F("登入 %@", Provider == LLMProvider.Codex ? "Codex" : "Claude Code");
+
+    /// <summary>「打開設定」打開哪一頁（R108，設定會記住上次的頁面）：公司的伺服器沒登入時是企業伺服器，其他是整理工具</summary>
+    public string SettingsPage => Kind == SummarizerProblemKind.EnterpriseSignedOut ? "enterprise" : SettingsPages.Provider;
 
     /// <summary>用 Codex 桌面版附的 codex 時是那個 app 的名稱（R55.3）</summary>
     string? DesktopApp => Provider == LLMProvider.Codex ? DesktopApps.CodexAppName() : null;

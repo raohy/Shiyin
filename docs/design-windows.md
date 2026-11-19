@@ -310,7 +310,7 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 | 主視窗（NavigationSplitView：側欄、搜尋、會議內容） | 主視窗：左邊會議清單（含資料夾、搜尋框、垃圾桶、匯入），右邊會議內容 |
 | 會議頁的分頁（紀錄、逐字稿、提問，R44.1） | `SelectorBar`，Ctrl+1～3；待確認是紀錄頂部的 `Expander`、我的筆記是逐字稿頂部的 `Expander`（§11.6） |
 | 錄音中的畫面、播放列、時間軸 | 同樣的排版；時間軸用 Canvas 放矩形、三角形、圓點 |
-| Settings（4 個分頁，R44.5） | 獨立的設定視窗，上方 `SelectorBar` 4 頁（整理工具、錄音與轉錄、說話者與詞彙、進階）；「進階」頁多一個介面語言（R26.4、D57） |
+| Settings（左邊側欄十一項，R108、M§82） | 獨立的設定視窗，左邊 `NavigationView` 十一項分四組、上方搜尋（§11.41）；「一般」頁多一個介面語言（R26.4、D57） |
 | 引導、使用說明、回報問題、問所有會議 | 各自的視窗 |
 | MenuBarExtra | 系統匣圖示（WinUIEx 的 TrayIcon）：左鍵打開主視窗，右鍵選單有錄音狀態、暫停、停止、進行中的工作、打開、說明、設定、結束。Windows 11 預設把新圖示收進「^」，引導的最後一步說明 |
 | 偵測會議的浮動視窗（NSPanel） | 右下角、最上層、不搶焦點的小視窗（`WS_EX_NOACTIVATE`），30 秒收起 |
@@ -339,12 +339,13 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 - 粗體用 `FontWeights.Bold`（`Ui.Text(bold: true)`），不要用 SemiBold：中文、日文沒有 SemiBold 的字重，Windows 會換成明體的假粗體，跟其他文字不一樣。ContentDialog 內建的標題也是 SemiBold，標題要用 `Ui.DialogTitle`。
 - 文字加按鈕的一列（狀態列、範本的說明、錄音列）用 `Ui.Bar`：長的文字或會被截的東西放中間那欄（左欄寬度跟著內容、不會換行），按鈕放右邊照內容寬。全部放在橫的 StackPanel 裡時，英文的按鈕比較寬，會被擠出視窗。放不下時整個藏起來、不要切一半的（錄音列的兩個音量條）用 `FitRow`。逐字稿的搜尋列是 Grid：搜尋框最寬 300、可以縮。
 - `TextHighlighter` 要給 `Foreground`：預設是黑色，深色模式下標起來的字看不見。
-- 視窗的最小尺寸同 Mac（主視窗 960×620、設定 600×480、其他 520×440，`WindowPlacement.MinimumSize`，不超過螢幕的工作區）。
+- 視窗的最小尺寸同 Mac（主視窗 960×620、設定 720×500（§11.41）、其他 520×440，`WindowPlacement.MinimumSize`，不超過螢幕的工作區）。
 - 介面巡檢的做法：虛擬機用 `ctl.sh open settings|guide|report|ask|onboarding`、`uia.sh` 按分頁和選單、`shot.sh` 截圖，淺色、深色（改 `AppsUseLightTheme` 再廣播 `ImmersiveColorSet`，app 不用重開）、中文、英文（`--set interfaceLanguage=en`）、最小視窗（`SetWindowPos` 拉到比最小還小）各走一次；測試資料夾裡有各種狀態的會議（整理失敗、猜到名字、校正建議、分不準的提醒、待確認、日文）。
 - 可以選取的 `TextBlock` 有自己的右鍵選單（拷貝、全選），會蓋掉外層的 `ContextFlyout`：文字上也要設同一個選單。
 - 快捷鍵掛在整個視窗時設 `KeyboardAcceleratorPlacementMode = Hidden`，不然滑鼠停在視窗裡會跳出快捷鍵提示。
 - 無障礙名稱（螢幕閱讀器、UI Automation）：只有圖示的按鈕、沒有標題的輸入框和下拉選單、`ListViewItem`（內容是好幾個文字元件時，名稱會是空的或資料的型別名稱）都要設 `AutomationProperties.Name`。新的畫面用虛擬機的 `uia.sh dump` 檢查。
 - 錄音開始時先接好每個聲道的 `OnSamples`，全部接好再 `Start()`：模擬錄音的第二個聲道是第一個的鏡像，第一個一開始就送資料，第二個還沒接上的話開頭那幾段會丟掉、兩個聲道對不齊（CI 的 macOS 機器比較慢時 `RecorderTests` 失敗）。真的錄音（WASAPI）順序沒有差別。
+- `ReleasePointerCapture` 會馬上（同步）觸發 `PointerCaptureLost`：在 `PointerReleased` 裡放掉捕捉之前，先把要用的拖曳狀態記下來（2026-11-17 虛擬機：編輯會議在波形上拖曳選取，`PointerCaptureLost` 先把「拖曳中」清掉，放開時變成點一下）。
 - 服務要在 UI 執行緒建、在 UI 執行緒關（MediaPlayer、全域快捷鍵）；結束時背景只做停止錄音和工作，`AppHost.Post` 不再更新畫面，回到 UI 執行緒再關播放器和資料庫（錄音中按「結束」曾經卡死）。
 
 ### 11.3 外觀、字型
@@ -357,7 +358,7 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
   - 淡淡上色的一塊（建議條、狀態條、待確認展開的那一塊、提問的回答、錄自己聲音的那段文字）：`Ui.Tint` 在對比主題時透明，`Ui.Tinted(border, 底色)` 改成沒有底色、一圈文字顏色的細框（同 Windows 設定的卡片在對比主題的樣子）。逐字稿目前播放、跳過來的段落改成一圈框（播放的是反白的顏色），標起來的字（搜尋、校正建議）是反白的底配反白的字。
   - 清單的列、超連結按鈕、整列是按鈕的會議列裡的字和圖示不自己給顏色：`Ui.FollowForeground(內容)` 在對比主題時把 `TextBlock`、圖示的 `Foreground` 清掉，跟著列或按鈕的前景色（平常是按鈕的字或文字的顏色，選到、滑過去是反白的字，超連結是超連結的顏色）；跳過控制項（「⋯」這些按鈕自己處理）和有自己底色的一小塊（頭像、資料夾齒輪的小圓）。會議列的狀態文字（失敗、待確認）每秒更新時也不上色。用在側欄的導覽、會議、人物、搜尋結果的列，會議頁上方和逐字稿的說話者，人物頁的會議列和待辦表的會議連結、常參加的人。
   - 頭像：視窗底色的圓、文字顏色的字和外圈（「我」的外圈 2）；底色不透明，放在選到的列上也看得清楚。
-  - `Ui.Borderless`（沒有框的按鈕：會議設定、文件、鉛筆、合併到、移除這個人、篩選的漏斗和 ✕、「⋯」）在對比主題時照平台的按鈕（按鈕色的字和框，滑過去反白）：沒有框的按鈕看起來跟一般的字一樣，原本覆寫的滑過底色（`Subtle`）和字（反白的顏色）也不是成對的系統色。紅字的按鈕（移除這個人…）也是按鈕色。待確認的標記「？」同樣不上琥珀色。時間點（`Ui.Time`）、提問的出處連結不給青瓷綠，照平台的超連結顏色。
+  - `Ui.Borderless`（沒有框的按鈕：會議設定、文件、鉛筆、合併到、移除這個人、篩選的漏斗和 ✕、「⋯」）在對比主題時照平台的按鈕（按鈕色的字和框，滑過去反白）：沒有框的按鈕看起來跟一般的字一樣，原本覆寫的滑過底色（`Subtle`）和字（反白的顏色）也不是成對的系統色。紅字的按鈕（移除這個人…）也是按鈕色。待確認的標記「？」同樣不上琥珀色。時間點（`Ui.Time`）、提問的出處連結不給青瓷綠，照平台的超連結顏色。彈窗、編輯畫面右上角的 ✕（`Sheet.Header`）平常往右上多出去一點對齊，對比主題時不移：按鈕有框，多出去的那段被欄位切掉、框缺一角（2026-11-17「水生」）。
   - 開著 app 開關對比主題、換一個對比主題（`ActualTheme` 不變）：`Ui.OnContrastChanged(元件, 動作)` 聽 `UISettings.ColorValuesChanged`（不在 UI 執行緒，排回元件的 `DispatcherQueue`），`Ui.ContrastKey`（沒開時空字串，開著時是用到的系統色；每次重讀對比主題開了沒，`Ui.HighContrast` 平常用記住的值，建一頁要問上千次）變了才做：主視窗重新給顏色（`restyle`）、重建列表、重畫；列表、人物頁「內容一樣時不重建」的比對加上 `Ui.ThemeKey`（深淺色＋`ContrastKey`）。`AccessibilitySettings.HighContrastChanged` 在沒打包的桌面 app 訂閱時丟 0x80070490（2026-11-15 虛擬機啟動就當掉），不用。已知：從一個對比主題直接換成另一個時，平台的 `SelectorBar`（紀錄／逐字稿／提問、條列／心智圖）選取的那一條底線留著前一個主題的反白顏色，重開拾音才換（一般→對比、對比→一般會換）；設定、引導這些另外開的視窗開著時換主題，自己的顏色要重開視窗才換（底色會換）。
   - 驗證：虛擬機用 `Start-Process` 開 `C:\Windows\Resources\Ease of Access Themes\hc2.theme`（夜空）、`hcwhite.theme`（沙漠）套用（`hc1` 黃昏、`hcblack` 水生），等 `CurrentTheme` 換好再關掉跳出來的設定視窗；改回原本的主題是同樣開 `%LOCALAPPDATA%\Microsoft\Windows\Themes\Custom.theme`，`HKCU\Control Panel\Accessibility\HighContrast` 的「High Contrast Scheme」、`Themes` 的 `LastHighContrastTheme` 會記成剛剛用過的對比主題，測前 `reg export`、測完改回（原本是「High Contrast Black」、`hcblack.theme`）；剛開機時第一次開 `.theme` 可能等不到套用（設定 app 還在啟動），再開一次。停虛擬機見 §15.2（不要強制斷電）。
 - 介面字型用系統預設（Segoe UI Variable、微軟正黑體）。會議標題的明體：Mac 用宋體，Windows 中文、英文用新細明體（`PMingLiU`，沒有時退回 `Microsoft JhengHei UI`），日文用 `Yu Mincho`，都是粗體（`Ui.TitleFont`、`Ui.Heading`）。
@@ -382,7 +383,7 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 
 - `DetailTab` 剩 Summary（「紀錄」）、Transcript、Ask；`NotesTabs` 的摘要和議題合成一頁；`ReviewTab` 的內容變成紀錄頂部可展開的一條（`ReviewBanner`，有待確認才顯示）；我的筆記收進逐字稿頂部的 Expander。控制通道 `tab` 接受舊名稱當別名。
 - `MoreMenu` 分組同 M§33.2；復原上一版放編輯列、復原說話者的調整放改名視窗和右鍵選單（有東西可復原才顯示）。
-- 設定頁四頁、引導三步，分法同 M§33.3、§33.4（Windows 沒有 CLI 時「你平常用哪個 AI？」的第二段只列 API）。
+- 引導三步，分法同 M§33.4（Windows 沒有 CLI 時「你平常用哪個 AI？」的第二段只列 API）。設定原本是四頁（M§33.3），R108 改成左邊導覽十一項（§11.41）。
 - 標準答案不變；介面文字跑 `l10n.py windows-check`。
 
 ### 11.7 麥克風看得到、換得到，文字大小，匯出（R58～R60，M§38）
@@ -441,8 +442,8 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 - 開關是 `settings.json` 的 `mcpEnabled`（每次 `tools/call` 重讀檔案）；`--set 鍵=值` 只對那次執行有效（測試用）。企業伺服器的 `mcp: false` 同 Mac：`EnterpriseInfo`、`EnterpriseAccount` 的 `Mcp`，`EnterpriseServer.McpBlocked(settings)` 直接讀存著的帳號。log 寫進 `logs\shiyin-<日期>.log`（同 app，只寫工具名稱、筆數、花多久）。
 - 路徑：安裝版是 `%LOCALAPPDATA%\ShiyinApp\current\shiyin-mcp.exe`（Velopack 更新後路徑不變），不需要 Mac 的啟動檔。`SHIYIN_HOME` 是用環境變數指定的（DEBUG、示範資料）時，登記時一起帶（Claude Code `-e SHIYIN_HOME=…`，要放在名稱後面：`-e` 可以接好幾個值，放前面會把名稱也吃掉；Codex `--env SHIYIN_HOME=…`；Claude Desktop 的 `env`）。
 - 加到 Claude Code、Codex（`Mcp/McpSetup.cs`）：`IToolLocator` 找到的 claude、codex（真正的 exe，或 node 加套件的 js；不會經過 cmd.exe），`ProcessRunner`（`ArgumentList`）；先 `mcp remove` 再 `mcp add`。Claude Desktop：寫法同 Mac（先備份成 `.bak`、只改 `mcpServers.shiyin`，Windows 的 `JsonObject` 保留其他鍵的順序）；設定檔的位置：MSIX 版（Store、官網的安裝檔都是 MSIX，`Claude_pzs8sxrjxfjjc`）的 AppData 被虛擬化，只讀 `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json`（寫到 `%APPDATA%\Claude` 它讀不到，連它自己的「Edit Config」都開錯檔，anthropics/claude-code#26073、#29100）。偵測到 MSIX 套件（`Packages.ByFamily`；裝了還沒開過、資料夾還不在也算）或那個資料夾在就寫那裡（資料夾不在就建），都沒有才寫 `%APPDATA%\Claude\claude_desktop_config.json`。有沒有裝看 `WindowsToolLocator.HasClaudeDesktop()`。
-- 設定頁（進階）同 Mac 的一組「AI 工具（MCP）」：開關、三個按鈕、「複製」下拉選單（英文是 Copy，用 `MeetingLanguages.Ui`；翻譯表的「複製」是 Duplicate）。DEBUG：`SHIYIN_MCP_SERVER` 指到 `dotnet build` 出來的 shiyin-mcp（DEBUG 的 app 資料夾裡沒有）、`SHIYIN_CLAUDE_DESKTOP_CONFIG` 指到別的設定檔。
-- DEBUG 控制通道：`open settings <provider|recording|names|advanced>` 打開設定的那一頁、`openlink <網址>` 等於點了那個 shiyin: 網址。
+- 設定的「AI 工具」那一頁（原本在進階，§11.41）同 Mac：開關、三個按鈕、「複製」下拉選單（英文是 Copy，用 `MeetingLanguages.Ui`；翻譯表的「複製」是 Duplicate）。DEBUG：`SHIYIN_MCP_SERVER` 指到 `dotnet build` 出來的 shiyin-mcp（DEBUG 的 app 資料夾裡沒有）、`SHIYIN_CLAUDE_DESKTOP_CONFIG` 指到別的設定檔。
+- DEBUG 控制通道：`open settings <頁面>` 打開設定的那一頁（§11.41）、`openlink <網址>` 等於點了那個 shiyin: 網址。
 - 會議連結：`NotificationLinks.Parse` 也認得 `shiyin://open?meeting=…&t=…`（`open` 是主機名稱、路徑是空的；通知用的 `shiyin:open?…` 照舊），`Link.Open` 多了 `Seconds`。有時間點時 `AppHost.ShowMeetingAt`：打開那場、切到逐字稿、從那裡開始（同「問所有會議」點出處）；沒有時同點通知（選到那場，分頁不變）。會議已經永久刪掉了（舊的連結、舊的通知）：打開主視窗、提示「找不到這場會議，可能已經刪掉了」（同 Mac），不選那個 id。
 - 驗證：`dotnet test`（標準答案、協定、開關、唯讀、企業伺服器的 `mcp`、`McpSetup` 的參數和設定檔）；Mac 上 `shiyin-mcp.dll` 用 stdin 送協定訊息、跟 Mac 的 `Shiyin --mcp` 讀同一份資料庫逐字比；虛擬機裡 Claude Code 沒有登入時只驗設定檔寫對。
 
@@ -533,13 +534,10 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 - **刪除一句**（M§63、D171）：`AppDatabase.DeleteSegment`、`UndoSpeakerEdit` 同 Mac。快照多記 `deleted`，`segment`、`corrections` 的鍵照 Mac 的 Codable（段落：`id`、`meetingId`、`seq`、`start`、`end`、`text`、`lowConfidence`、`speaker`（沒有就不寫）、`kind`、`channel`（沒有就不寫）、`speakerManual`；校正建議：`id`、`meetingId`、`segmentId`、`original`、`suggestion`、`reason`、`status`、`createdAt`），同一份資料庫在 Mac、Windows 打開都能復原對方刪的句子。復原時校正建議的 id 已經有人用（`AUTOINCREMENT`，正常不會發生）就用新的 id，不讓整個復原失敗。
   - 逐字稿的右鍵選單：說話者那一組（拆成兩句…、這句是誰說的、這段連續的話…）後面加「從這裡分成兩場…」（第一句沒有）、「刪除這句」（`Symbol.Delete`）、「復原：…」（`Symbol.Undo`，從「有說話者才顯示」的那一組移出來，沒辨識說話者的會議也有）。不用確認（D171）。
   - `AppController.DeleteSegment`：擋下來的條件同 `SpeakerEditProblem`（垃圾桶裡、正在處理），訊息「正在處理這場會議，完成後才能修改逐字稿」；復原的說明「刪除一句「前 12 個字…」」（字數用 `SwiftText`，同 Mac 的字形叢集）。
-- **分割會議**（M§64、D170）：
-  - 確認：`ContentDialog`，標題「從 mm:ss 這句開始分成另一場會議？」、內文同 Mac、主要按鈕「分成兩場」、預設按鈕是「取消」（分開後沒辦法合併回來）。
-  - 錄音（`IAudioSplitter`，`AppController.Splitter`，D172）：WAV 直接切位元組（Services 的 `AudioSplit.SplitWav`，Mac 上的測試也跑得到）：`fmt ` 區段原樣複製，`data` 從第 `floor(切點 × 取樣率)` 個音框切開，格式、聲道、位元數都不變（逐個取樣相同）；其他區段（`LIST` 等）不帶。其他格式（Platform 的 `MediaFoundationSplitter`）：Media Foundation 解碼成 16 位元 PCM（原本的取樣率、聲道數），切開後各自壓成 AAC 的 m4a：取樣率不是 44.1／48 kHz 時升到 48 kHz（AAC 編碼器只收這兩種，同 §13），位元率照原檔的平均（檔案大小 ÷ 長度）取 96／128／160／192 kbps 最接近的。m4a 以外的格式（匯入的 mp3、mp4、aac、flac…）也輸出 m4a，原本那場的錄音檔一起改成 `<id>.m4a`。
-  - 資料庫（`AppDatabase.SplitMeeting`，一個交易）同 M§64；給的副檔名跟原本那場的不同時，原本那場的 `audio_file` 一起改。
-  - 換檔：先發 `ReleasingAudio`（主視窗停止播放、放掉檔案），後段搬到 `audio\<新 id>.<副檔名>`，前段取代原本那場的檔案（`MediaPlayer` 不一定馬上放掉檔案：`File.Move` 遇到 IOException 每 0.2 秒重試，最多 2 秒），副檔名換了就刪掉舊檔；再發 `AudioReplaced`（主視窗重新載入播放器，同壓縮完換檔）。
-  - 擋下來的條件（正在錄音、有排隊或進行中的工作、在垃圾桶裡、另一場正在分割）、排重新整理、通知、選取留在原本那場，同 M§64。`AppController.SplittingMeeting` 是正在分割的那場。
-- **DEBUG 控制通道**（同 Mac 的名稱；會議 id 都寫在參數裡，不看目前選的）：`selectmany <id,id,…>`（等於 Ctrl 點選）、`trashmany`、`restoremany`、`purgemany <id,id,…>`（不經過確認）、`showtrash 0|1`、`confirmemptytrash`（打開確認對話框）、`emptytrash`（不經過確認）、`deletesegment <會議 id> <段落 id>`、`splitmeeting <會議 id> <段落 id>`（不經過確認）、`splitconfirm <會議 id> <段落 id>`（打開確認對話框，等於右鍵「從這裡分成兩場…」）。`state` 加 `multiSelected`、`showTrash`、`trashCount`、`confirmDelete`、`deleteTargets`、`confirmPurge`、`confirmEmptyTrash`、`splitMeetingRequest`、`splittingMeeting`（對話框開著時是要處理的那幾場、那一句）。
+- **分割會議**（M§64、D180）：
+  - 確認：`Dialogs.Confirm`，標題「從 mm:ss 這句開始分成另一場會議？」、內文同 Mac（最後一句是「30 天內可以從「更多」還原。」）、主要按鈕「分成兩場」。
+  - `AppController.SplitMeeting` 走編輯會議的套用（§11.40、M§81.6）：片段是整場（會議長度、錄音長度、最後一句的結尾取大的）、切點是那一句的開始（四捨五入到 0.01 秒），所以一樣能還原。錄音、資料庫、換檔、擋下來的條件、排重新整理、通知都同 §11.40；原本的 `IAudioSplitter`、`MediaFoundationSplitter`、`SplittingMeeting` 拿掉（`AppDatabase.SplitMeeting` 改成交易內也能呼叫，編輯的套用接著用）。
+- **DEBUG 控制通道**（同 Mac 的名稱；會議 id 都寫在參數裡，不看目前選的）：`selectmany <id,id,…>`（等於 Ctrl 點選）、`trashmany`、`restoremany`、`purgemany <id,id,…>`（不經過確認）、`showtrash 0|1`、`confirmemptytrash`（打開確認對話框）、`emptytrash`（不經過確認）、`deletesegment <會議 id> <段落 id>`、`splitmeeting <會議 id> <段落 id>`（不經過確認）、`splitconfirm <會議 id> <段落 id>`（打開確認對話框，等於右鍵「從這裡分成兩場…」）。`state` 加 `multiSelected`、`showTrash`、`trashCount`、`confirmDelete`、`deleteTargets`、`confirmPurge`、`confirmEmptyTrash`、`splitMeetingRequest`、`splittingMeeting`（對話框開著時是要處理的那幾場、那一句；`splittingMeeting` 現在是正在套用編輯的那場，同 Mac）。
 - 虛擬機驗證：`uia.ps1` 加 `rclick`（真的滑鼠右鍵點那個元件，打開 `ContextFlyout`，可以接著點選單的選項）、`lclick`（真的左鍵點，`DropDownButton` 用 UIA 的 Invoke 打不開選單時）、`ctrlclick`（按住 Ctrl 點，多選）、`key`（按一個鍵，例如 Delete）；虛擬機裡的輸入不會送到 Mac。要點：送鍵盤之前用 `AttachThreadInput`＋`SetForegroundWindow` 把拾音拉到前面（排程工作開的 PowerShell 會搶到前景，Ctrl 送不到拾音）；打開選單和點選項要在同一個腳本裡（下一個 PowerShell 開起來會搶焦點，選單被關掉）；in-session 的腳本丟出錯誤時只看得到 TIMEOUT。
 
 ### 11.24 心智圖放大縮小（R91，M§65）
@@ -787,6 +785,77 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 - DEBUG：`dialogui <export|rediarize|editinfo|replace|split|trash|purge> <會議 id[,…]> [段落 id 或錯誤寫法]`（同 Mac 的 `exportui`、`preview editinfo|replace|rediarize`；確認的其他幾種照舊用 `folderdeleteui`、`personremove`、`confirmemptytrash`、`splitconfirm`，資料夾條件 `editfolderrule`、匯入 `importinto`、重新命名 `renameui`），state 的 `sheet`（開著的對話框的標題，沒開是空字串）。
 - 驗證：虛擬機 `uia.sh` 打開每一種、截圖（深色、淺色、高對比），按 Enter／Esc（`uia.sh key`）、✕（`uia.sh click … 關閉`），看 state 的 `sheet` 和對應的狀態；從右鍵選單的項目打開（`uia.sh rclick … <項目>`、`menukeys … 28,0D`）再按 Enter／Esc；開著拾音時換深淺色再打開。
 
+### 11.40 編輯會議：裁切、刪掉一段、分成兩場、合併兩場（R107，M§81、D178～D183）
+
+- **共用的邏輯**跟 Mac 同一套，標準答案比對（§4）：
+  - `Shiyin.Core/Model/EditPlan.cs`（片段、`Map`、`Snap`、`MapSentence`、`Source`、`Split`、`Keeping`、`RemapUserNotes`）、`MeetingNotes.MappingTimes`：`util/edit-plan.json`。
+  - `Shiyin.Data/AppDatabase.Edits.cs`：migration v15（`meeting_edits`）、`ApplyEdit`、`RestoreEdit`、快照、合併時說話者的對法（人物 → 名字 → 聲紋，門檻是 `VoiceprintThreshold`：Windows 的聲紋模型不同，§9）、搜尋索引重建、30 天：`db/49～61`、`schema.sql`。比對時 `meeting_edits.snapshot` 寫成 `<snapshot>`、`edited_at` 是時間欄位（同 Mac 的 dumpTable）。
+  - 快照的 JSON 照 Mac 的 `EditSnapshot`（Codable 的鍵、沒有值的選填欄位不寫、Data 是 base64、斜線跳脫）：同一份資料庫在 Mac、Windows 都能還原對方編輯的會議。
+- **錄音**（`IAudioEditor`：Windows 是 Platform 的 `MediaFoundationAudioEditor`，測試用 Services 的 `AudioEdit.WavOnly`）：
+  - 只有一場、錄音是 WAV：`AudioEdit.ComposeWav` 照位元組接（`fmt ` 區段原樣，`data` 照片段的 `floor(秒 × 取樣率)` 切，格式、聲道、位元數不變，逐個取樣相同；其他區段不帶）。同原本的 WAV 分割（§11.23）。片段超出錄音的部分當成沒有（同 Mac 的 composeWAV）。
+  - 其他（m4a、匯入的 mp3、影片，或合併）：Media Foundation 解碼（`MediaFoundationPcmReader`，同 `MediaFoundationDecoder.OpenReader`），`PlanPcmStream` 照片段依序讀：取樣率取高的（NAudio 的 WdlResampler 換）、聲道取多的（最多 2，少的複製過去），沒有錄音、錄音比片段短的地方補安靜，長度一定是每段 `round(長度 × 取樣率)` 的和；壓成 AAC 的 m4a：取樣率不是 44.1／48 kHz 時升到 48 kHz（同壓縮、分割），位元率照來源的平均取 96～192 kbps 最接近的（WAV 的來源算 96）。檔名換成 `<id>.m4a`（D172）。
+  - 測試（Mac 上）的 `WavOnly` 合併時寫成 16 位元的 WAV（Media Foundation 只有 Windows 有），其他格式說不支援。
+  - 換檔：先發 `ReleasingAudio`（主視窗停止播放），第一次編輯時原本的錄音搬到 `audio\edits\<id>.<副檔名>`，之後的編輯舊的直接刪；新的搬回 `audio\<id>.<副檔名>`。`MediaPlayer` 不一定馬上放掉檔案：搬、刪都遇到 IOException 每 0.2 秒重試、最多 2 秒（同 §11.23）。換好發 `AudioReplaced`（主視窗重新載入播放器）。合併時複製參考文件的原始檔（`documents\<新 id>\<檔名>`）。
+  - 還原：刪掉現在的錄音、從 `audio\edits\` 搬回來，編輯後加進來的參考文件連檔案刪掉。
+  - 30 天：`AppController.PurgeExpiredEdits`，啟動時（清垃圾桶之後）和永久刪除會議之後跑：最後編輯超過 30 天的刪掉快照和錄音，`audio\edits\` 裡沒人用的檔一起刪。
+- **擋下來、訊息、排重新整理**同 M§81.5（`AppController.EditProblem`、`ApplyingEdit`）：正在錄音、有排隊或進行中的工作（`HasActiveJobs` 或 `RunningJob`）、在垃圾桶裡、另一場正在套用時說原因；會議不見了不說。
+- **編輯畫面是主視窗上的覆蓋層**（`Views/MeetingEditView.cs`、`Views/EditTimeline.cs`），不是 ContentDialog，也不是另一個視窗：
+  - ContentDialog 同時只能開一個（§11.2.1），編輯畫面裡還要開套用、放棄的確認和選會議的彈窗；ContentDialog 開在覆蓋層上面，照常用 `Dialogs.Confirm`、`SheetDialog`。
+  - 另一個視窗：WinUI 3 沒有附屬在主視窗上的模態視窗（`OverlappedPresenter.IsModal` 要自己用 Win32 設擁有者），主視窗還能點，會有 D183 說的衝突（同一場會議在主視窗被改名、移到垃圾桶、開始整理）；深淺色、文字大小、截圖都要另外處理。覆蓋層跟 Mac 的 sheet 一樣：蓋住整個主視窗，這段時間這場會議不會有其他操作。
+  - 做法：`MainWindow` 的內容改成外層 Grid（原本的 root ＋ `editorLayer`）。覆蓋層是半透明的黑（淺色 35%、深色 55%），吃掉滑鼠；中間的卡片圓角 12、內距 24、細框和 `ThemeShadow`，淺色白、深色 #2B2B2B，大小跟著視窗（寬 720～1100、高 520～900，上下留 24、左右 48，視窗小的時候留 16 的邊）。卡片裡是一個 `ScrollViewer`（`MeetingEditView.Host`）：卡片夠高時跟沒有捲動一樣（內容的高度＝卡片），太矮時內容撐到逐字稿至少留 112、整張卡片上下捲，「取消」「套用…」不會被切掉（150% 縮放的 1080p 筆電視窗內容只有 640 左右高；2026-11-17 虛擬機 150%：逐字稿剩 0、下面的按鈕被切掉一半）。內容的高度在 `LayoutUpdated` 算（逐字稿以外每一列的 `DesiredSize` 加上 112，值變了才設），逐字稿照樣虛擬化。對比主題時卡片一圈字的顏色的框（12% 的灰框在變暗的主視窗上看不出邊）。`TabFocusNavigation = Cycle`：Tab 不會跑到後面的主視窗。開著時主視窗的快捷鍵（`root.KeyboardAccelerators`：Ctrl+Delete、Ctrl+R…）停用；root 的空白鍵播放、文字大小的按鍵在 root 底下，覆蓋層收不到，不用另外擋。打開時停止主視窗的播放、存好逐字稿的草稿，焦點給時間軸。
+  - **開著時不重建會議頁**：`MainWindow.Refresh` 照樣更新側欄，右邊的會議頁先不重建（`detailStale`），關掉時補一次。覆蓋層底下重建的分頁列（`SelectorBar`：紀錄／逐字稿／提問、原文／精簡）會畫到覆蓋層上面、跟著每次重建跳來跳去（2026-11-17 虛擬機：下載模型時每個進度都 `MarkDirty` → 重讀會議 → 重建會議頁，使用者看到分頁列在時間軸上閃；拿掉卡片的 `ThemeShadow`、`Translation` 照樣會，不是陰影造成的）。文字大小改了也是關掉時才重建。
+  - 開著時換深淺色、對比主題：用同一份編輯狀態（`MeetingEditor`：把手、刪掉的段落、選取、切點、合併、縮放、讀好的波形、選了的句子）重建畫面（`MeetingEditView.Rebuilt`），焦點給時間軸。畫面的顏色是建的時候決定的（平台的按鈕、`Sheet.Pill` 在對比主題另有一套），只重畫時間軸的話說明文字、按鈕會留在舊的顏色。讀到一半的波形由新的畫面接手（`peaksCancel` 共用）。
+  - 排法同 Mac：標題「編輯會議」＋灰字（「標題・原本 58:10」，合併時加「（合併「X」00:59）」）、✕；時間軸；播放列（試聽、播放頭的時間、說明、說話者的圖例最多 4 位、縮放）；動作列（`Sheet.Pill` compact：設成開頭、設成結尾、刪掉選取的範圍、在這裡分成兩場／拿掉切點、合併另一場…／取消合併，放不下時換行）；逐字稿；摘要和「取消」「套用…」。
+- **時間軸**（`EditTimeline`）：`ScrollViewer`（只有左右）裡一條 Canvas。上面一列標籤（開頭、結尾青瓷綠，切點琥珀色；合併時多一行每一場的名字），中間 132 高的軌道，下面刻度（間隔至少 70 點一格）。
+  - 軌道由下往上：議題帶、波形、標記重點的菱形、裁掉的兩端（變暗）、刪掉的段落（變暗、斜線、虛線邊）、選取（藍色，淺色 #007AFF、深色 #0A84FF：把手是青瓷綠）、合併的分隔線、切點（琥珀色虛線）；再上面一層是按得到的東西：刪掉的段落中間的「刪掉 03:35・恢復」（窄的時候「↶ 恢復」或只有圖示）、切點的剪刀（按一下拿掉）、選取的長度、開頭和結尾的把手、播放頭。
+  - 波形依說話者著色：每 3 點一條，同一個說話者、留不留同一組的長條放在一個 `Path`（`GeometryGroup`），只畫看得到的那一段前後各多一個畫面（2 小時的會議放大 40 倍有幾萬點寬，全部畫成元件太慢），捲動超出時再畫。峰值：`IAudioDecoder` 讀成 16 kHz 單聲道，每 0.05 秒一個（Mac 讀 8 kHz），背景讀，讀好前顯示「正在讀取錄音…」和句子的色塊。
+  - 把手、播放頭在一層不重建的 Canvas 裡只搬位置（拖曳中重畫時拿下來再放回去，滑鼠的捕捉和焦點會不見）。其他東西（把手、刪掉的段落、選取、切點、縮放、合併）變了才整個重畫，試聽中每 0.05 秒只搬播放頭。
+  - 把手、時間軸的表面是 `Adjustable`（`ContentControl` 加自己的 AutomationPeer，UI Automation 是 Slider 類型，名稱「開頭」「結尾」「播放位置」）：RangeValue 是秒數（UIA 的 SetValue 也能調，虛擬機驗證用），Value 是時間的字「00:12」（朗讀程式唸這個，不然唸「12.4」這種秒數；SetValue 吃「01:30」或秒數），說明（HelpText）是「00:12，剩下 02:15」「00:30／03:00」。唸出來的字變了才發 `PropertyChanged`（Value、RangeValue），按 ← → 時朗讀程式唸新的時間。刪掉的段落的按鈕名稱「刪掉的段落 12:00 到 18:50，按一下恢復」，切點的剪刀「切點 02:00，按一下拿掉」。把手的游標是左右箭頭，兩邊各多 4 點也抓得到。
+  - 焦點：時間軸的表面拿到焦點時外面一圈框（另一層，不佔位置、不重畫）：用鍵盤（Tab 進來、按了 ← →）是 2 點字的顏色，滑鼠點、打開時程式給的焦點是 1 點淡灰（滑鼠用的人不用一直看到粗框；原本一律 1 點 35% 的灰，鍵盤用的人看不太出來）。把手拿到焦點時外框從 1 點 30% 的黑變成 2 點字的顏色。
+  - 對比主題（2026-11-17 虛擬機「水生」「沙漠」巡檢，§11.3）：時間軸是視窗底色加一圈字的顏色的框；裁掉、刪掉的地方不蓋半透明的一層（系統色疊出來的就不是系統色），那裡的波形、議題、標記改用停用的字的顏色，刪掉的段落是停用的字的斜線、字的顏色的虛線邊；議題帶沒有底色、一圈框；選取沒有底色、2 點反白顏色的框，「選取 00:15」是反白的底配反白的字；把手是反白的顏色、握把是反白的字、焦點時外框字的顏色；剪刀的圓是字的顏色、圖示是視窗底色；「恢復」照平台的按鈕（原本自己的白底配上對比主題的白字，看不到字）；合併時每場的名字是 `Ui.Tinted` 的框；試聽鈕照平台的按鈕（有框）。
+  - 滑鼠：在波形上拖曳（超過 4 點）選一段，點一下移播放頭、逐字稿捲到那一句；把手拖曳。縮放：播放列的放大鏡和滑桿（1～40 倍，對數），在時間軸上按住 Ctrl 滾滾輪（以游標為中心；Mac 是觸控板捏合，Windows 的精確式觸控板捏合也是送 Ctrl＋滾輪）；不用 Ctrl＋、Ctrl－（整個 app 的文字大小）。縮放後播放頭留在畫面中間，試聽中、放大時播放頭跟著捲。
+- **鍵盤**（R107.9）：焦點在時間軸上 ← → 移播放頭 1 秒（Shift 10 秒）、Delete／Backspace 刪掉選取的範圍；把手上 ← → 0.1 秒（Shift 1 秒）。整個編輯畫面（`PreviewKeyDown`）：空白鍵試聽、Enter 套用、Esc 取消，焦點在按鈕上時空白鍵、Enter 照按鈕自己的（Esc 照樣是取消），在輸入框時不攔。逐字稿選了句子時 Delete 刪掉那幾句（都刪掉了就恢復；Windows 才有，清單選好幾項按 Delete 是 Windows 的習慣）。
+- **逐字稿**：`ListView`（虛擬化，同 §11.2 的寫法），`SelectionMode = Extended`：Ctrl、Shift 點選是 Windows 的多選（Mac 是 ⌘、⇧），點一下（沒按 Ctrl、Shift）從那句播放。每一列：時間（青瓷綠）、說話者（顏色點、名字）、文字（最多兩行；刪掉、裁掉的變灰、刪除線），滑過或選到的那列右邊一顆 compact 按鈕（刪掉／恢復／從這句開始／到這句結束），播放到的那句淡淡的底，試聽中跟著捲。右鍵（打開時才建，對象是選取的那幾句，同 Mac）：從這裡播放、刪掉這句／這 N 句、恢復這句／這 N 句、從這句開始（設成開頭）、到這句結束（設成結尾）、從這句分成兩場。列的無障礙名稱是時間、說話者、文字，刪掉的加「（刪掉）」。說明改寫「按住 Ctrl、Shift 選好幾句」（Windows 才有的字串）。列的範本（`DataTemplate` 的 `ContentControl`）`IsTabStop=False`：不然 Tab 在列和下一個按鈕中間多停一個看不到、沒有名字的地方（UI Automation 只讀到視窗的 InputSite；主視窗逐字稿分頁的範本同樣改掉）。刪掉句子後（按鈕、右鍵、Delete）編輯狀態清掉選取（同 Mac），清單的選取也一起拿掉，不然看起來還選著、再按 Delete 沒反應。對比主題：列裡的字跟著列的前景色（`Ui.FollowForeground`，選到的列是反白的底配反白的字；原本青瓷綠的時間在反白的底上看不見），說話者的點不畫（都是字的顏色），播放到的那句是一圈反白顏色的框。動作列「設成開頭」「設成結尾」的直線用 `PathIcon`，跟著按鈕的字色（停用、對比主題）。
+- **試聽**（`EditPreview`、Platform 的 `EditPreviewSource`）：Mac 用 AVMutableComposition 把片段接成一條；Windows 用 `MediaStreamSource`（同 `MixedAudioSource`）＋`PlanPcmStream` 依序讀片段，交給 `MediaPlayer`。混成單聲道、取樣率取高的（最高 48 kHz）、每次 0.1 秒 16 位元 PCM；時間是新時間軸上的秒數，0.05 秒一次照 `EditPlan.Source` 換回時間軸的播放頭。播放頭在刪掉、裁掉的地方時從下一個留下的地方開始（`PreviewStart`，同 Mac）。改了把手、刪掉的段落、切點、合併時先停止；移播放頭時從新的位置接著播。沒有音效裝置時 `MediaPlayer` 丟例外就不播（同 `Player`）。DEBUG 的 `--set debugMutePreview=YES` 不出聲、不用 `MediaPlayer`，照真的時間走（虛擬機沒有音效裝置，`MediaPlayer` 不會前進；同 Mac 的 `-debugMutePreview`）。
+- **合併另一場**（`Dialogs.MergePicker`，`SheetDialog` 寬 472＝Mac 的 520 減兩邊）：標題、說明、搜尋欄位（打開時焦點在這裡）、`ListView`（高 300）分「前後三天」「更早或更晚」兩段（段落標題是停用的項目），每一場是標題、「日期・長度・資料夾」，選到的那場右邊打勾，會議語言不同時多一行琥珀色的「兩場的會議語言不同，合併後照這場的語言整理」；「取消」「合併」（沒選時停用），Enter、雙擊也是合併。選了之後時間軸接上另一場（同 Mac：這場的裁切變成刪掉的段落、把手在整條的兩端），「取消合併」回到只有這場。
+- **確認**：`Dialogs.Confirm` 的說明是「・」開頭的好幾行時畫成條列（點一欄、文字一欄，換行對齊在點的後面，同 Mac 的 ConfirmSheet）。套用（「套用這些改動？」，主要按鈕「套用」）、放棄（「放棄這些改動？」，紅底「放棄」）、還原（「還原成編輯前的樣子？」，主要按鈕「還原」）。
+- **入口**（R107.1）：會議列表的右鍵和「⋯」（`MainWindow.EditMenuItems`）：「重新命名…」下面「編輯會議…」（剪刀），編輯過的會議再多「還原成編輯前的樣子…」，右邊灰字「還有 N 天」（`MenuLook.Hint`）。會議頁的「更多」：「重新處理」下面同樣兩項。**跟 Mac 不同**：Mac 工具列的選單建立一次就不更新，所以「還原」一直在、沒編輯過時按了說明；Windows 的「更多」每次打開時重建（`Opening`），沒編輯過的不列「還原」（同設計稿）。
+- **會議頁上方**：`ApplyingEdit` 是這場時狀態列是轉圈和「正在套用編輯…」（`StatusKey` 加這個狀態，換成別的時才重建）。
+- **DEBUG 控制通道**（同 Mac 的名稱，§15.3）：`editmeeting <會議 id> keep=<開始>-<結束>[,…] [split=<秒>] [merge=<會議 id>[:<開始>-<結束>,…]]`（不經過畫面和確認）、`restoreedit <會議 id>`、`confirmrestoreedit <會議 id>`（打開還原的確認）、`editage <會議 id> <天數>`（把最後編輯的時間改早，接著清一次過期的）、`openedit <會議 id>`、`editorstate start= end= del= sel= cut= playhead= zoom= merge= lines= play apply cancel`（直接改打開的編輯畫面；`apply`、`cancel` 等於按「套用…」「取消」，會打開確認）。`state` 加 `applyingEdit`、`editingMeeting`、`editor`（把手、刪掉的段落、選取、切點、片段、試聽的時間、波形讀好了沒）、`meetingEdit`（選取中的會議的快照：錄音、剩幾天、分出去、合併進來的會議）、`mergePickerOpen`、`confirmRestoreEdit`。
+- 驗證：Mac 上 `dotnet test`（標準答案；`MeetingEditTests` 的裁切加刪段、合併、裁切加分成兩場的套用和還原逐欄比對、錄音逐個取樣比對、30 天清除、擋下來、`PlanPcmStream` 的換取樣率和補安靜、編輯畫面的狀態和說明文字）；虛擬機用控制通道、UI Automation、真的滑鼠和鍵盤（`uia.sh`）操作，截圖淺色、深色、英文。`uia.ps1` 多了 `dragat <視窗> <名稱> <橫向的位置 0～1> <往右幾個像素> [ctrl|shift]`（真的滑鼠在元件裡按下、橫著拖、放開；0 是點一下：拖把手、在波形上選一段、點波形移播放頭）、`range <視窗> <名稱> [值]`（讀、設 RangeValue）、`key` 的 `shift`。2026-11-17 輔助使用巡檢：150%（桌面 1352×908，主視窗最小時的卡片）、對比主題「水生」「沙漠」、只用鍵盤（Tab 一圈、空白鍵、← →、Shift、Delete、Enter、Esc，逐字稿 ↓、Shift+↓、Delete）、UI Automation 的名稱、值和說明；開著時換對比主題、深淺色；下載模型時打開編輯畫面、試聽、拖曳選取，連拍確認分頁列不會跑到上面。
+- 跟 Mac 不同、還沒在真的 Windows 電腦上確認的：試聽真的出聲音時跳過刪掉的段落聽起來對不對（虛擬機沒有音效裝置，用 `debugMutePreview` 的時鐘驗播放頭）；精確式觸控板的捏合（虛擬機只送得出 Ctrl＋滾輪）；朗讀程式真的唸出把手、播放位置（UI Automation 讀得到名稱、時間、說明，但虛擬機裡用 UIAutomationClient 聽不到 PropertyChanged，連平台的 Slider 也聽不到，按 ← → 時唸不唸新的時間要真的開朗讀程式聽）；分頁列畫到覆蓋層上面在真的顯示卡上會不會發生（虛擬機是軟體繪圖；不重建會議頁之後兩邊都不會再觸發）。時間軸的縮放滑桿唸的是對數的值（平台的 Slider），沒改。
+
+### 11.41 設定：左邊導覽十一項（R108.7，M§82、D184）
+
+- **版面**：`NavigationView`（`PaneDisplayMode = Left`，拿掉收合鈕、上一頁、內建的「設定」，`OpenPaneLength` 248），十一項分四組，組和組之間 `NavigationViewItemSeparator`（Mac 是組和組之間空一點）。右邊：上面是那一頁的名稱（24 號粗體，不跟著捲，同 Windows 設定），下面捲動的內容（左右 28 的邊，靠上：只有一張卡片的頁面不會被拉到視窗底）。代號、順序、分組、名稱、搜尋的關鍵字在 `Shiyin.Services/SettingsPages.cs`（測試讀 Mac 的 `SettingsView.swift` 比對代號和分組）。
+- **每一頁**（R108.6：原本四頁的段落照搬，項目、存的鍵、說明文字不變；只有一段的頁面不再放段落標題，同 Mac）：
+
+| 頁（代號） | 內容（原本在哪） |
+|---|---|
+| 整理工具（provider） | 原「整理工具」去掉範本 |
+| 範本（templates） | 原「整理工具」的範本 |
+| 錄音（recording） | 錄音來源、提醒與快捷鍵（原「錄音與轉錄」） |
+| 轉錄（transcription） | 轉錄（正式轉錄、說話者辨識、即時逐字稿）、語言（原「錄音與轉錄」，順序同 Mac） |
+| 模型與空間（models） | 模型清單（原「錄音與轉錄 → 轉錄」，含顯示卡加速的元件）、儲存空間（原「進階」） |
+| 說話者（speakers）、詞彙表（glossary） | 原「說話者與詞彙」的兩段 |
+| 一般（general） | 介面（介面語言）、顯示、其他（重新顯示首次使用引導、重建搜尋索引）、匿名使用統計（原「進階」） |
+| AI 工具（ai）、企業伺服器（enterprise） | 原「進階」的那一段 |
+| 檢查與更新（status） | 更新（目前版本、檢查更新）、其他（回報問題…、關於拾音）（原「進階」） |
+
+- **圖示**：Segoe Fluent Icons 的字（整理工具 E8BD Message、範本 E8A5 Document、錄音 E720 Microphone、轉錄 E9D9 Diagnostic、模型與空間 EDA2 HardDrive、說話者 E716 People、詞彙表 E82D Dictionary、一般 E713 Setting、AI 工具 EA86 Puzzle、企業伺服器 E825 Bank、檢查與更新 E895 Sync），上 Mac 那一項的顏色，**沒有底色方塊**：Windows 11 的設定是彩色的圖示加文字，WinUI 的 `NavigationViewItem` 本來也是一個圖示加文字；Mac 的彩色方塊是 macOS 系統設定的樣子。淺色調深、深色調亮，在導覽的底色上對比 3.8:1 以上（Mac 的橘、青、綠直接放在淺色底上不到 3:1）。對比主題時不上色，跟著項目的文字顏色。開著設定時換深淺色、對比主題：圖示重新上色、這一頁重畫（原本設定開著時換主題，自己的顏色要重開視窗才換）。
+- **底色**：導覽是主視窗側欄的顏色（`Ui.SidebarBackground`，淺色 #F7F7F7、深色 #2B2B2B），右邊是 NavigationView 自己的內容層（左上角圓角、細框），卡片照舊。
+- **搜尋**（R108.4）：`NavigationView.AutoSuggestBox`（導覽上方，無障礙名稱「搜尋設定」，沒有建議清單）。打字時只留名稱或關鍵字對得上的項目（`SettingsPages.Find`，不分大小寫），分隔線只留在兩組看得到的項目中間；只剩一項時直接選它；Enter 選第一項。關鍵字同 Mac，只列 Windows 有的項目：Mac 才有的系統錄音權限、說話者辨識的模型、環境檢查不列；Windows 才有的介面語言、顯示卡加速、回報問題、關於拾音加上。選到的那一項被篩掉、再出現時，NavigationView 的選取條不見了（2026-11-17 虛擬機），排好之後重新選一次。
+- **鍵盤**：導覽 `SelectionFollowsFocus`：↑ ↓ 換頁（同 Windows 設定、Mac 的側欄；預設只移焦點，要再按 Enter 或空白鍵）。打開設定時焦點在搜尋框，Tab 到選到的那一項、再 Tab 到那一頁的內容。打開時、從別的地方指定頁面時，導覽捲到看得到選到的那一項（`StartBringIntoView`：150% 縮放、視窗矮的時候「檢查與更新」在捲動範圍外）。導覽每一項的 UI Automation 名稱是頁名。
+- **對比主題**（2026-11-17「水生」「沙漠」十一頁巡檢）：範本清單選到的那一列「預設」跟著列的前景色（`Ui.FollowForeground`；次要文字的顏色在反白的底上看不見），其他照 §11.3。
+- **記住頁面**（R108.5）：`settings.json` 的 `settingsPage`（鍵、值同 Mac 的 UserDefaults），換頁就記（值變了才寫）；存的不是十一頁的代號時是整理工具。
+- **視窗**：900×660（Mac 820×620），最小 720×500（同 Mac）、可以拉大。比 Mac 大：Windows 的下拉選單、開關的標題在控制項上面、字 14（Mac 13），同樣的內容要比較高；導覽 248 比 Mac 的側欄 220 寬（上面有搜尋框）。最小的時候範本的編輯欄很窄（範本清單固定 200 寬），照樣能用。
+- **跟 Mac 不同的地方**：
+  - 一般多了「介面」（介面語言，D57）；檢查與更新沒有環境檢查、更新網址（Windows 本來就沒有），多了回報問題…、關於拾音（Windows 沒有選單列，原本放在進階的「其他」）。轉錄沒有「說話者辨識的模型」（Windows 沒有 Nemotron）；模型與空間沒有「第二版留下的檔案」。
+  - 從別的地方打開設定時指定頁面（`App.ShowSettings(頁面)`）：會議頁的「設定整理工具」「打開設定」打開整理工具（公司的伺服器沒登入時打開企業伺服器，`SummarizerProblem.SettingsPage`）；企業伺服器的加入連結、瀏覽器登入完回來打開企業伺服器（原本是進階）。設定會記住上次的頁面，不指定的話會停在別頁。Mac 的 `openSettings()` 不能指定頁面，目前停在上次那頁。
+  - 說明文字、使用說明裡的舊頁名（「設定 → 錄音與轉錄」「進階 → 企業伺服器」）照 R108.6 不改，同 Mac。
+- **DEBUG**：`open settings [頁面]`（代號、0～10、4.8 以前的 `names`／`advanced`／`storage` 當別名；沒給頁面時停在上次那頁）、`closewindow settings`、`settingssearch [文字]`（等於在搜尋框打字，沒給文字是清掉；回傳留下的頁面）；state 的 `settingsPage`（開著時目前的頁面）、`settingsSearch`、`settingsVisible`（導覽看得到的頁面）、`settingsPageStored`（settings.json 記住的）。
+- 驗證：Mac 上 `dotnet test`（`SettingsPagesTests`：代號和分組同 Mac、搜尋「麥克風」「API key」「快捷鍵」各只剩一頁、英文的名稱和搜尋、關鍵字都是設定視窗裡的字、舊頁名、記住的頁面寫進 settings.json）；虛擬機用 UI Automation 和真的滑鼠點導覽換頁、`uia.sh set 設定 '搜尋設定#1' <字>` 搜尋（同名的「搜尋設定」有三個元件，`#1` 是輸入框）、`uia.sh close` 關掉再按主視窗的齒輪、重開 app 停在上次那頁，`snapwin.ps1 place` 拉大、縮到比最小還小，淺色、深色、英文截圖。2026-11-17 輔助使用巡檢：150%、對比主題「水生」（十一頁）「沙漠」、只用鍵盤（搜尋框 Tab 到導覽、↑ ↓ 換頁、Tab 進內容、搜尋「轉錄」按 Enter 選第一項）、導覽的 UI Automation 名稱；停在「檢查與更新」關掉重開，頁面不會被 ↑ ↓ 換頁改掉、導覽捲到那一項。
+
 ## 12. 系統整合
 
 ### 12.1 單一執行個體、開檔
@@ -956,7 +1025,7 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 ### 15.3 控制通道
 
 - DEBUG 版開 named pipe `\\.\pipe\shiyin-debug`（`Debug/ControlPipe.cs`）；`shiyinctl.exe <指令> <參數…>`（`Shiyin.Ctl`）把結果的 JSON 印到標準輸出（Mac 是寫成檔案；從 SSH 用時直接讀輸出比較方便）。named pipe 不分工作階段，從 SSH 也連得到桌面上的拾音。
-- 指令：`state`、`select`、`tab`、`open`、`closewindow`、`quit`、`record-sim`、`recordstop`、`recordpause`、`recordstall`、`recordinterrupt`、`recordlang`、`import`、`export`、`purge`、`rediarize`、`language`、`llmprovider`、`llmkey`、`llmurl`、`modelurl`、`model`、`hotkey`、`meetingapp`、`metrics`。名稱和參數跟 Mac 的 `Debug/DebugControl.swift` 相同（例如 `export <項目> <格式> <路徑> [times] [speakers] [會議 id]`、`import [lang=ja] <檔案…>`），Mac 的測試方法可以直接照用。
+- 指令：`state`、`select`、`tab`、`open`（`open settings [頁面]`，§11.41）、`closewindow`（`main`、`settings`）、`settingssearch`、`quit`、`record-sim`、`recordstop`、`recordpause`、`recordstall`、`recordinterrupt`、`recordlang`、`import`、`export`、`purge`、`rediarize`、`language`、`llmprovider`、`llmkey`、`llmurl`、`modelurl`、`model`、`hotkey`、`meetingapp`、`metrics`。名稱和參數跟 Mac 的 `Debug/DebugControl.swift` 相同（例如 `export <項目> <格式> <路徑> [times] [speakers] [會議 id]`、`import [lang=ja] <檔案…>`），Mac 的測試方法可以直接照用。
 - 評估（`transcribe-eval`、`voiceprint-eval`、`detect-eval`、`diarize-eval`、`fast-eval`、`live-eval`）不在 app 裡，用 `Shiyin.Eval` 命令列在 Mac 或 Windows 上跑，輸出格式跟 Mac 相同，例如用 `scripts/dev/asr-score.swift` 算錯字率（R28.4）。
 
 ### 15.4 真的畫面：排程工作和 UI Automation
@@ -964,7 +1033,7 @@ sherpa-onnx 的說話者分段是凝聚式分群（`FastClusteringConfig` 只有
 從 SSH 啟動的程式不會出現在登入的桌面，UI Automation 也碰不到桌面。所以用排程工作在桌面的工作階段執行 PowerShell（`ps/in-session.ps1`：註冊「互動式登入」的工作、等它跑完、讀回輸出）。
 
 - `insession.sh`：把標準輸入的 PowerShell 放到桌面跑，例如 `ps/start-app.ps1` 在桌面開 DEBUG 版（資料在 `C:\ShiyinTest`）。
-- `uia.sh <動作> <視窗> <名稱>`（`ps/uia.ps1`，Windows 內建的 UIAutomationClient）：`windows`、`dump`、`click`（Invoke／Toggle／選取／展開）、`open`（會打開選單的按鈕，交給另一個程序按，不然會等到選單關掉）、`menu`、`choose`（下拉選單）、`set`（輸入框）、`close`、`menukeys`（真的滑鼠打開右鍵或「⋯」的選單、同一個程序接著按鍵，§11.38）。同名的元件能按的排前面，`名稱#2` 指定第幾個。拖曳用 `drag`（真的滑鼠，也能從檔案總管拖檔案進來，§11.36），鍵盤焦點用 `focus`、`focused`。SplitButton 的箭頭、DropDownButton、子選單用 `ps/expand.ps1 <視窗> <名稱> [項目] [子選單的項目或 ?]`（ExpandCollapsePattern；`uia.ps1` 的 `click`、`menu` 用 Invoke，會按到 SplitButton 主要的動作），放在 `insession.sh` 裡跑。
+- `uia.sh <動作> <視窗> <名稱>`（`ps/uia.ps1`，Windows 內建的 UIAutomationClient）：`windows`、`dump`、`click`（Invoke／Toggle／選取／展開）、`open`（會打開選單的按鈕，交給另一個程序按，不然會等到選單關掉）、`menu`、`choose`（下拉選單）、`set`（輸入框）、`close`、`menukeys`（真的滑鼠打開右鍵或「⋯」的選單、同一個程序接著按鍵，§11.38）。同名的元件能按的排前面，`名稱#2` 指定第幾個。拖曳用 `drag`（真的滑鼠，也能從檔案總管拖檔案進來，§11.36）、`dragat`（元件裡橫著拖，§11.40），鍵盤焦點用 `focus`、`focused`，RangeValue 用 `range`。SplitButton 的箭頭、DropDownButton、子選單用 `ps/expand.ps1 <視窗> <名稱> [項目] [子選單的項目或 ?]`（ExpandCollapsePattern；`uia.ps1` 的 `click`、`menu` 用 Invoke，會按到 SplitButton 主要的動作），放在 `insession.sh` 裡跑。
 - `shot.sh <檔案>`：在 Mac 上用 `screencapture -l` 截 UTM 的視窗（整個虛擬機的畫面）。
 - UI Automation 做不到時（開著選單、存檔對話框時 UI Automation 會卡住）：用 UTM 的 AppleScript `input scan code` 送按鍵，只會送進虛擬機，不會到 Mac 前景的 app。
 - 系統的視窗（SmartScreen、系統匣）不屬於拾音：直接從桌面的根元件找（例如系統匣在 `Shell_TrayWnd`，隱藏的圖示先按「顯示隱藏的圖示」）。

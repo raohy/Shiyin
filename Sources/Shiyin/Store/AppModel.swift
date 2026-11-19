@@ -327,8 +327,12 @@ final class AppModel {
     var splitRequest: Int64?
     /// 「从这里分成两场…」要确认的段落（R90、design §64）
     var splitMeetingRequest: Int64?
-    /// 正在分割的会议（录音切档要几秒）
-    var splittingMeeting: Int64?
+    /// 编辑会议的画面（R107、design §81.5）打开的那场
+    var editingMeeting: Int64?
+    /// 正在套用编辑、分成两场、还原的那场（录音接档要几秒）
+    var applyingEdit: Int64?
+    /// 「还原成编辑前的样子…」要确认的那场（R107.8）
+    var confirmRestoreEdit: Int64?
 
     var pendingImport: [URL] = []
     var showImportSheet = false
@@ -470,6 +474,7 @@ final class AppModel {
         })
         cleanUpPreviousRun()
         purgeExpiredTrash()
+        purgeExpiredEdits()
         recoverRecordings()
         runner.start()
         // 语言检测模型很小（60 MB），开着自动检测就先下载好
@@ -1144,6 +1149,7 @@ final class AppModel {
                 try db.deleteMeeting(meeting.id!)
                 if meeting.hasAudio { try? FileManager.default.removeItem(at: meeting.audioURL) }
             }
+            purgeExpiredEdits()
         }
         selectedMeetings = []
     }
@@ -1238,62 +1244,14 @@ final class AppModel {
         return nil
     }
 
-    /// 从某一句分成两场（R90、design §64）：先在背景切录音，再一个交易搬数据库，最后换文件、排刷新
+    /// 从某一句分成两场（R90、design §64）：走编辑会议的套用（整场保留、在这句切开），所以一样能还原（D180）
     func splitMeeting(at segmentId: Int64) {
         guard let id = selection, let detail, let segment = detail.segments.first(where: { $0.id == segmentId }) else { return }
-        let meeting = detail.meeting
-        if recorder.isRecording && recorder.meetingId == id {
-            errorMessage = String(localized: "这场会议还在录音，请先停止录音再分成两场")
-            return
-        }
-        if meeting.deletedAt != nil {
-            noticeMessage = String(localized: "垃圾桶里的会议要先还原才能操作")
-            return
-        }
-        if splittingMeeting != nil || (try? db.hasActiveJobs(id)) == true {
-            noticeMessage = String(localized: "正在处理这场会议，完成后才能分成两场")
-            return
-        }
         let cut = (segment.start * 100).rounded() / 100
         guard cut > 0 else { return }
-        let title = String(localized: "\(meeting.displayTitle)（2）")
-        let (audio, hasAudio) = (meeting.audioURL, meeting.hasAudio)
-        splittingMeeting = id
-        Task {
-            defer { splittingMeeting = nil }
-            do {
-                let parts = hasAudio ? try await Task.detached(priority: .userInitiated) { try await AudioTrim.split(audio, at: cut) }.value : nil
-                defer { if let parts { try? FileManager.default.removeItem(at: parts.head.deletingLastPathComponent()) } }
-                guard let created = try db.splitMeeting(id, at: cut, title: title, audioExtension: parts?.head.pathExtension) else { return }
-                if let parts {
-                    if selection == id { player.unload() }
-                    try FileManager.default.moveItem(at: parts.tail, to: created.audioURL)
-                    // 原本不是 WAV、m4a（导入的 mp3、mp4…）时换成 m4a，文件名跟着换（D172）
-                    let head = Paths.audioDir.appendingPathComponent("\(id).\(parts.head.pathExtension)")
-                    if head == audio {
-                        _ = try FileManager.default.replaceItemAt(audio, withItemAt: parts.head)
-                    } else {
-                        try FileManager.default.moveItem(at: parts.head, to: head)
-                        try? FileManager.default.removeItem(at: audio)
-                    }
-                }
-                let message: String
-                if AppSettings.summarizerReady {
-                    try db.enqueue(id, kind: .summarize)
-                    try db.enqueue(created.id!, kind: .summarize)
-                    runner.wake()
-                    message = String(localized: "已分成两场：「\(created.displayTitle)」。两场都在刷新会议记录")
-                } else {
-                    message = String(localized: "已分成两场：「\(created.displayTitle)」。两场都要刷新会议记录，设置好整理工具后按「刷新」")
-                }
-                reload()
-                if selection == id { reloadDetail(forceAudio: true) }
-                noticeMessage = message
-            } catch {
-                errorMessage = String(localized: "分成两场失败：\(error.localizedDescription)")
-                reload()
-            }
-        }
+        let end = max(Double(detail.meeting.durationSeconds ?? 0), player.duration,
+                      detail.segments.map(\.end).max() ?? 0, ((try? db.segments(id, kind: "live")) ?? []).map(\.end).max() ?? 0)
+        applyMeetingEdit(id, plan: EditPlan(pieces: [.init(meetingId: id, start: 0, end: end)]), cut: cut)
     }
 
     /// 「删除这句」（R89、design §63）：不用确认，跟说话者的调整共用「复原」

@@ -379,11 +379,11 @@ struct OnboardingView: View {
                     Label(String(localized: "转录模型下载中 \(total > 0 ? Int(Double(received) / Double(total) * 100) : 0)%，下载好之前先用 macOS 内置识别转录。"), systemImage: "arrow.down.circle")
                         .foregroundStyle(Color.signal).fixedSize(horizontal: false, vertical: true)
                 default:
-                    Label("转录模型还没下载好，会先用 macOS 内置识别转录；可以到「设置 → 录音与转录」下载，用模型转录比较准。", systemImage: "arrow.down.circle")
+                    Label("转录模型还没下载好，会先用 macOS 内置识别转录；可以到「设置 → 模型与空间」下载，用模型转录比较准。", systemImage: "arrow.down.circle")
                         .foregroundStyle(Color.signal).fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Text("之后可以在「设置 → 高级」重新显示这个引导。").foregroundStyle(.secondary)
+            Text("之后可以在「设置 → 一般」重新显示这个引导。").foregroundStyle(.secondary)
         }
     }
 

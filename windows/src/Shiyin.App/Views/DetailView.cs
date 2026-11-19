@@ -172,6 +172,7 @@ public sealed class DetailView
         var state = host.Controller.Status(Detail);
         var running = host.Runner.RunningJob(id);
         var helpers = string.Join(",", Enum.GetValues<JobLane>().Select(l => host.Runner.Running(l)).Where(h => h is not null && h.Job.MeetingId == id).Select(h => h!.Job.Kind));
+        if (host.Controller.ApplyingEdit == id) return "applyingEdit";
         return state switch
         {
             MeetingStatus.Transcribing t => $"transcribing|{t.Stage}|{t.Progress is null}|{running?.Server is not null}|{running?.Server?.Waiting}",
@@ -477,6 +478,9 @@ public sealed class DetailView
         var state = host.Controller.Status(Detail);
         var running = host.Runner.RunningJob(id);
         Button Cancel() => Ui.Button(L.T("取消"), () => host.Controller.CancelJobs(id));
+        // 編輯會議、分成兩場、還原：接錄音要幾秒（M§81.5）
+        if (host.Controller.ApplyingEdit == id)
+            return Banner(Ui.Row(10, new ProgressRing { IsActive = true, Width = 16, Height = 16 }, Ui.Text(L.T("正在套用編輯…"), 13, color: Ui.Secondary)), null, Ui.Subtle);
         // 企業伺服器在排隊、連不上時，可以改在這台電腦轉錄（R50.5）
         Button Local() => Ui.Button(L.T("改在這台電腦轉錄"), () => host.Runner.TranscribeLocally(id));
         var warm = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(30, 0xB9, 0x7F, 0x06));
@@ -504,7 +508,7 @@ public sealed class DetailView
                     // 設定問題（沒登入、key 錯誤…）而且還沒修好（R46.2、M§34.4）：給修的按鈕，不放「重試」（重試也一樣會失敗）
                     actions.Children.Add(Ui.Button(problem.ActionTitle, () =>
                     {
-                        if (problem.OffersLogin) CliLogin.Open(host, problem.Provider); else App.Current.ShowSettings();
+                        if (problem.OffersLogin) CliLogin.Open(host, problem.Provider); else App.Current.ShowSettings(problem.SettingsPage);
                     }));
                 }
                 else
@@ -604,16 +608,24 @@ public sealed class DetailView
         var id = Detail.Meeting.Id!.Value;
         var c = host.Controller;
         var menu = new MenuFlyout();
-        var redo = Ui.Sub(L.T("重新處理"),
-            Ui.Item(L.T("重新整理會議紀錄"), () => c.Resummarize(id), icon: Symbol.Refresh),
-            Ui.Item(L.T("檢查可能聽錯的字"), () => c.CheckTranscript(id), icon: Symbol.Find),
-            Ui.Item(L.T("重新轉錄（含說話者辨識）"), () => c.Retranscribe(id), icon: Symbol.Microphone),
-            Ui.Item(L.T("重新辨識說話者…"), () => { if (c.RequestRediarize(id)) _ = Dialogs.Rediarize(window, id); }, icon: Symbol.People));
-        redo.Icon = new SymbolIcon(Symbol.Sync);
-        menu.Items.Add(redo);
-        menu.Items.Add(new MenuFlyoutSeparator());
-        menu.Items.Add(window.FolderMenu(id, Detail.Meeting.Folder));
-        menu.Items.Add(Ui.Item(L.T("移到垃圾桶"), () => host.Controller.MoveToTrash(id), icon: Symbol.Delete));
+        void Fill()
+        {
+            menu.Items.Clear();
+            var redo = Ui.Sub(L.T("重新處理"),
+                Ui.Item(L.T("重新整理會議紀錄"), () => c.Resummarize(id), icon: Symbol.Refresh),
+                Ui.Item(L.T("檢查可能聽錯的字"), () => c.CheckTranscript(id), icon: Symbol.Find),
+                Ui.Item(L.T("重新轉錄（含說話者辨識）"), () => c.Retranscribe(id), icon: Symbol.Microphone),
+                Ui.Item(L.T("重新辨識說話者…"), () => { if (c.RequestRediarize(id)) _ = Dialogs.Rediarize(window, id); }, icon: Symbol.People));
+            redo.Icon = new SymbolIcon(Symbol.Sync);
+            menu.Items.Add(redo);
+            // 編輯會議（R107.1）、編輯過的會議多「還原成編輯前的樣子…」（R107.8）。Windows 的選單每次打開時重建，沒編輯過的不列「還原」
+            foreach (var item in window.EditMenuItems(id)) menu.Items.Add(item);
+            menu.Items.Add(new MenuFlyoutSeparator());
+            menu.Items.Add(window.FolderMenu(id, Detail.Meeting.Folder));
+            menu.Items.Add(Ui.Item(L.T("移到垃圾桶"), () => host.Controller.MoveToTrash(id), icon: Symbol.Delete));
+        }
+        Fill();
+        menu.Opening += (_, _) => Ui.Guard(Fill);
         var button = new DropDownButton { Content = Ui.Row(6, new SymbolIcon(Symbol.More), Ui.Text(L.T("更多"), wrap: false)), Flyout = menu };
         // 內容是圖示加文字時，無障礙名稱不會自動帶出來（螢幕閱讀器、UI Automation 都讀不到）
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, L.T("更多"));
@@ -696,6 +708,9 @@ public sealed class RecordingPanel
     int shownLines;
     bool followLatest = true;
     long? meetingId;
+    // 標記重點的那一句後面的星號（同 Mac：每個標記落在它之前最後一句），跟已經出現的句子一一對應
+    readonly List<FontIcon> stars = [];
+    List<double> bookmarkTimes = [];
 
     public RecordingPanel(AppHost host, MainWindow window)
     {
@@ -783,11 +798,13 @@ public sealed class RecordingPanel
         {
             meetingId = detail.Meeting.Id;
             lines.Children.Clear();
+            stars.Clear();
             shownLines = 0;
             followLatest = true;
             notesBox.Load(detail.Meeting.Id!.Value, detail.Meeting.UserNotes);
             volatileText.Language = Ui.ContentLanguage(detail.Meeting.MeetingLanguage);
         }
+        bookmarkTimes = [.. detail.Bookmarks.Select(b => b.Time)];
         Update();
     }
 
@@ -858,7 +875,7 @@ public sealed class RecordingPanel
         }
 
         var all = r.LiveLines;
-        if (all.Count < shownLines) { lines.Children.Clear(); shownLines = 0; }
+        if (all.Count < shownLines) { lines.Children.Clear(); stars.Clear(); shownLines = 0; }
         if (lines.Children.Count == 0 && all.Count == 0 && r.VolatileText.Length == 0)
             lines.Children.Add(Ui.Text(host.Settings.LiveTranscription ? L.T("開始說話後，逐字稿會即時出現在這裡。") : L.T("即時逐字稿已在設定中關閉，錄音結束後會正式轉錄。"), color: Ui.Secondary));
         else if (shownLines == 0 && lines.Children.Count > 0 && all.Count > 0) lines.Children.Clear();
@@ -872,8 +889,21 @@ public sealed class RecordingPanel
             var time = Ui.Text(TimeFormat.String(line.Start), Ui.C(13), color: Ui.Celadon, wrap: false);
             time.Width = Ui.C(52);
             time.TextAlignment = TextAlignment.Right;
-            lines.Children.Add(Ui.Split(time, text, 12));
+            // 星號跟文字在同一格：收起來時不佔寬度（左邊的間距只在出現時算），沒標記的句子照樣用滿整行（同 Mac）
+            var star = new FontIcon { Glyph = "\uE735", FontSize = Ui.C(11), Foreground = Ui.Signal, VerticalAlignment = VerticalAlignment.Top,
+                                      Margin = new Thickness(12, 4, 0, 0), Visibility = Visibility.Collapsed };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(star, L.T("標記重點"));
+            var body = new Grid();
+            body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(star, 1);
+            body.Children.Add(text);
+            body.Children.Add(star);
+            stars.Add(star);
+            lines.Children.Add(Ui.Split(time, body, 12));
         }
+        var starred = bookmarkTimes.Select(t => { var i = all.Count - 1; while (i >= 0 && all[i].Start > t) i--; return i; }).ToHashSet();
+        for (var i = 0; i < stars.Count; i++) stars[i].Visibility = starred.Contains(i) ? Visibility.Visible : Visibility.Collapsed;
         volatileText.Text = r.VolatileText;
         volatileText.Foreground = Ui.Secondary;
         if (r.VolatileText.Length > 0) lines.Children.Add(volatileRow);
@@ -886,6 +916,7 @@ public sealed class RecordingPanel
     {
         ApplyScale();
         lines.Children.Clear();
+        stars.Clear();
         shownLines = 0;
         if (meetingId is not null) Update();
     }

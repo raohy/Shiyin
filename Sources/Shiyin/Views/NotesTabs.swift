@@ -166,7 +166,7 @@ struct InlineReviewCard: View {
 /// 没有会议记录时的说明与动作
 struct NotesPlaceholder: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
     let detail: MeetingDetail
 
     var body: some View {
@@ -182,7 +182,7 @@ struct NotesPlaceholder: View {
                 // 没选过整理工具、也没有 claude、codex（R35.2）：说还没设置，给打开设置的按钮（整理工具是第一个标签页）
                 Text("还没设置整理工具。选好之后，就能把逐字稿整理成摘要、决议和待办；之后的会议转录完会自动整理。")
                     .foregroundStyle(.secondary)
-                Button("设置整理工具") { openSettings() }
+                Button("设置整理工具") { openWindow.settings(.provider) }
             } else if AppSettings.provider != .none, let problem = model.summarizerProblem {
                 // 选了整理工具但还没准备好（没登录、没有 key…，R45.4）：说原因，给修的按钮
                 // 不加 fixedSize：这里不在 ScrollView 里，量最小高度时整个窗口的内容会被往上推
@@ -190,7 +190,7 @@ struct NotesPlaceholder: View {
                     .foregroundStyle(.secondary)
                 Button(problem.actionTitle) {
                     switch problem.action {
-                    case .openSettings: openSettings()
+                    case .openSettings: openWindow.settings(problem.settingsPage)
                     case .login(let provider): CLILogin.openLogin(provider)
                     }
                 }

@@ -2,7 +2,7 @@
 
 import { content, LANGS, GITHUB, KOFI } from './content.mjs';
 import { demoSection } from './demo-markup.mjs';
-import { homeSchema, pageSchema, guideSchema, windowsSchema } from './seo.mjs';
+import { homeSchema, pageSchema, guideSchema, windowsSchema, AUTHOR_SITE } from './seo.mjs';
 import { GUIDES } from './guides.mjs';
 
 export const ROUTES = {
@@ -86,6 +86,7 @@ ${alternates.filter((l) => l !== lang).map((l) => `<meta property="og:locale:alt
 ${seo}
 <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1C1C1E" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
@@ -108,6 +109,7 @@ ${body}
   <div class="wide">
     <span>${c.footer.tagline}</span>
     <a href="${GITHUB}">GitHub</a>
+    <a href="${AUTHOR_SITE}">Wei Builds</a>
     <a href="${KOFI}">${c.footer.sponsor}</a>
     <a href="${ROUTES.changelog(lang)}">${c.nav.changelog}</a>
 ${windows ? `    <a href="${platformHref}">${route === 'windows' ? c.footer.mac : c.footer.windows}</a>\n` : ''}${guidesLangs().includes(lang) ? `    <a href="${ROUTES.guides(lang)}">${c.guides.nav}</a>\n` : ''}${others.map((l) => `    <a href="${href(l)}" lang="${content[l].lang}" hreflang="${content[l].lang}">${content[l].label}</a>`).join('\n')}
@@ -128,6 +130,36 @@ function shot(lang, name, alt, { first = false, caption = '', win = false, size 
   <source type="image/avif" srcset="${dir}/${name}-960.avif 960w, ${dir}/${name}.avif ${width}w" sizes="(max-width: 1000px) calc(100vw - 40px), 960px">
   <img class="shot" src="${dir}/${name}.png" width="${width}" height="${height}" alt="${escape(alt)}" ${loading}>
 </picture>${caption ? `\n<figcaption>${caption}</figcaption>` : ''}`;
+}
+
+// 第一次打開被擋時的示範（docs/website.md §6.1）：真的 macOS 26 畫面（警告、系統設定的「安全性」），
+// 游標依序按「完成」「強制打開」，純 CSS 循環（不用 script），減少動態效果時兩張並排不動。框和游標的位置是圖上的百分比
+function gatekeeperDemo(lang) {
+  const g = content[lang].download.gatekeeper;
+  if (!g) return '';
+  const pic = (name, w, h, alt) => `<picture><source type="image/avif" srcset="/images/${name}.avif"><img src="/images/${name}.png" width="${w}" height="${h}" alt="${escape(alt)}" loading="lazy" decoding="async"></picture>`;
+  const cursor = '<svg class="gk-cursor" viewBox="0 0 22 30" aria-hidden="true"><path d="M2 2v22l6-5.5 4 9 3.6-1.6-4-8.8H19z"/></svg>';
+  return `<figure class="gk" aria-label="${escape(g.label)}">
+  <div class="gk-stage">
+    <div class="gk-frame gk-a">
+      <div class="gk-pic gk-dialog">${pic('gatekeeper-dialog', 570, 518, g.alt1)}
+        <span class="gk-ring" style="left:10%;top:78.4%;width:38.6%;height:10.8%"></span>
+        <span class="gk-no" style="left:51.4%;top:78.4%;width:38.4%;height:10.8%"><b>${g.no}</b></span>
+        ${cursor}
+      </div>
+      <p class="gk-cap"><span>1</span>${g.step1}</p>
+    </div>
+    <div class="gk-frame gk-b">
+      <div class="gk-pic gk-settings">${pic('gatekeeper-settings', 1010, 330, g.alt2)}
+        <span class="gk-ring" style="left:78.6%;top:53%;width:15.6%;height:16%"></span>
+        ${cursor}
+      </div>
+      <p class="gk-cap"><span>2</span>${g.step2}</p>
+    </div>
+  </div>
+  <figcaption><span>3</span>${g.step3}</figcaption>
+</figure>
+`;
 }
 
 // 介紹影片（docs/website.md §15）：不自動播放、不先下載，按了才載入。
@@ -276,6 +308,14 @@ ${paragraphs(c.notes.ps)}
 ${shot(lang, 'mindmap', c.shots.mindmap)}
 </figure>
 
+<section class="col part">
+<h2>${c.organize.h2}</h2>
+${paragraphs(c.organize.ps)}
+</section>
+<figure class="wide part">
+${shot(lang, 'organize', c.shots.organize)}
+</figure>
+
 <section class="col part" id="privacy">
 <h2>${c.privacy.h2}</h2>
 <p>${c.privacy.lead}</p>
@@ -299,7 +339,7 @@ ${c.download.rows.map(([k, v]) => `  <div><dt>${k}</dt><dd>${v}</dd></div>`).joi
 <ol class="steps">
 ${c.download.steps.map((s) => `  <li>${s}</li>`).join('\n')}
 </ol>
-<p class="note">${c.download.note}</p>
+${gatekeeperDemo(lang)}<p class="note">${c.download.note}</p>
 ${windowsDownload(lang, windows)}<div class="star-ask">
   <p>${c.download.starAsk}</p>
   <div class="asks">
@@ -374,6 +414,14 @@ ${paragraphs(c.notes.ps)}
 </section>
 <figure class="wide part">
 ${shot(lang, 'mindmap', w.shots.mindmap, { win: true, size: [1656, 962] })}
+</figure>
+
+<section class="col part">
+<h2>${c.organize.h2}</h2>
+${paragraphs(c.organize.ps)}
+</section>
+<figure class="wide part">
+${shot(lang, 'organize', w.shots.organize, { win: true })}
 </figure>
 
 <section class="col part" id="privacy">

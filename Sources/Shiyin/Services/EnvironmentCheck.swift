@@ -27,7 +27,7 @@ struct EnvironmentStatus: Equatable {
             let signedIn = EnterpriseServer.shared.isSignedIn
             items.append(Item(name: String(localized: "企业服务器"), ok: signedIn,
                               detail: String(localized: "已登录 \(account.email)（\(account.serverName)）"),
-                              fix: String(localized: "登录已失效：到「高级 → 企业服务器」重新登录"), required: server))
+                              fix: String(localized: "登录已失效：到「设置 → 企业服务器」重新登录"), required: server))
         }
         // 第一项是默认会议语言的模型（Qwen3-ASR 或 Breeze，design §32.6、§41.3）；默认语言用 large-v3-turbo 时看中文的
         let defaultLanguage = AppSettings.defaultMeetingLanguage
@@ -39,20 +39,20 @@ struct EnvironmentStatus: Equatable {
                  ok: models.isInstalled(transcriptionFor: main) || AppSettings.useSystemTranscriber || server,
                  detail: server && !models.isInstalled(transcriptionFor: main) ? String(localized: "没有下载，正式转录用企业服务器") : models.isInstalled(transcriptionFor: main)
                      ? (!qwen ? String(localized: "已下载（1.66 GB）") : String(localized: "已下载（2.5 GB）")) : AppSettings.useSystemTranscriber ? String(localized: "没有下载，正式转录使用 macOS 内置识别") : String(localized: "还没下载"),
-                 fix: String(localized: "到设置的「录音与转录」下载，或把正式转录改成 macOS 内置"),
+                 fix: String(localized: "到设置的「模型与空间」下载，或在「转录」把正式转录改成 macOS 内置"),
                  required: !defaultLanguage.usesTurbo && !server),
             Item(name: String(localized: "\(MeetingLanguage.uiNames(model: "turbo"))转录模型"), ok: models.isInstalled(.japanese) || AppSettings.useSystemTranscriber || server,
                  detail: models.isInstalled(.japanese) ? String(localized: "已下载（574 MB）")
                      : server ? String(localized: "没有下载，正式转录用企业服务器")
                      : AppSettings.useSystemTranscriber ? String(localized: "没有下载，正式转录使用 macOS 内置识别")
                      : String(localized: "还没下载，第一次转录\(MeetingLanguage.uiNames(model: "turbo"))会议时会自动下载"),
-                 fix: String(localized: "到设置的「录音与转录」下载"), required: defaultLanguage.usesTurbo && !AppSettings.useSystemTranscriber && !server),
+                 fix: String(localized: "到设置的「模型与空间」下载"), required: defaultLanguage.usesTurbo && !AppSettings.useSystemTranscriber && !server),
             Item(name: String(localized: "语言检测模型"), ok: models.isInstalled(.languageDetection) || !AppSettings.autoDetectLanguage,
                  detail: models.isInstalled(.languageDetection) ? String(localized: "已下载（60 MB）")
                      : AppSettings.autoDetectLanguage ? String(localized: "还没下载，下载好之前录音不会自动检测语言") : String(localized: "没有开自动检测会议语言"),
-                 fix: String(localized: "到设置的「录音与转录」下载"), required: false),
+                 fix: String(localized: "到设置的「模型与空间」下载"), required: false),
             Item(name: String(localized: "说话者识别模型"), ok: models.diarizerState == .installed,
-                 detail: models.diarizerState == .installed ? String(localized: "已下载") : String(localized: "还没下载"), fix: String(localized: "到设置的「录音与转录」下载"), required: false),
+                 detail: models.diarizerState == .installed ? String(localized: "已下载") : String(localized: "还没下载"), fix: String(localized: "到设置的「模型与空间」下载"), required: false),
             Item(name: String(localized: "麦克风权限"), ok: mic == .authorized,
                  detail: mic == .authorized ? String(localized: "已允许") : mic == .notDetermined ? String(localized: "还没询问") : String(localized: "被拒绝"),
                  fix: String(localized: "第一次录音时会询问；被拒绝的话到「系统设置 → 隐私与安全性 → 麦克风」打开拾音"), required: false),

@@ -12,7 +12,7 @@
 
 - W1 一眼看懂：首頁第一屏就要說清楚「Mac 上的會議紀錄 app，錄音不出電腦，每一條紀錄都點得回原話」，並且可以直接下載。
 - W2 說清楚跟其他工具哪裡不同：錄音留在本機、台灣中文夾英文、AI 會標出它沒把握的地方、用你已經有的 Claude 或 ChatGPT 訂閱。
-- W3 下載：按鈕永遠指向最新版的 DMG；旁邊寫清楚系統需求（macOS 26、Apple Silicon）和第一次打開要怎麼做（沒有 Apple 開發者簽章，要到隱私權與安全性按「仍要打開」）。
+- W3 下載：按鈕永遠指向最新版的 DMG；旁邊寫清楚系統需求（macOS 26、Apple Silicon）和第一次打開要怎麼做（沒有 Apple 開發者簽章，要先按「完成」、再到隱私權與安全性按「強制打開」；中文首頁有真畫面的示範，§6.1）。
 - W4 版本說明：每一版的更新內容，最新的在最上面。**發布新版後自動出現在網站上，不用另外改網站。**
 - W5 隱私說明：哪些東西留在這台 Mac、哪些文字會送到你選的整理工具，講清楚。登入公司的企業伺服器時錄音、逐字稿送到哪裡另寫一段（R52.1，Mac 首頁和 Windows 頁共用）。
 - W6 繁體中文、英文、日文三種語言，預設繁體中文；頁首用下拉選單切換。app 介面有繁中、簡中、英文（日本的 macOS 會顯示英文），會議可以是中英日文，所以日文版要寫清楚介面是英文。
@@ -99,6 +99,7 @@
 │   開會時，邊錄邊看逐字稿（兩段說明）＋錄音中截圖               │
 │   停止後，在 Mac 上正式轉錄（兩段說明）＋逐字稿截圖            │
 │   整理成會議紀錄，不確定的地方會問你＋心智圖截圖（4.6）        │
+│   會議多了，用資料夾整理＋側欄資料夾和右鍵選單的截圖（5.0）     │
 │   錄音不會離開你的 Mac（留在 Mac／送到整理工具 兩欄清單；      │
 │     整理工具、匿名使用統計、企業伺服器各一段）                 │
 │   下載（版本、系統、空間、費用；DMG 按鈕；第一次打開 1-2-3；    │
@@ -147,6 +148,13 @@
 - SEO：每頁的標題和說明、canonical、`hreflang`（三種語言互相指向，x-default 指中文）、`sitemap.xml`、分享預覽（Open Graph、1200×630 的圖）。網站網址從環境變數 `SITE_URL` 讀，預設 `https://shiyin.weibuilds.com`。
 - Google Search Console：用 HTML 檔驗證網站擁有權，驗證通過後也要一直留著，刪掉會失去驗證。檔名要多一個 `.html`（`site/public/google<代碼>.html.html`）：Cloudflare Pages 會把 `.html` 結尾的網址 308 轉址到沒有副檔名的網址，而且不能關；多一個副檔名，`/google<代碼>.html` 才會直接回 200。sitemap 在 Search Console 送出 `/sitemap.xml`。
 - `_headers`：`nosniff`、Referrer-Policy、CSP（script 只允許自己網站的檔案，也就是 `/demo.js`、`/platform.js`；不允許 inline script）、圖片快取一天。
+
+### 6.1 第一次打開被擋的示範
+
+- 中文首頁下載區的三個步驟下面，放 macOS 26 真的畫面輪流示範（`gatekeeperDemo`，`site/src/pages.mjs`）：① 警告「未打開『拾音』」，游標按「完成」，「丟到垃圾桶」（預設的藍色按鈕）標「不要按」；② 系統設定「隱私權與安全性」的「安全性」，游標按「強制打開」；③ 文字：再按一次「強制打開」、輸入密碼。
+- 純 CSS 循環（10 秒一輪，script 只能用自己網站的，CSP 也不讓 `data:` 圖），減少動態效果時兩張上下排、框一直亮著。框和游標的位置是圖上的百分比，換圖要重量。
+- 圖：`site/public/images/gatekeeper-dialog`、`gatekeeper-settings`（AVIF＋PNG 備援），2026-11-18 在這台 Mac 用隔離過的拾音複本觸發、`screencapture -l` 截的（深色）；系統設定只裁「安全性」那塊（側欄有使用者的名字和 Apple 帳號）。
+- 英文、日文首頁只有步驟文字（畫面上的字是中文）：Done／Move to Trash、Open Anyway；完了／ゴミ箱に入れる、このまま開く。
 
 ## 7. 版本說明自動更新
 
@@ -327,6 +335,9 @@ Ko-fi：`https://ko-fi.com/weiwei_chang`（PayPal 收款；GitHub Sponsors 沒�
 - **`/llms.txt`**：給 AI 讀的 Markdown（llmstxt.org 的格式）：拾音是什麼、跟其他工具不同的地方、系統需求、價格、最新版本，和各頁的連結。英文為主，附繁中摘要。版本號、日期從 GitHub Releases 帶入；**app 加了重要功能時要跟著補**（跟首屏示範 §10.1 一樣）。
 - **sitemap**：每個網址加上 `lastmod`（首頁、版本說明用最新版的發布日期），跟 HTML 一樣加上 `x-default`。
 - **IndexNow**：Bing 的索引也供 ChatGPT 搜尋、Copilot 用。根目錄放金鑰檔（`/<金鑰>.txt`），部署後把 sitemap 裡的網址送給 `api.indexnow.org`；每天的自動重建不送（內容沒變，只有 GitHub 數字變）。送失敗只記警告，不讓部署失敗。
+- **`/favicon.ico`**：搜尋引擎不看 `<link rel="icon">` 也會直接抓這個網址（2026-10-21～11-03 Googlebot 抓了 5 次都是 404），`make-images.sh` 用 sips 從 icon.png 產生 48×48 的 ICO。
+- **作者**：結構化資料的作者（`Person`）網址是作者的網站 `https://www.weibuilds.com/`，`sameAs` 連 GitHub；頁尾有「Wei Builds」連過去（那邊的作品頁、文章也連回官網），讓搜尋引擎知道兩個網站是同一個人的。
+- **`*.pages.dev`**：Pages 專案自己的網址內容跟正式網域一樣，`_headers` 對它加 `X-Robots-Tag: noindex`。
 - **爬蟲**：robots.txt 維持全部允許。搜尋用（OAI-SearchBot、PerplexityBot、Claude-SearchBot）和訓練用（GPTBot、ClaudeBot）都不擋：拾音是開源專案，被 AI 學到、推薦是好事。
 
 ### 14.2 指南（教學、比較）
@@ -379,6 +390,12 @@ Ko-fi：`https://ko-fi.com/weiwei_chang`（PayPal 收款；GitHub Sponsors 沒�
 
 - **基準（2026-10-21）**：搜「拾音 app」「Shiyin meeting notes」都找不到官網；網站 6 個網址；GitHub 62 顆星、累計下載 202 次。
 - **Search Console**：每週看曝光、點擊、平均排名、已編入索引的網頁數。目標：4 週內 20 個網址都編入索引；8 週內指南頁開始有曝光。
+- **2026-11-18 的狀況**（上線 4 週）：
+  - Google：sitemap 讀取成功、23 個網址都知道，**編入索引 0 個**（「已檢索 - 目前尚未建立索引」10 個，含三種語言的首頁；「已找到 - 目前尚未建立索引」13 個），曝光 0。網址審查：允許檢索、擷取成功、允許編入索引、標準網址是自己，沒有技術問題。Googlebot 10-27 之後沒再來抓頁面，4 週只抓了 72 次。
+  - 原因在網域：`weibuilds.com` 是 2026-04-21 註冊的新網域，Search Console 的網域資源顯示**外部連結 0**，整個網域 34 個網址只收了 2 個（都是 www）。GitHub 上的連結（repo 首頁、README、awesome-mac）都是 `nofollow`，Google 不算。
+  - 所以 Google 這邊要靠 §14.4 的站外連結和在 Search Console 手動「要求建立索引」（一天約 10 個），再改站內的字幫助不大。2026-11-18 送了 7 個：三種語言的首頁、Windows 頁、指南列表、比較（中文）、Google Meet 逐字稿。
+  - Bing 這邊（ChatGPT 搜尋、Copilot、DuckDuckGo 用它的索引）：DuckDuckGo 搜 `site:shiyin.weibuilds.com` 有首頁、英日文首頁、Windows 頁和 5 篇指南，IndexNow 有用。
+  - 用各家爬蟲的 User-Agent（Googlebot、bingbot、GPTBot、OAI-SearchBot、ClaudeBot、PerplexityBot、ChatGPT-User、Claude-User）抓首頁、指南、llms.txt 都是 200，Cloudflare 沒有擋。
 - **Bing**：使用者到 Bing Webmaster Tools 從 Search Console 匯入網站（ChatGPT 搜尋、Copilot 用 Bing 的索引）。
 - **AI 回答**：固定一組問題，每月各問 3 次（ChatGPT、Perplexity、Gemini、Google AI 摘要），記錄拾音被提到幾次（例如 2/3）、被引用的是哪一頁：
   - 中文：「Mac 上推薦的會議記錄 app」「Google Meet 中文逐字稿怎麼做」「不上傳的會議逐字稿工具」「中英夾雜的逐字稿工具」
@@ -417,13 +434,14 @@ Ko-fi：`https://ko-fi.com/weiwei_chang`（PayPal 收款；GitHub Sponsors 沒�
 | 開會時，邊錄邊看逐字稿 | 同首頁，快捷鍵寫 Windows 的（Ctrl+R、Ctrl+Alt+Shift+B）；錄音中的截圖 |
 | 停止後，在電腦上正式轉錄 | 同首頁，加一段顯示卡加速：NVIDIA 自動下載（40 分鐘的會議 RTX 3060 約 8 分鐘、只用 CPU 約 30 分鐘，requirements R27 R4.6、N2 的實測）；AMD（含 Radeon 內顯）自動下載 Vulkan 版（約 20 MB，R4.7，還沒在真的 AMD 電腦上量過速度，不寫數字）；逐字稿的截圖 |
 | 整理成會議紀錄 | 同首頁；心智圖的截圖 |
+| 會議多了，用資料夾整理 | 同首頁；側欄資料夾和右鍵選單的截圖（organize，尺寸同 summary） |
 | 錄音不會離開你的電腦 | 同首頁的隱私，把「Mac」換成「電腦」 |
 | 下載 | 版本（連到 GitHub Release，Windows 版的更新紀錄不在網站上，§7）、系統、記憶體、磁碟空間（模型約 2 GB，NVIDIA 另外約 1.1 GB、AMD 另外約 60 MB）、顯示卡、費用；x64 的下載按鈕、ARM 的連結；安裝三步；SmartScreen 的示意圖（§16.3）；智慧型應用程式控制的說明；點星和贊助 |
-| 電腦效能（在下載區的需求表下面） | 只寫量過或確定的事：NVIDIA 顯示卡最快（RTX 3060 的實測、驅動 527 版以後、顯示記憶體建議 4 GB 以上，轉錄模型約 1.7 GB）；只用 CPU 比較慢（同一台桌機的實測，筆電可能比會議本身還久；轉錄最多用 8 個執行緒）；等不及時改用快速辨識（設定 → 錄音與轉錄 → 正式轉錄，比較不準、不參考詞彙表）；錄音中的即時逐字稿約用一個核心的三分之一（R27 R2.1 的實測）；AMD 顯示卡自動下載加速元件、用顯示卡轉錄（不寫速度）；ARM 的電腦、Intel 顯示卡只用 CPU。不寫沒量過的 CPU 等級、顯示卡型號清單；有更多電腦的實測再補成表 |
+| 電腦效能（在下載區的需求表下面） | 只寫量過或確定的事：NVIDIA 顯示卡最快（RTX 3060 的實測、驅動 527 版以後、顯示記憶體建議 4 GB 以上，轉錄模型約 1.7 GB）；只用 CPU 比較慢（同一台桌機的實測，筆電可能比會議本身還久；轉錄最多用 8 個執行緒）；等不及時改用快速辨識（設定 → 轉錄 → 正式轉錄，比較不準、不參考詞彙表）；錄音中的即時逐字稿約用一個核心的三分之一（R27 R2.1 的實測）；AMD 顯示卡自動下載加速元件、用顯示卡轉錄（不寫速度）；ARM 的電腦、Intel 顯示卡只用 CPU。不寫沒量過的 CPU 等級、顯示卡型號清單；有更多電腦的實測再補成表 |
 | 最近更新 | 最新的 Windows 版（版本說明從 GitHub Release 讀，§7） |
 | 常見問題 | 要付費嗎、沒有 NVIDIA 顯示卡可以用嗎（AMD 也會用顯示卡，其他用 CPU）、為什麼 Windows 會擋下來、Mac 和 Windows 的會議可以互通嗎（.shiyin 封包，聲紋不互通）、需要網路嗎、支援 Windows 10 嗎 |
 
-- 截圖（Windows 版真的畫面，深色模式，跟 Mac 的截圖同一份示範資料）：`docs/images/windows/`、`docs/images/en/windows/`（日文版用英文的），四張 summary、recording、transcript、mindmap。虛擬機調成 150%（桌面 1728×1044，§16.4），視窗 960×640，截出來 1422×951，裁掉四周 2 px 的視窗邊框，成為 1418×946，四角照 Windows 11 的圓角（8 DIP）改成透明。AVIF 1418、960 寬兩種。**整個視窗要在工作列上面**（`snapwin.ps1 place` 的 `-Top`，預設 6）：壓到工作列時底部會被蓋住，裁掉之後播放鍵像被切掉。**長寬要是偶數（960 寬的版本也是，1418×946 → 960×640）**：sips 轉奇數尺寸的圖會產生壞掉的 AVIF（grid 不對），Chrome 看得到，Safari 和用 libavif 的瀏覽器一片空白。`make-images.sh` 遇到奇數尺寸會停下來。心智圖（mindmap）例外：Windows 的側欄不能收，960 寬放不下整張圖，改在 125% 拍 1340×780 的視窗，裁成 1656×962（`pages.mjs` 的 `shot()` 帶 `size`）。
+- 截圖（Windows 版真的畫面，深色模式，跟 Mac 的截圖同一份示範資料）：`docs/images/windows/`、`docs/images/en/windows/`（日文版用英文的），五張 summary、recording、transcript、mindmap、organize（5.0）。虛擬機調成 150%（桌面 1728×1044，§16.4），視窗 960×640，截出來 1422×951，裁掉四周 2 px 的視窗邊框，成為 1418×946，四角照 Windows 11 的圓角（8 DIP）改成透明。AVIF 1418、960 寬兩種。**整個視窗要在工作列上面**（`snapwin.ps1 place` 的 `-Top`，預設 6）：壓到工作列時底部會被蓋住，裁掉之後播放鍵像被切掉。**長寬要是偶數（960 寬的版本也是，1418×946 → 960×640）**：sips 轉奇數尺寸的圖會產生壞掉的 AVIF（grid 不對），Chrome 看得到，Safari 和用 libavif 的瀏覽器一片空白。`make-images.sh` 遇到奇數尺寸會停下來。心智圖（mindmap）例外：Windows 的側欄不能收，960 寬放不下整張圖，改在 125% 拍 1340×780 的視窗，裁成 1656×962（`pages.mjs` 的 `shot()` 帶 `size`）。
 - 結構化資料：`SoftwareApplication`（operatingSystem 是 Windows 11、下載網址是 x64 的安裝檔、截圖是 Windows 的）、`FAQPage`。sitemap 加這三頁（lastmod 用 Windows 版的發布日期）。
 - 分享預覽圖全站共用一張（`og.png`、`og-en.png`、`og-ja.png`，`site/og.html` 截的）：標題「Mac 和 Windows 的會議紀錄 app」（英文 A meeting-notes app for Mac and Windows、日文 Mac と Windows の議事録アプリ），右邊 Mac 的截圖在後面露出紅黃綠、Windows 的截圖在前面露出視窗按鈕。首頁的標題、說明照樣以 Mac 為主（搜尋只看那些），預覽圖是貼到 Threads、LINE 時給人看的，兩個平台都要看得到。換圖時 `content.mjs` 的網址把 `?v=` 加一：Threads、Facebook 依圖片網址快取，同一個網址不會重抓。
 
@@ -448,5 +466,17 @@ Windows 使用者最容易卡住的是第一次執行時的 SmartScreen（拾音
 - 工具在 `scripts/windows/vm/ps/`：`display.ps1`（解析度）、`dpi.ps1`（縮放）、`snapwin.ps1`（放好視窗、截圖）、`clickname.ps1`（用虛擬機的滑鼠點元件）、`setnotes.ps1`（填輸入框），用 `insession.sh` 在桌面跑。截完把縮放改回 100%、解析度改回 1024×768。
 - 紀錄：點「紀錄」分頁讓焦點離開搜尋框（Lumio 那場，英文是 Kickoff 那場）；逐字稿：點 00:24（英文 00:22）那一段的時間，**再點一次「逐字稿」分頁**讓「從 00:24 開始播放」的提示框消失（只把滑鼠移開，提示框會留著）；錄音：`record-sim` 用 Lumio 的錄音（英文用定價那場），筆記用 UI Automation 填兩行，再點側欄讓筆記框沒有焦點，約 30 秒時截（4.1 的錄音畫面沒改，錄音的截圖沿用）。點擊用虛擬機裡的滑鼠（只送進虛擬機）。紀錄的播放位置 `seek 27.5`（英文 125），讓議題帶中間的一段亮起來（4.6）。
 - 心智圖（4.6）：`notesview mindmap`，`dpi.ps1 125`、`snapwin.ps1 place … -Width 1340 -Height 780`（125% 時視窗最高約 780），中文 `select 3`、英文 `select 2`，`seek 100`；點「心智圖」（英文 Mind map）讓焦點離開搜尋框，`ps/wheel.ps1 1620 450 -6 1722 600` 捲到底（整張圖露出來，滑鼠移到視窗外，捲軸和提示框才會收起來），截完 `dpi.ps1 150` 或 100。裁切：`python3 scripts/windows/vm/crop-shot.py <截圖> <輸出> 1.25`（150% 的不用給縮放；會自動湊成偶數、四角透明）。拍完把兩個示範資料夾的 `notesView` 改回 list。
-- 虛擬機的桌面 1728×1044 就夠（960×640 在 150% 是 1440×960，`-Top 6` 整個在工作列上面），`display.ps1 set 2560 1044` 在 UTM 現在的設定會失敗（-1），不用改解析度。OneDrive 的「開啟 Windows 備份」提示框會蓋在右下角、被截進去：`Stop-Process -Name OneDrive`，並把 `HKCU\…\Run` 的 OneDrive 拿掉（2026-10-25 已拿掉）。
-- Mac 的截圖（`docs/images/`、`docs/images/en/`，1920×1344）：DEBUG 版用示範資料的複本啟動（中文的要把 12、14 兩場連同 segments、speakers 等有 meeting_id 的資料表一起刪掉，不然 FOREIGN KEY 開不了資料庫），`shiyinctl windowsize 960 672` 把視窗調成截圖的大小（視窗在別的桌面時 AX 改不了），`screencapture -x -o -l <視窗編號>` 在別的桌面也截得到（視窗編號用 CGWindowList 依 pid 找，標題是會議名稱）；系統要先在深色模式。紀錄：`select 2`、`tab summary`、`seek 27.5`（英文 125）；逐字稿：`select 3`（英文 1）、`tab transcript`、`seek 24.5`（英文 23.5，讓 00:24／00:22 那一段反白）。接了滑鼠時系統會一直顯示捲軸：啟動參數加 `-AppleShowScrollBars WhenScrolling`（只對這次執行）。心智圖（4.6）：`notesview mindmap`，`clickat 244 26` 收起側欄（再按一次打開），中文 `select 3`、英文 `select 2`，`livescroll 1` 捲到底讓整張圖露出來，`seek 100`；拍完 `notesview list`、打開側欄，共用設定的視窗大小、側欄照拍之前的還原。
+- 解析度（2026-11-17 起）：UTM 的視窗變小後虛擬機只有 1280×908，150% 放不下，拍之前 `display.ps1 set 1920 1200`（第一次有時會被釘回 908 高，再設一次並確認）；150% 時工作區底在 1128、125% 在 1140。拍完改回：先 `set 1280 1024` 才會變回 1280×908（直接 `set 1280 908` 回 -1）。（以前桌面是 1728×1044，`-Top 6` 整個在工作列上面。）OneDrive 的「開啟 Windows 備份」提示框會蓋在右下角、被截進去：`Stop-Process -Name OneDrive`，並把 `HKCU\…\Run` 的 OneDrive 拿掉（2026-10-25 已拿掉）。
+- Mac 的截圖（`docs/images/`、`docs/images/en/`，1920×1344）：DEBUG 版用示範資料的複本啟動（中文的要把 12、14 兩場連同 segments、speakers 等有 meeting_id 的資料表一起刪掉，不然 FOREIGN KEY 開不了資料庫），`shiyinctl windowsize 960 672` 把視窗調成截圖的大小（視窗在別的桌面時 AX 改不了），`screencapture -x -o -l <視窗編號>` 在別的桌面也截得到（視窗編號用 CGWindowList 依 pid 找，標題是會議名稱）；系統要先在深色模式。紀錄：`select 2`、`tab summary`、`seek 27.5`（英文 125）；逐字稿：`select 3`（英文 1）、`tab transcript`、`seek 24.5`（英文 23.5，讓 00:24／00:22 那一段反白）。接了滑鼠時系統會一直顯示捲軸：啟動參數加 `-AppleShowScrollBars WhenScrolling`（只對這次執行）。心智圖（4.6）：`notesview mindmap`，`togglesidebar hide` 收起側欄（`togglesidebar show` 打開；**不要用 `clickat` 點工具列**，座標偏一點就按到錄音，曾經真的開始錄麥克風），中文 `select 3`、英文 `select 2`，`livescroll 1` 捲到底讓整張圖露出來，`seek 100`；拍完 `notesview list`、打開側欄，共用設定的視窗大小、側欄照拍之前的還原。
+- 5.0 的截圖（資料夾）：示範資料用 `ShiyinDemo/home`、`ShiyinDemoEN/home` 的複本（`…/shoot`），套 `scripts/dev/site-shots/organize-zh.sql`、`organize-en.sql`：原本三場分進資料夾，另外加七場（四場在資料夾、三場在「其他會議」），加的那幾場清掉待確認。紀錄、逐字稿那場所在的資料夾展開、那場被選到（側欄有資料夾和「其他會議」）。啟動後先 `closewindow onboarding`、`windowlevel main desktop`、`floatothers off`、`appearance dark`、`windowsize 960 672`；錄音的截圖用 `fakemic "MacBook Pro Microphone" 0` 把麥克風名稱換成一般的（只在記憶體）。
+- organize（資料夾）：展開「Lumio 新品上市」（英文 Remote control project），選紀錄那場、`seek 27.5`（英文 125）；在「其他會議」最上面那場 `mouseat rightq <x> <y> <主視窗> app` 打開右鍵選單，`keyat down`、`down`、`right`、`down`、`down` 打開「移到資料夾」的子選單、反白其中一個資料夾。選單是另一個視窗（`state` 的 `floatingMenuWindow`），主視窗、選單各截一張，照 CGWindowList 的位置（點 ×2）把選單疊到主視窗上；存成 RGBA，四角保持透明。截完 `floatclose`。
+- 截完檢查每張的透明度：視窗剛出現、切換時有淡入，太早截會截到半透明（幾乎全白）的畫面（中間的像素 alpha 要是 255）。
+- 5.0 的 Windows 截圖（跟上面不一樣的地方）：
+  - 資料：Mac 拍攝用的複本（`ShiyinDemo/shoot`、`ShiyinDemoEN/shoot`）`sqlite3 .backup` 加 `audio/` 放進 `C:\ShiyinShoot`、`C:\ShiyinShootEN`（模型硬連結），Windows 版直接開得起來；拍完刪掉。
+  - 深色：虛擬機平常是淺色，開 app 前 `ps/theme.ps1 dark`（`AppsUseLightTheme`、`SystemUsesLightTheme` 設 0、廣播 `ImmersiveColorSet`），拍完 `light`。
+  - 標題列要是使用中的樣子：點擊和 `snapwin snap` 要在同一次 `insession` 裡跑（下一個 PowerShell 一開就搶走前景，標題列變灰）；捲動之後點標題列空白處（150% 點 (700,25)、125% 點 (700,20)），等約 6 秒讓捲軸收起來再截。
+  - 側欄：`sidebarexpand "folder:<名稱>" on|off`；`select` 會自動展開那場所在的資料夾，其他的要自己收回去。
+  - 逐字稿：上方多了說話者頭像和「原文／精簡」，原地放會把 00:24（英文 00:22）那段切掉。改成 `seek 24.5`／`23.5`（同 Mac）、不點時間，用 `ps/scroll.ps1` 以 UI Automation 的 ScrollPattern 設清單的捲動位置（中文 4.97%，00:04 在最上面；英文 7.63%，00:12 在最上面）。滾輪捲一格會把第一段切一半。
+  - 錄音：錄音島會擋在螢幕上方中間，視窗改放 `snapwin place … -Top 80`；會議名稱照 Mac 改成「Lumio 新品週會」「Pricing check-in」（`renamemeetingui <id>`，UI Automation 填名稱、按儲存）；`record-sim` 中文用 `audio\2.m4a`、英文 `audio\3.m4a`；截圖約要 4～5 秒，elapsed 26.5 秒（英文 28.5）開始截（音量條要亮，停在句子之間的停頓就重拍）；停止後會排正式轉錄，用 `purge <id>` 刪掉那場。
+  - organize：`ps/org.ps1` 一次做完（用虛擬機的滑鼠右鍵點那一列、慢慢滑到「移到資料夾」、等 1.5 秒子選單展開、先水平滑進子選單再滑到那一項、同一個程序裡截主視窗）。視窗放 `-Top 168`（底邊貼齊工作區），WinUI 才會把子選單往上推進視窗裡；`-Top 6` 時子選單超出視窗底約 80 px。
+  - `insession.sh` 用 here-string 包內容，腳本裡有 `'@`（Add-Type）時要寫成檔案再呼叫。
