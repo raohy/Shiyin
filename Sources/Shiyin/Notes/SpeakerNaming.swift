@@ -98,9 +98,10 @@ enum SpeakerNaming {
 
     @MainActor
     static func suggest(_ context: Context, provider: LLMProvider, model: String,
-                        onStart: (Subprocess) -> Void) async throws -> [Suggestion] {
-        let data = try await LLMClient.generateJSON(provider: provider, model: model, system: system(context.language),
-                                                    prompt: prompt(context), format: format, onStart: onStart)
+                        thinkingEffort: ThinkingEffort = .auto, onStart: (Subprocess) -> Void) async throws -> [Suggestion] {
+        let data = try await LLMClient.generateJSON(provider: provider, model: model, thinkingEffort: thinkingEffort,
+                                                    system: system(context.language), prompt: prompt(context),
+                                                    format: format, onStart: onStart)
         struct Output: Decodable { var speakerNames: [Suggestion] }
         let output: Output
         do { output = try JSONDecoder().decode(Output.self, from: data) }

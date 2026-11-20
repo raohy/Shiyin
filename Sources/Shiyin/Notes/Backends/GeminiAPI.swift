@@ -3,20 +3,31 @@ import Foundation
 /// Gemini API（design §19.2、D23）：Interactions API；store: false，不让 Google 保存会议内容
 struct GeminiAPI: LLMBackend {
     let model: String
+    var thinkingEffort: ThinkingEffort = .auto
 
     private var base: String { LLMClient.apiBase(.gemini, "https://generativelanguage.googleapis.com") }
 
-    func generateJSON(system: String, prompt: String, format: LLMClient.OutputFormat,
-                      onStart: (Subprocess) -> Void) async throws -> Data {
-        guard let key = try Keychain.read("gemini"), !key.isEmpty else { throw LLMError.missingKey("Gemini") }
+    static func requestBody(model: String, system: String, prompt: String, format: LLMClient.OutputFormat,
+                            thinkingEffort: ThinkingEffort) throws -> [String: Any] {
         let schema = try JSONSerialization.jsonObject(with: Data(format.schema.utf8))
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "system_instruction": system,
             "input": prompt,
             "response_format": ["type": "text", "mime_type": "application/json", "schema": schema],
             "store": false,
         ]
+        if thinkingEffort != .auto {
+            body["generation_config"] = ["thinking_level": thinkingEffort.rawValue]
+        }
+        return body
+    }
+
+    func generateJSON(system: String, prompt: String, format: LLMClient.OutputFormat,
+                      onStart: (Subprocess) -> Void) async throws -> Data {
+        guard let key = try Keychain.read("gemini"), !key.isEmpty else { throw LLMError.missingKey("Gemini") }
+        let body = try Self.requestBody(model: model, system: system, prompt: prompt, format: format,
+                                        thinkingEffort: thinkingEffort)
         var request = URLRequest(url: URL(string: base + "/v1beta/interactions")!, timeoutInterval: LLMClient.timeout)
         request.httpMethod = "POST"
         request.setValue(key, forHTTPHeaderField: "x-goog-api-key")

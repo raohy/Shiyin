@@ -405,6 +405,18 @@ print('{"structured_output":{"summary":"fake","questions":[]}}')
         executable = tools / name
         executable.write_text(fake_cli)
         executable.chmod(0o755)
+    fake_agy = tools / 'agy'
+    fake_agy.write_text('''#!/usr/bin/env python3
+import json,sys
+schema = json.load(open(sys.argv[sys.argv.index('--json-schema') + 1], encoding='utf-8'))
+priority = schema['properties']['questions']['items']['properties']['priority']
+if priority.get('type') != 'integer' or 'enum' in priority:
+    print(json.dumps({'status': 'ERROR', 'error': 'INVALID_ARGUMENT: priority enum cannot be empty'}))
+    sys.exit(1)
+print(json.dumps({'status': 'SUCCESS', 'structured_output': {'summary': '接口待确认', 'questions': [
+    {'text': '谁负责接口？', 'reason': '负责人未定', 'segment': 0, 'priority': 9}]}}))
+''')
+    fake_agy.chmod(0o755)
     launch(fake_cli=True)
     cli_mid = preparation('本地假 CLI 取消检查')
     ctl('llmprovider', 'claude', '')
@@ -429,6 +441,14 @@ print('{"structured_output":{"summary":"fake","questions":[]}}')
     wait_state(cli_mid, lambda s: '超时' in s['message'] and not s['busy'], 'CLI timeout')
     wait(terminated, 'CLI terminated after timeout')
     check(snapshot(cli_mid)['state']['nextSeq'] == 0, 'CLI 超时终止且保留待分析内容')
+    ctl('coach', 'stop', cli_mid)
+    agy_mid = preparation('本地假 agy 格式兼容检查')
+    ctl('llmprovider', 'agy', '')
+    ctl('coach', 'start', agy_mid)
+    ctl('coach', 'review', agy_mid, 12, '接口负责人还没有确定。')
+    s = wait_state(agy_mid, lambda s: s['state']['nextSeq'] == 1 and not s['busy'], 'agy coach analysis')
+    check(any(q['text'] == '谁负责接口？' and q['priority'] == 3 and q['time'] == 12
+              for q in s['state']['questions']), 'agy 接受会中提问格式并限制返回的优先级')
     print(f'应用集成检查通过：{checks} 项；测试结果：{base}', flush=True)
 finally:
     try:

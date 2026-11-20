@@ -31,6 +31,7 @@ enum Paths {
     static let toolDirectories: [String] = [
         "/opt/homebrew/bin", "/usr/local/bin",
         (NSHomeDirectory() as NSString).appendingPathComponent(".local/bin"),
+        (NSHomeDirectory() as NSString).appendingPathComponent(".gemini/antigravity/bin"),
     ]
 
     /// 找到的外部工具（design §37.1）
@@ -51,8 +52,8 @@ enum Paths {
     /// 先找用户自己装的（toolDirectories），codex 找不到时再找 Codex 桌面版附的（R55.1）
     static func locateTool(_ name: String) -> ToolLocation? {
         #if DEBUG
-        // -debugNoCLI YES：当成没有安装 claude、codex（包括桌面版附的），在装了 CLI 的电脑上测（design §19.6）
-        if ["claude", "codex"].contains(name) && UserDefaults.standard.bool(forKey: "debugNoCLI") { return nil }
+        // -debugNoCLI YES：当成没有安装 claude、codex、agy（包括桌面版附的），在装了 CLI 的电脑上测（design §19.6）
+        if ["claude", "codex", "agy"].contains(name) && UserDefaults.standard.bool(forKey: "debugNoCLI") { return nil }
         // -debugToolDirectory <文件夹>：先找这个文件夹，用假的 claude、codex 测（design §40.3）
         if let debugDir = UserDefaults.standard.string(forKey: "debugToolDirectory"), !debugDir.isEmpty {
             let path = (debugDir as NSString).appendingPathComponent(name)

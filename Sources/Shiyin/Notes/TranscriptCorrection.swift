@@ -107,13 +107,15 @@ enum TranscriptCorrection {
     /// 分段送出，回传验证过的建议；onProgress 反馈 0～1
     @MainActor
     static func suggest(_ context: Context, provider: LLMProvider, model: String,
+                        thinkingEffort: ThinkingEffort = .auto,
                         onStart: (Subprocess) -> Void, onProgress: (Double) -> Void) async throws -> [CorrectionSuggestion] {
         var result: [CorrectionSuggestion] = []
         let count = context.segments.count
         var start = 0
         while start < count {
             let range = start..<min(start + chunkSize, count)
-            let data = try await LLMClient.generateJSON(provider: provider, model: model, system: system(context.language),
+            let data = try await LLMClient.generateJSON(provider: provider, model: model, thinkingEffort: thinkingEffort,
+                                                        system: system(context.language),
                                                         prompt: prompt(context, range: range), format: format, onStart: onStart)
             struct Output: Decodable { var corrections: [CorrectionSuggestion] }
             let output: Output

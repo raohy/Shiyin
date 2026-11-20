@@ -2084,6 +2084,108 @@
     "Anthropic API": {
       "extractionState": "manual"
     },
+    "Antigravity 的消息：%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antigravity 的消息：%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antigravity says: %@"
+          }
+        }
+      }
+    },
+    "Antigravity 的用量额度用完了，等恢复后再试，或到设置 → 整理工具先换成其他工具或 API。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antigravity 的用量额度用完了，等恢复后再试，或到设置 → 整理工具先换成其他工具或 API。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antigravity is out of usage until it resets. Try again then, or switch to another tool or an API in Settings → Summarizer."
+          }
+        }
+      }
+    },
+    "Antigravity 还没登录或登录已过期，请重新登录后再试一次（终端命令：agy）。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antigravity 还没登录或登录已过期，请重新登录后再试一次（终端命令：agy）。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antigravity isn’t signed in, or its sign-in has expired. Sign in again and try once more (Terminal command: agy)."
+          }
+        }
+      }
+    },
+    "Antigravity 还没登录，登录之后才能整理（终端命令：agy）。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antigravity 还没登录，登录之后才能整理（终端命令：agy）。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antigravity isn’t signed in. Sign in to summarize (Terminal command: agy)."
+          }
+        }
+      }
+    },
+    "Antigravity（agy CLI）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antigravity（agy CLI）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antigravity (agy CLI)"
+          }
+        }
+      }
+    },
+    "Antigravity（这台 Mac 已经装了 agy CLI）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antigravity（这台 Mac 已经装了 agy CLI）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antigravity (agy CLI is installed on this Mac)"
+          }
+        }
+      }
+    },
     "Apple Silicon（M1 以上）": {
       "extractionState": "manual",
       "localizations": {
@@ -3217,6 +3319,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "When Zoom, Teams, Webex, Google Meet (in a browser) or another meeting app starts using the microphone and Shiyin isn't recording, Shiyin asks whether to record; it never starts recording on its own. When the meeting app stops using the microphone, a 60-second countdown starts and the recording stops and is transcribed unless you click Keep Recording. With automatic stop turned off, Shiyin only asks whether to stop."
+          }
+        }
+      }
+    },
+    "agy 回传内容不含结构化结果": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "agy 回传内容不含结构化结果"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "agy returned no structured output"
+          }
+        }
+      }
+    },
+    "agy 没有回传结果（结束代码 %d）": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "agy 没有回传结果（结束代码 %d）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "agy returned no result (exit code %d)"
           }
         }
       }
@@ -5089,6 +5225,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "The meetings are in different languages; the notes will use this meeting’s language"
+          }
+        }
+      }
+    },
+    "中": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "中"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Medium"
           }
         }
       }
@@ -7009,6 +7162,23 @@
         }
       }
     },
+    "低": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "低"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Low"
+          }
+        }
+      }
+    },
     "你平常用哪个 AI？": {
       "extractionState": "manual",
       "localizations": {
@@ -7175,6 +7345,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "使用说明"
+          }
+        }
+      }
+    },
+    "使用默认模型": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用默认模型"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use default model"
           }
         }
       }
@@ -12215,6 +12402,23 @@
         }
       }
     },
+    "取得不到模型清单，请确认已安装并登录 agy，或直接输入模型名称。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取得不到模型清单，请确认已安装并登录 agy，或直接输入模型名称。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t get the model list. Make sure agy is installed and signed in, or type the model name instead."
+          }
+        }
+      }
+    },
     "取得不到模型清單，可以直接輸入模型名稱。": {
       "extractionState": "manual",
       "localizations": {
@@ -16328,6 +16532,23 @@
         }
       }
     },
+    "已安装，可通过下方测试确认可用": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装，可通过下方测试确认可用"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installed; run the test below to verify"
+          }
+        }
+      }
+    },
     "已安装，看不出登录状态": {
       "extractionState": "manual",
       "localizations": {
@@ -18308,6 +18529,23 @@
         }
       }
     },
+    "当前模型不支持调整思考强度，将使用默认设置。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前模型不支持调整思考强度，将使用默认设置。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This model doesn’t support adjusting thinking effort; the default setting will be used."
+          }
+        }
+      }
+    },
     "当前讨论摘要": {
       "extractionState": "manual",
       "localizations": {
@@ -19620,6 +19858,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "忽略"
+          }
+        }
+      }
+    },
+    "思考强度": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "思考强度"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking effort"
           }
         }
       }
@@ -23974,6 +24229,23 @@
         }
       }
     },
+    "整理、提问、猜说话者时会把逐字稿文字、你的笔记、词汇表和会议基本资料通过 Antigravity CLI（agy）送到你选择的模型。录音档不会送出。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整理、提问、猜说话者时会把逐字稿文字、你的笔记、词汇表和会议基本资料通过 Antigravity CLI（agy）送到你选择的模型。录音档不会送出。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When summarizing, answering questions or guessing speaker names, the transcript text, your notes, the glossary and basic meeting details are sent via Antigravity CLI (agy) to your chosen model. The recording is never sent."
+          }
+        }
+      }
+    },
     "整理中": {
       "extractionState": "manual",
       "localizations": {
@@ -24344,6 +24616,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "整理工具选 Anthropic API 时需要"
+          }
+        }
+      }
+    },
+    "整理工具选 Antigravity 时需要：安装 agy CLI 并完成登录": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整理工具选 Antigravity 时需要：安装 agy CLI 并完成登录"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needed for the Antigravity summarizer: install the agy CLI and sign in"
           }
         }
       }
@@ -26090,6 +26379,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "最近 30 天"
+          }
+        }
+      }
+    },
+    "最高": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最高"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Max"
           }
         }
       }
@@ -37826,6 +38132,23 @@
         }
       }
     },
+    "超高": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "超高"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extra high"
+          }
+        }
+      }
+    },
     "跳到第一处": {
       "extractionState": "manual",
       "localizations": {
@@ -39618,6 +39941,23 @@
         }
       }
     },
+    "这台 Mac 找不到 agy。没有在用 Antigravity CLI 的话，请到设置 → 整理工具改用 API（填 API key）或选「不整理」": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这台 Mac 找不到 agy。没有在用 Antigravity CLI 的话，请到设置 → 整理工具改用 API（填 API key）或选「不整理」"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "agy isn't installed on this Mac. If you don't use Antigravity CLI, go to Settings → Summarizer and choose an API (with an API key) or “Don't summarize”."
+          }
+        }
+      }
+    },
     "这台 Mac 找不到 claude。没有在用 Claude Code 的话，请到设置 → 整理工具改用 API（填 API key）或选「不整理」": {
       "extractionState": "manual",
       "localizations": {
@@ -39665,6 +40005,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "这台 Mac 没有安装 Claude Code（命令行版），安装方法在下面"
+          }
+        }
+      }
+    },
+    "这台 Mac 没有安装 agy：没有在用 Antigravity CLI 的话，请改选 API": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这台 Mac 没有安装 agy：没有在用 Antigravity CLI 的话，请改选 API"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "agy isn't installed on this Mac. If you don't use Antigravity CLI, choose an API instead"
           }
         }
       }
@@ -44312,6 +44669,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "验证模型失败：%@"
+          }
+        }
+      }
+    },
+    "高": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "高"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "High"
           }
         }
       }

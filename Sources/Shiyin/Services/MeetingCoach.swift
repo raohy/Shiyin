@@ -83,7 +83,7 @@ final class MeetingCoach {
                 return
             }
             let prompt = try MeetingCoachPrompt.input(state: state, batch: batch)
-            let provider = AppSettings.provider, model = AppSettings.model
+            let provider = AppSettings.provider, model = AppSettings.model, effort = AppSettings.thinkingEffort
             let current = UUID()
             token = current
             busy = true
@@ -104,8 +104,9 @@ final class MeetingCoach {
                     try Task.checkCancellation()
                     let format = LLMClient.OutputFormat(schema: MeetingCoachPrompt.schema, toolName: "save_meeting_questions",
                                                         toolDescription: "Save cumulative meeting context and suggested follow-up questions")
-                    let data = try await LLMClient.generateJSON(provider: provider, model: model, system: MeetingCoachPrompt.system,
-                                                               prompt: prompt, format: format, onStart: { self.process = $0 })
+                    let data = try await LLMClient.generateJSON(provider: provider, model: model, thinkingEffort: effort,
+                                                               system: MeetingCoachPrompt.system, prompt: prompt, format: format,
+                                                               onStart: { self.process = $0 })
                     try Task.checkCancellation()
                     guard self.token == current, self.meetingId == id else { return }
                     let output = try JSONDecoder().decode(CoachOutput.self, from: data)

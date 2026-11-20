@@ -86,13 +86,15 @@ enum TranscriptCleanup {
     /// 分段送出，回传「第几句 → 精简后的文字」（只有改过的句子；空字符串是整句都是赘字）；onProgress 回报 0～1
     @MainActor
     static func clean(_ context: Context, provider: LLMProvider, model: String,
+                      thinkingEffort: ThinkingEffort = .auto,
                       onStart: (Subprocess) -> Void, onProgress: (Double) -> Void) async throws -> [Int: String] {
         var result: [Int: String] = [:]
         let count = context.segments.count
         var start = 0
         while start < count {
             let range = start..<min(start + chunkSize, count)
-            let data = try await LLMClient.generateJSON(provider: provider, model: model, system: system(context.language),
+            let data = try await LLMClient.generateJSON(provider: provider, model: model, thinkingEffort: thinkingEffort,
+                                                        system: system(context.language),
                                                         prompt: prompt(context, range: range), format: format, onStart: onStart)
             struct Output: Decodable { var lines: [Line] }
             let output: Output

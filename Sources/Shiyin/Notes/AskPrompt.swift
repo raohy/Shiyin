@@ -235,9 +235,11 @@ enum AskPrompt {
     // MARK: 送出
 
     @MainActor
-    static func generate<T: Decodable>(_ type: T.Type, provider: LLMProvider, model: String, system: String, prompt: String,
+    static func generate<T: Decodable>(_ type: T.Type, provider: LLMProvider, model: String,
+                                       thinkingEffort: ThinkingEffort = .auto, system: String, prompt: String,
                                        format: LLMClient.OutputFormat, onStart: (Subprocess) -> Void) async throws -> T {
-        let data = try await LLMClient.generateJSON(provider: provider, model: model, system: system, prompt: prompt, format: format, onStart: onStart)
+        let data = try await LLMClient.generateJSON(provider: provider, model: model, thinkingEffort: thinkingEffort,
+                                                  system: system, prompt: prompt, format: format, onStart: onStart)
         do { return try JSONDecoder().decode(T.self, from: data) }
         catch { throw LLMError.badAnswer(error.localizedDescription + provider.badOutputHint) }
     }

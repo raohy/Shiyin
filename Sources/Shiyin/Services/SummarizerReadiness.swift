@@ -25,13 +25,15 @@ enum SummarizerProblem: Equatable {
         switch self {
         case .notChosen: return String(localized: "还没设置整理工具，请到设置选择 Claude、Codex 或 API")
         case .off: return String(localized: "整理工具设置为「不整理」，请到设置改成 Claude、Codex 或 API")
-        case .notInstalled(let provider): return LLMError.notInstalled(provider == .codex ? "codex" : "claude").localizedDescription
+        case .notInstalled(let provider): return LLMError.notInstalled(provider.cliToolName ?? "claude").localizedDescription
         case .notLoggedIn(let provider):
             // 用桌面版附的 codex：到那个 app 登录（R55.3）
             if let app = CLILogin.desktopApp(provider) { return String(localized: "Codex 还没登录，请打开 \(app) 登录之后再整理。") }
-            return provider == .codex
-                ? String(localized: "Codex 还没登录，登录之后才能整理（终端命令：codex login）。")
-                : String(localized: "Claude Code 还没登录，登录之后才能整理（终端命令：claude auth login）。")
+            switch provider {
+            case .codex: return String(localized: "Codex 还没登录，登录之后才能整理（终端命令：codex login）。")
+            case .agy: return String(localized: "Antigravity 还没登录，登录之后才能整理（终端命令：agy）。")
+            default: return String(localized: "Claude Code 还没登录，登录之后才能整理（终端命令：claude auth login）。")
+            }
         case .missingKey(let provider): return String(localized: "还没有填 \(provider.shortLabel) 的 API key，请到设置 → 整理工具填写")
         case .incomplete: return String(localized: "还没有填 OpenAI 兼容 API 的网址或模型，请到设置 → 整理工具填写")
         case .enterpriseSignedOut: return String(localized: "公司的服务器还没登录或登录已失效，请到设置 → 企业服务器登录")
@@ -43,7 +45,7 @@ enum SummarizerProblem: Equatable {
     var action: Action {
         switch self {
         case .notLoggedIn(let provider): return .login(provider)
-        case .paused(let provider, let detail) where (provider == .claude || provider == .codex) && LLMError.isLoginMessage(detail):
+        case .paused(let provider, let detail) where provider.isCLI && LLMError.isLoginMessage(detail):
             return .login(provider)
         default: return .openSettings
         }
@@ -57,7 +59,7 @@ enum SummarizerProblem: Equatable {
         case .openSettings: return String(localized: "打开设置")
         case .login(let provider):
             if let app = CLILogin.desktopApp(provider) { return String(localized: "打开 \(app) 登录") }
-            return String(localized: "登录 \(provider == .codex ? "Codex" : "Claude Code")")
+            return String(localized: "登录 \(provider.cliDisplayName)")
         }
     }
 }
@@ -69,8 +71,8 @@ extension AppSettings {
         let provider = self.provider
         switch provider {
         case .none: return .off
-        case .claude, .codex:
-            if Paths.findTool(provider == .claude ? "claude" : "codex") == nil { return .notInstalled(provider) }
+        case .claude, .codex, .agy:
+            if Paths.findTool(provider.cliToolName!) == nil { return .notInstalled(provider) }
             if CLILoginCache.loggedIn(provider) == false { return .notLoggedIn(provider) }
         case .anthropic, .openai, .gemini:
             if !Keychain.exists(provider.keychainAccount) { return .missingKey(provider) }
@@ -137,10 +139,11 @@ enum SummarizerPause {
         NotificationCenter.default.post(name: .summarizerStateChanged, object: nil)
     }
 
-    /// 整理工具设置的指纹：换工具、改模型或网址、存或删 key 都会变
+    /// 整理工具设置的指纹：换工具、改模型、改思考强度或网址、存或删 key 都会变
     static func signature(_ provider: LLMProvider) -> String {
         let url = provider == .openaiCompatible ? OpenAICompatibleAPI.savedBaseURL : ""
-        return [provider.rawValue, AppSettings.model, url, String(Keychain.generation)].joined(separator: "|")
+        return [provider.rawValue, AppSettings.model, AppSettings.thinkingEffort.rawValue, url,
+                String(Keychain.generation)].joined(separator: "|")
     }
 }
 
@@ -148,14 +151,14 @@ enum SummarizerPause {
 @MainActor
 enum SummarizerTest {
     /// 成功回传花了几秒，失败丢出整理工具的错误；成功时解除暂停（R46.3）
-    static func run(provider: LLMProvider, model: String) async throws -> Int {
+    static func run(provider: LLMProvider, model: String, thinkingEffort: ThinkingEffort = .auto) async throws -> Int {
         let started = Date()
         let language = AppSettings.defaultMeetingLanguage
         let prompt = language.prompt(zh: "这是连接测试。逐字稿：\n[00:00] 说话者 1：大家好，今天只是测试一下。",
                                    en: "This is a connection test. Transcript:\n[00:00] Speaker 1: Hi everyone, this is just a test.",
                                    ja: "これは接続テストです。文字起こし：\n[00:00] 話者 1：皆さん、今日はテストだけです。")  // l10n-skip
-        _ = try await LLMClient.generate(provider: provider, model: model, system: NotesPrompt.system(language),
-                                         prompt: prompt, onStart: { _ in })
+        _ = try await LLMClient.generate(provider: provider, model: model, thinkingEffort: thinkingEffort,
+                                         system: NotesPrompt.system(language), prompt: prompt, onStart: { _ in })
         SummarizerPause.clear()
         return Int(Date().timeIntervalSince(started).rounded())
     }
@@ -163,5 +166,14 @@ enum SummarizerTest {
     /// 这个整理工具在设置里的模型（引导里选的不一定是目前的整理工具）
     static func model(for provider: LLMProvider) -> String {
         provider == AppSettings.provider ? AppSettings.model : UserDefaults.standard.string(forKey: provider.modelKey) ?? ""
+    }
+
+    /// 这个整理工具在设置里的思考强度（引导里选的不一定是目前的整理工具）
+    static func thinkingEffort(for provider: LLMProvider) -> ThinkingEffort {
+        if provider == AppSettings.provider { return AppSettings.thinkingEffort }
+        let raw = UserDefaults.standard.string(forKey: provider.thinkingEffortKey) ?? ""
+        guard let effort = ThinkingEffort(rawValue: raw),
+              provider.supportedThinkingEfforts.contains(effort) else { return .auto }
+        return effort
     }
 }

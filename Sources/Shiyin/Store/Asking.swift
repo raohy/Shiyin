@@ -150,7 +150,7 @@ extension AppModel {
         let question = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !question.isEmpty, asking == nil, let id = meetingId ?? selection, let meeting = try? db.meeting(id) else { return }
         if let reason = askUnavailableReason { errorMessage = reason; return }
-        let provider = AppSettings.provider, model = AppSettings.model
+        let provider = AppSettings.provider, model = AppSettings.model, effort = AppSettings.thinkingEffort
         let language = meeting.meetingLanguage
         run(.meeting(id), question: question, providerLabel: provider.shortLabel) {
             let names = Dictionary(uniqueKeysWithValues: ((try? self.db.speakers(id)) ?? []).map { ($0.idx, $0.name) })
@@ -164,8 +164,9 @@ extension AppModel {
                                                  documents: documents)
             let system = AskPrompt.meetingSystem(language, documents: !documents.isEmpty)
             self.askRequest?.phase = .answering
-            let raw = try await AskPrompt.generate(AskPrompt.Answer.self, provider: provider, model: model, system: system,
-                                                   prompt: prompt, format: AskPrompt.meetingFormat, onStart: { self.askProcess = $0 })
+            let raw = try await AskPrompt.generate(AskPrompt.Answer.self, provider: provider, model: model, thinkingEffort: effort,
+                                                   system: system, prompt: prompt, format: AskPrompt.meetingFormat,
+                                                   onStart: { self.askProcess = $0 })
             return QuestionRecord(meetingId: id, question: question,
                                   answer: Self.json(AskPrompt.validate(raw, meetingIds: nil, documentCitations: !documents.isEmpty)),
                                   provider: provider.rawValue)
@@ -182,13 +183,14 @@ extension AppModel {
         let question = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !question.isEmpty, asking == nil else { return }
         if let reason = askUnavailableReason { errorMessage = reason; return }
-        let provider = AppSettings.provider, model = AppSettings.model
+        let provider = AppSettings.provider, model = AppSettings.model, effort = AppSettings.thinkingEffort
         let language = MeetingLanguage.interface
         run(.all, question: question, scope: scope, folder: folder, providerLabel: provider.shortLabel) {
             // 1. 抽关键词
             self.askRequest?.phase = .keywords
             struct Keywords: Decodable { var keywords: [String] }
-            let keywords = try await AskPrompt.generate(Keywords.self, provider: provider, model: model, system: AskPrompt.keywordsSystem(language),
+            let keywords = try await AskPrompt.generate(Keywords.self, provider: provider, model: model, thinkingEffort: effort,
+                                                        system: AskPrompt.keywordsSystem(language),
                                                         prompt: AskPrompt.keywordsPrompt(language, question: question),
                                                         format: AskPrompt.keywordsFormat, onStart: { self.askProcess = $0 }).keywords
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { $0.count >= 2 }
@@ -203,7 +205,8 @@ extension AppModel {
             }
             // 3. 回答
             self.askRequest?.phase = .answering
-            let raw = try await AskPrompt.generate(AskPrompt.Answer.self, provider: provider, model: model, system: AskPrompt.allSystem(language),
+            let raw = try await AskPrompt.generate(AskPrompt.Answer.self, provider: provider, model: model, thinkingEffort: effort,
+                                                   system: AskPrompt.allSystem(language),
                                                    prompt: AskPrompt.allPrompt(language, blocks: blocks, question: question),
                                                    format: AskPrompt.allFormat, onStart: { self.askProcess = $0 })
             var answer = AskPrompt.validate(raw, meetingIds: Set(blocks.map(\.id)))

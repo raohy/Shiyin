@@ -66,7 +66,8 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         switch self {
         case .provider:
             [String(localized: "转录完成后自动整理成会议记录"), String(localized: "转录完成后检查可能听错的字"), String(localized: "模型"),
-             String(localized: "测试整理工具"), "Claude", "Codex", "ChatGPT", "OpenAI", "Gemini", "Anthropic", "API key"]
+             String(localized: "思考强度"), String(localized: "测试整理工具"),
+             "Claude", "Codex", "Antigravity", "agy", "ChatGPT", "OpenAI", "Gemini", "Anthropic", "API key"]
         case .templates: [String(localized: "要产生的段落"), String(localized: "自订段落"), String(localized: "设为默认模板")]
         case .recording:
             [String(localized: "录音来源"), String(localized: "麦克风"), String(localized: "麦克风权限设置"), String(localized: "系统录音权限设置"),
@@ -227,11 +228,13 @@ struct ProviderSettings: View {
     @AppStorage(AppSettings.autoSummarizeKey) private var autoSummarize = true
     @AppStorage(AppSettings.correctTranscriptKey) private var correctTranscript = true
     @State private var modelName = ""
+    @State private var thinkingEffort: ThinkingEffort = .auto
     @State private var baseURL = ""
     @State private var key = ""
     @State private var keySaved = false
     @State private var keyError: String?
     @State private var availableModels: [String] = []
+    @State private var agyModels: [AgyCLI.ModelOption] = []
     // 「选择」的模型清单：按了才取（取的时候要读 key，可能跳出钥匙串的确认，design §22.1）
     @State private var pickingModel = false
     @State private var loadingModels = false
@@ -255,12 +258,12 @@ struct ProviderSettings: View {
     var body: some View {
         Form {
             Picker("整理工具", selection: Binding(get: { provider }, set: { storedProvider = $0 })) {
-                // 这台 Mac 没有 claude、codex 时才有：选它等于清掉设置，回到「还没设置」
+                // 这台 Mac 没有 claude、codex、agy 时才有：选它等于清掉设置，回到「还没设置」
                 if AppSettings.detectedProvider == .none { Text("之后再设置（先不整理）").tag("") }
-                // 没安装的 claude、codex 不能选（R45.3）；目前选的就是它时照样显示
+                // 没安装的 CLI 不能选（R45.3）；目前选的就是它时照样显示
                 // 公司：登录了企业服务器、公司有提供整理才出现（R51.1、D124；登录在高级）
                 ForEach(LLMProvider.allCases.filter { $0 != .enterprise || EnterpriseServer.shared.account?.llm == true || $0 == current }) { item in
-                    let missing = (item == .claude || item == .codex) && Paths.findTool(item == .claude ? "claude" : "codex") == nil
+                    let missing = item.cliToolName.map { Paths.findTool($0) == nil } ?? false
                     Text(missing ? String(localized: "\(item.label)（没有安装）") : item == .enterprise ? companyLabel : item.label).tag(item.rawValue)
                         .selectionDisabled(missing && item != current)
                 }
@@ -269,14 +272,22 @@ struct ProviderSettings: View {
             if current != .none, let notice = problemNotice {
                 Text(notice).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
             }
-            if current == .claude || current == .codex {
+            if current.isCLI {
                 LabeledContent("状态") {
                     HStack(spacing: 8) {
-                        if Paths.findTool(current == .claude ? "claude" : "codex") == nil {
-                            Text(current == .codex ? "这台 Mac 没有安装 codex：没有在用 Codex 的话，请改选 API"
-                                 : showClaudeHint ? "这台 Mac 没有安装 Claude Code（命令行版），安装方法在下面"
-                                 : "这台 Mac 没有安装 claude：没有在用 Claude Code 的话，请改选 API")
-                                .foregroundStyle(.secondary)
+                        if let cli = current.cliToolName, Paths.findTool(cli) == nil {
+                            Group {
+                                switch current {
+                                case .codex:
+                                    Text("这台 Mac 没有安装 codex：没有在用 Codex 的话，请改选 API")
+                                case .agy:
+                                    Text("这台 Mac 没有安装 agy：没有在用 Antigravity CLI 的话，请改选 API")
+                                default:
+                                    Text(showClaudeHint ? "这台 Mac 没有安装 Claude Code（命令行版），安装方法在下面"
+                                         : "这台 Mac 没有安装 claude：没有在用 Claude Code 的话，请改选 API")
+                                }
+                            }
+                            .foregroundStyle(.secondary)
                         } else if checkingLogin {
                             Text("检查登录状态…").foregroundStyle(.secondary)
                         } else if let login {
@@ -289,7 +300,8 @@ struct ProviderSettings: View {
                                 }
                             }
                         } else {
-                            Text("已安装，看不出登录状态").foregroundStyle(.secondary)
+                            Text(current == .agy ? "已安装，可通过下方测试确认可用" : "已安装，看不出登录状态")
+                                .foregroundStyle(.secondary)
                         }
                         Button { recheck() } label: { Image(systemName: "arrow.clockwise") }
                             .buttonStyle(.borderless)
@@ -352,15 +364,31 @@ struct ProviderSettings: View {
             }
             if current != .none && current != .enterprise {
                 HStack {
-                    TextField("模型", text: $modelName, prompt: Text(current == .openaiCompatible ? "必填"
-                                                                    : current == .enterprise ? "留空使用公司设置的默认模型"
-                                                                    : current.defaultModel.isEmpty ? "留空使用默认模型" : "默认：\(current.defaultModel)"))
+                    TextField("模型", text: modelBinding, prompt: Text(current == .openaiCompatible ? "必填"
+                                                                        : current == .enterprise ? "留空使用公司设置的默认模型"
+                                                                        : current.defaultModel.isEmpty ? "留空使用默认模型" : "默认：\(current.defaultModel)"))
                     if canListModels {
                         Button("选择", action: openModelPicker)
                             .popover(isPresented: $pickingModel, arrowEdge: .bottom) { modelList }
                     }
                 }
-                .onChange(of: modelName) { _, value in UserDefaults.standard.set(value, forKey: current.modelKey) }
+            }
+            if current.supportsThinkingEffort {
+                Picker("思考强度", selection: Binding(
+                    get: { availableEfforts.contains(thinkingEffort) ? thinkingEffort : .auto },
+                    set: {
+                        thinkingEffort = $0
+                        UserDefaults.standard.set($0.rawValue, forKey: current.thinkingEffortKey)
+                    })) {
+                    ForEach(availableEfforts) { level in
+                        Text(level.label).tag(level)
+                    }
+                }
+                .disabled(effortUnsupportedByModel)
+                if effortUnsupportedByModel {
+                    Text("当前模型不支持调整思考强度，将使用默认设置。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             // 测试：送一个很短的请求，确认登录、key、模型都能用（用户反馈：开完会才发现登录过期）
             if current != .none && (current != .enterprise || EnterpriseServer.shared.isSignedIn) {
@@ -436,9 +464,11 @@ struct ProviderSettings: View {
         testing = true
         testResult = nil
         let tested = current
+        let effort = effortUnsupportedByModel ? .auto
+            : (availableEfforts.contains(thinkingEffort) ? thinkingEffort : .auto)
         let result: (Bool, String)
         do {
-            let seconds = try await SummarizerTest.run(provider: tested, model: modelName)
+            let seconds = try await SummarizerTest.run(provider: tested, model: modelName, thinkingEffort: effort)
             result = (true, String(localized: "可以使用（\(seconds) 秒）"))
         } catch {
             result = (false, error.localizedDescription)
@@ -463,12 +493,16 @@ struct ProviderSettings: View {
         DesktopApps.clearCache()
         recheckCount += 1
         model.refreshSummarizerProblem()
+        if current == .agy {
+            AgyCLI.cachedModelOptions = []
+            if Paths.findTool("agy") != nil { refreshModels() }
+        }
         Task { await checkLogin(userInitiated: true) }
     }
 
     /// userInitiated：用户按了「重新检查」，查到已登录就测一次（R45.3）；打开设置页时的自动检查不测（不花额度）
     private func checkLogin(userInitiated: Bool = false) async {
-        guard current == .claude || current == .codex else { login = nil; return }
+        guard current.isCLI else { login = nil; return }
         checkingLogin = true
         let checked = current
         let status = await CLILogin.refresh(checked)
@@ -493,21 +527,81 @@ struct ProviderSettings: View {
         }
     }
 
+    private var modelBinding: Binding<String> {
+        Binding(
+            get: { modelName },
+            set: { value in
+                modelName = value
+                UserDefaults.standard.set(value, forKey: current.modelKey)
+                syncEffortForAgyModel(value)
+            }
+        )
+    }
+
+    private func selectModel(_ value: String) {
+        modelName = value
+        UserDefaults.standard.set(value, forKey: current.modelKey)
+        syncEffortForAgyModel(value)
+        pickingModel = false
+    }
+
+    private func agyModelOption(for rawModel: String) -> AgyCLI.ModelOption? {
+        guard current == .agy else { return nil }
+        let trimmed = rawModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if let direct = agyModels.first(where: { $0.id == trimmed }) { return direct }
+        let base = AgyCLI.resolvedModelAndEffort(model: trimmed, effort: .high).model
+        return agyModels.first(where: { $0.id == base })
+    }
+
+    private var selectedAgyModel: AgyCLI.ModelOption? { agyModelOption(for: modelName) }
+    private var effortUnsupportedByModel: Bool { current == .agy && selectedAgyModel?.efforts.isEmpty == true }
+
+    private var availableEfforts: [ThinkingEffort] {
+        if effortUnsupportedByModel { return [.auto] }
+        if current == .agy, let known = selectedAgyModel, !known.efforts.isEmpty {
+            return [.auto] + known.efforts
+        }
+        return current.supportedThinkingEfforts
+    }
+
+    private func syncEffortForAgyModel(_ rawModel: String) {
+        guard current == .agy, let known = agyModelOption(for: rawModel) else { return }
+        if known.efforts.isEmpty || (thinkingEffort != .auto && !known.efforts.contains(thinkingEffort)) {
+            thinkingEffort = .auto
+            UserDefaults.standard.set("", forKey: current.thinkingEffortKey)
+        }
+    }
+
     private func load() {
         testResult = nil
         testing = false
         login = nil
         Task { await checkLogin() }
         modelName = UserDefaults.standard.string(forKey: current.modelKey) ?? ""
+        let rawEffort = UserDefaults.standard.string(forKey: current.thinkingEffortKey) ?? ""
+        let loadedEffort = ThinkingEffort(rawValue: rawEffort) ?? .auto
+        thinkingEffort = current.supportedThinkingEfforts.contains(loadedEffort) ? loadedEffort : .auto
         companyModels = nil
         Task { await refreshCompany() }
         baseURL = UserDefaults.standard.string(forKey: OpenAICompatibleAPI.baseURLKey) ?? ""
         // 只看有没有存，不读出 key：打开设置页不能跳出钥匙串的确认（R18.7、R21.1）
         keySaved = current.usesAPIKey && Keychain.exists(current.keychainAccount)
         keyError = nil
-        availableModels = []
-        modelListError = nil
-        loadingModels = false
+        if current == .agy {
+            agyModels = AgyCLI.cachedModelOptions
+            availableModels = agyModels.map(\.id)
+            modelListError = nil
+            loadingModels = false
+            if agyModels.isEmpty && Paths.findTool("agy") != nil {
+                refreshModels()
+            }
+        } else {
+            agyModels = []
+            availableModels = []
+            modelListError = nil
+            loadingModels = false
+        }
     }
 
     /// 菜单上的「公司（示例公司）」
@@ -548,10 +642,12 @@ struct ProviderSettings: View {
         Text("模型和 API key 由公司在服务器的后台设置。").font(.caption).foregroundStyle(.secondary)
     }
 
-    /// 可以从清单选模型：API 要有存 key，OpenAI 兼容 API 要有网址
+    /// 可以从清单选模型：API 要有存 key，OpenAI 兼容 API 要有网址，agy 要已安装
     private var canListModels: Bool {
         current == .openaiCompatible ? OpenAICompatibleAPI.normalized(baseURL) != nil
-            : current == .enterprise ? EnterpriseServer.shared.isSignedIn : current.usesAPIKey && keySaved
+            : current == .enterprise ? EnterpriseServer.shared.isSignedIn
+            : current == .agy ? Paths.findTool("agy") != nil
+            : current.usesAPIKey && keySaved
     }
 
     /// 「选择」用的模型清单；取的时候换了整理工具就不用。
@@ -560,10 +656,23 @@ struct ProviderSettings: View {
         let checked = current
         loadingModels = true
         modelListError = nil
+        if checked == .agy {
+            Task {
+                let options = await AgyCLI.fetchModelOptions()
+                guard checked == current else { return }
+                loadingModels = false
+                agyModels = options
+                availableModels = options.map(\.id)
+                if options.isEmpty {
+                    modelListError = String(localized: "取得不到模型清单，请确认已安装并登录 agy，或直接输入模型名称。")
+                }
+            }
+            return
+        }
         Task {
             let result = await Task.detached { () -> Result<[String], Error> in
                 do {
-                    _ = try Keychain.read(checked.keychainAccount)
+                    if checked.usesAPIKey { _ = try Keychain.read(checked.keychainAccount) }
                     return .success(await LLMClient.listModels(checked))
                 } catch {
                     return .failure(error)
@@ -592,13 +701,51 @@ struct ProviderSettings: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(width: 300, alignment: .leading)
                     .padding(14)
+            } else if current == .agy && !agyModels.isEmpty {
+                let rowCount = agyModels.count + (modelName.isEmpty ? 0 : 1)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 2) {
+                        if !modelName.isEmpty {
+                            Button {
+                                selectModel("")
+                            } label: {
+                                Text("使用默认模型")
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 5)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            Divider().padding(.vertical, 2)
+                        }
+                        ForEach(agyModels) { option in
+                            let selected = option.id == modelName || selectedAgyModel?.id == option.id
+                            Button {
+                                selectModel(option.id)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(option.displayName)
+                                    Text(option.id).font(.caption).foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 5)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .background(selected ? Color.celadon.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 5))
+                        }
+                    }
+                    .padding(6)
+                }
+                .frame(width: 320, height: min(340, CGFloat(rowCount) * 38 + 20))
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(availableModels, id: \.self) { name in
                             Button {
-                                modelName = name
-                                pickingModel = false
+                                selectModel(name)
                             } label: {
                                 Text(name)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -627,6 +774,8 @@ struct ProviderSettings: View {
             return String(localized: "整理、提问、猜说话者时会把逐字稿文字、你的笔记、词汇表和会议基本资料送到 Anthropic（Claude）。录音档不会送出。")
         case .codex, .openai:
             return String(localized: "整理、提问、猜说话者时会把逐字稿文字、你的笔记、词汇表和会议基本资料送到 OpenAI。录音档不会送出。")
+        case .agy:
+            return String(localized: "整理、提问、猜说话者时会把逐字稿文字、你的笔记、词汇表和会议基本资料通过 Antigravity CLI（agy）送到你选择的模型。录音档不会送出。")
         case .gemini:
             return String(localized: "整理、提问、猜说话者时会把逐字稿文字、你的笔记、词汇表和会议基本资料送到 Google（Gemini）。录音档不会送出。")
         case .enterprise:

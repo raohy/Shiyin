@@ -3,19 +3,30 @@ import Foundation
 /// OpenAI API（design §8.4）：Responses API，text.format 用 strict json_schema
 struct OpenAIAPI: LLMBackend {
     let model: String
+    var thinkingEffort: ThinkingEffort = .auto
 
     private var base: String { LLMClient.apiBase(.openai, "https://api.openai.com") }
 
-    func generateJSON(system: String, prompt: String, format: LLMClient.OutputFormat,
-                      onStart: (Subprocess) -> Void) async throws -> Data {
-        guard let key = try Keychain.read("openai"), !key.isEmpty else { throw LLMError.missingKey("OpenAI") }
+    static func requestBody(model: String, system: String, prompt: String, format: LLMClient.OutputFormat,
+                            thinkingEffort: ThinkingEffort) throws -> [String: Any] {
         let schemaObject = try JSONSerialization.jsonObject(with: Data(format.schema.utf8))
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "instructions": system,
             "input": prompt,
             "text": ["format": ["type": "json_schema", "name": format.toolName, "schema": schemaObject, "strict": true]],
         ]
+        if thinkingEffort != .auto {
+            body["reasoning"] = ["effort": thinkingEffort.rawValue]
+        }
+        return body
+    }
+
+    func generateJSON(system: String, prompt: String, format: LLMClient.OutputFormat,
+                      onStart: (Subprocess) -> Void) async throws -> Data {
+        guard let key = try Keychain.read("openai"), !key.isEmpty else { throw LLMError.missingKey("OpenAI") }
+        let body = try Self.requestBody(model: model, system: system, prompt: prompt, format: format,
+                                        thinkingEffort: thinkingEffort)
         var request = URLRequest(url: URL(string: base + "/v1/responses")!, timeoutInterval: LLMClient.timeout)
         request.httpMethod = "POST"
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")

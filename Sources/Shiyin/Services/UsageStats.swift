@@ -165,12 +165,13 @@ final class UsageStats: @unchecked Sendable {
         }
     }
 
-    /// 整理工具的种类：claudeCode、codex、api、local（本机的 OpenAI 兼容服务）、enterprise（公司，R52.2）；none 是 nil
+    /// 整理工具的种类：claudeCode、codex、agy、api、local（本机的 OpenAI 兼容服务）、enterprise（公司，R52.2）；none 是 nil
     @MainActor
     static func providerKind(_ provider: LLMProvider) -> String? {
         switch provider {
         case .claude: return "claudeCode"
         case .codex: return "codex"
+        case .agy: return "agy"
         case .openaiCompatible:
             let local = URL(string: OpenAICompatibleAPI.savedBaseURL).map(OpenAICompatibleAPI.isLocal) ?? false
             return local ? "local" : "api"

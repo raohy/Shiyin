@@ -1,14 +1,35 @@
 import Foundation
 
+enum ThinkingEffort: String, CaseIterable, Identifiable, Sendable {
+    case auto = ""
+    case low, medium, high, xhigh, max
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .auto: return String(localized: "默认")
+        case .low: return String(localized: "低")
+        case .medium: return String(localized: "中")
+        case .high: return String(localized: "高")
+        case .xhigh: return String(localized: "超高")
+        case .max: return String(localized: "最高")
+        }
+    }
+
+    static let orderedLevels: [ThinkingEffort] = [.low, .medium, .high, .xhigh, .max]
+}
+
 enum LLMProvider: String, CaseIterable, Identifiable {
     /// enterprise：公司的企业服务器（R51、design §36.3），菜单一直有（D124），模型由公司的后台设置
-    case claude, codex, anthropic, openai, gemini, openaiCompatible, enterprise, none
+    case claude, codex, agy, anthropic, openai, gemini, openaiCompatible, enterprise, none
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .claude: return String(localized: "Claude（claude CLI）")
         case .codex: return String(localized: "Codex（codex CLI）")
+        case .agy: return String(localized: "Antigravity（agy CLI）")
         case .anthropic: return "Anthropic API"
         case .openai: return "OpenAI API"
         case .gemini: return "Gemini API"
@@ -23,12 +44,33 @@ enum LLMProvider: String, CaseIterable, Identifiable {
         switch self {
         case .claude: return "Claude"
         case .codex: return "Codex"
+        case .agy: return "Antigravity"
         case .anthropic: return "Anthropic API"
         case .openai: return "OpenAI API"
         case .gemini: return "Gemini API"
         case .openaiCompatible: return String(localized: "OpenAI 兼容 API")
         case .enterprise: return String(localized: "公司的模型")
         case .none: return String(localized: "不整理")
+        }
+    }
+
+    var isCLI: Bool { self == .claude || self == .codex || self == .agy }
+
+    var cliToolName: String? {
+        switch self {
+        case .claude: return "claude"
+        case .codex: return "codex"
+        case .agy: return "agy"
+        default: return nil
+        }
+    }
+
+    var cliDisplayName: String {
+        switch self {
+        case .claude: return "Claude Code"
+        case .codex: return "Codex"
+        case .agy: return "Antigravity"
+        default: return shortLabel
         }
     }
 
@@ -49,6 +91,19 @@ enum LLMProvider: String, CaseIterable, Identifiable {
 
     /// 模型设置存在 UserDefaults 的 key；API 的默认模型
     var modelKey: String { "\(rawValue)Model" }
+    /// 思考强度存在 UserDefaults 的 key
+    var thinkingEffortKey: String { "\(rawValue)ThinkingEffort" }
+
+    var supportedThinkingEfforts: [ThinkingEffort] {
+        switch self {
+        case .agy, .claude: return [.auto, .low, .medium, .high, .xhigh, .max]
+        case .codex, .openai, .gemini: return [.auto, .low, .medium, .high, .xhigh]
+        case .anthropic, .openaiCompatible, .enterprise, .none: return []
+        }
+    }
+
+    var supportsThinkingEffort: Bool { !supportedThinkingEfforts.isEmpty }
+
     var defaultModel: String {
         switch self {
         case .anthropic: return "claude-sonnet-5-5"
@@ -120,22 +175,32 @@ enum LLMError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notInstalled(let name):
-            // 一般用户不知道什么是命令：说清楚是给已经在用 Claude Code（Codex）的人，没有的话改用 API（R35.4）
+            // 一般用户不知道什么是命令：说清楚是给已经在用 Claude Code（Codex / Antigravity）的人，没有的话改用 API（R35.4）
             if name == "claude" && DesktopApps.hasClaude {
                 // 只有 Claude 桌面版：说明要另外装 Claude Code（R56.3）
                 return String(localized: "这台 Mac 找不到 Claude Code（命令行版）。Claude 桌面版不能直接用，请到设置 → 整理工具照说明安装 Claude Code；或改用 API（填 API key）、选「不整理」")
             }
-            return name == "codex"
-                ? String(localized: "这台 Mac 找不到 codex。没有在用 Codex 的话，请到设置 → 整理工具改用 API（填 API key）或选「不整理」")
-                : String(localized: "这台 Mac 找不到 claude。没有在用 Claude Code 的话，请到设置 → 整理工具改用 API（填 API key）或选「不整理」")
+            switch name {
+            case "codex":
+                return String(localized: "这台 Mac 找不到 codex。没有在用 Codex 的话，请到设置 → 整理工具改用 API（填 API key）或选「不整理」")
+            case "agy":
+                return String(localized: "这台 Mac 找不到 agy。没有在用 Antigravity CLI 的话，请到设置 → 整理工具改用 API（填 API key）或选「不整理」")
+            default:
+                return String(localized: "这台 Mac 找不到 claude。没有在用 Claude Code 的话，请到设置 → 整理工具改用 API（填 API key）或选「不整理」")
+            }
         case .notLoggedIn(let name):
             // 用桌面版附的 codex：到那个 app 登录（R55.3）
             if name == "codex", let app = CLILogin.desktopApp(.codex) {
                 return String(localized: "Codex 还没登录或登录已过期，请打开 \(app) 重新登录后再试一次。")
             }
-            return name == "codex"
-                ? String(localized: "Codex 还没登录或登录已过期，请重新登录后再试一次（终端命令：codex login）。")
-                : String(localized: "Claude Code 还没登录或登录已过期，请重新登录后再试一次（终端命令：claude auth login）。")
+            switch name {
+            case "codex":
+                return String(localized: "Codex 还没登录或登录已过期，请重新登录后再试一次（终端命令：codex login）。")
+            case "agy":
+                return String(localized: "Antigravity 还没登录或登录已过期，请重新登录后再试一次（终端命令：agy）。")
+            default:
+                return String(localized: "Claude Code 还没登录或登录已过期，请重新登录后再试一次（终端命令：claude auth login）。")
+            }
         case .missingKey(let name): return String(localized: "还没有填 \(name) 的 API key，请到设置 → 整理工具填写")
         case .rejected(let detail), .limited(let detail), .unreachable(let detail), .notConfigured(let detail): return detail
         case .failed(let detail, _): return detail
@@ -170,19 +235,28 @@ enum LLMError: LocalizedError {
         return t.contains(#/hit your[^.\n]{0,30}limit/#) || t.contains(#/limit\W{1,5}resets/#)
     }
 
-    /// claude、codex 的额度用完（R62.2、design §40.2）：说是哪个工具、怎么办，下一行附上 CLI 的原文（里面有什么时候恢复，D137）
+    /// claude、codex、agy 的额度用完（R62.2、design §40.2）：说是哪个工具、怎么办，下一行附上 CLI 的原文（里面有什么时候恢复，D137）
     static func cliLimited(_ provider: LLMProvider, output: String) -> LLMError {
-        let advice = provider == .codex
-            ? String(localized: "Codex 的用量额度用完了，等恢复后再试，或到设置 → 整理工具先换成 Claude Code 或 API。")
-            : String(localized: "Claude Code 的用量额度用完了，等恢复后再试，或到设置 → 整理工具先换成 Codex 或 API。")
+        let advice: String
+        switch provider {
+        case .codex:
+            advice = String(localized: "Codex 的用量额度用完了，等恢复后再试，或到设置 → 整理工具先换成 Claude Code 或 API。")
+        case .agy:
+            advice = String(localized: "Antigravity 的用量额度用完了，等恢复后再试，或到设置 → 整理工具先换成其他工具或 API。")
+        default:
+            advice = String(localized: "Claude Code 的用量额度用完了，等恢复后再试，或到设置 → 整理工具先换成 Codex 或 API。")
+        }
         // 最后一行符合的：codex 的 stderr 前面可能有别的 log，错误在最后
         guard let line = output.split(whereSeparator: \.isNewline)
             .map({ $0.trimmingCharacters(in: .whitespaces) })
             .last(where: { isLimitProblem($0) }) else { return .limited(advice) }
         let original = String(line.prefix(300))
-        let source = provider == .codex
-            ? String(localized: "Codex 的消息：\(original)")
-            : String(localized: "Claude Code 的消息：\(original)")
+        let source: String
+        switch provider {
+        case .codex: source = String(localized: "Codex 的消息：\(original)")
+        case .agy: source = String(localized: "Antigravity 的消息：\(original)")
+        default: source = String(localized: "Claude Code 的消息：\(original)")
+        }
         return .limited(advice + "\n" + source)
     }
 
@@ -196,6 +270,7 @@ enum LLMError: LocalizedError {
         let t = text.lowercased()
         // 自己的说明文字里有「claude auth login」「codex login」，存在工作记录的失败消息也要认得
         return ["not logged in", "/login", "auth login", "codex login", "failed to authenticate", "oauth", "login required",
+                "not authenticated", "authentication required", "re-authenticate",
                 "invalid api key", "unauthorized", "401"].contains { t.contains($0) }
     }
 }
@@ -235,13 +310,14 @@ protocol LLMBackend {
 extension LLMProvider {
     /// 这个整理工具的实作；「不整理」没有
     @MainActor
-    func backend(model: String) -> (any LLMBackend)? {
+    func backend(model: String, thinkingEffort: ThinkingEffort = .auto) -> (any LLMBackend)? {
         switch self {
-        case .claude: return ClaudeCLI(model: model)
-        case .codex: return CodexCLI(model: model)
+        case .claude: return ClaudeCLI(model: model, thinkingEffort: thinkingEffort)
+        case .codex: return CodexCLI(model: model, thinkingEffort: thinkingEffort)
+        case .agy: return AgyCLI(model: model, thinkingEffort: thinkingEffort)
         case .anthropic: return AnthropicAPI(model: model.isEmpty ? defaultModel : model)
-        case .openai: return OpenAIAPI(model: model.isEmpty ? defaultModel : model)
-        case .gemini: return GeminiAPI(model: model.isEmpty ? defaultModel : model)
+        case .openai: return OpenAIAPI(model: model.isEmpty ? defaultModel : model, thinkingEffort: thinkingEffort)
+        case .gemini: return GeminiAPI(model: model.isEmpty ? defaultModel : model, thinkingEffort: thinkingEffort)
         case .openaiCompatible: return OpenAICompatibleAPI(model: model, baseURL: OpenAICompatibleAPI.savedBaseURL)
         case .enterprise: return EnterpriseAPI(model: model)
         case .none: return nil
@@ -280,18 +356,19 @@ enum LLMClient {
         }
     }
 
-    static func generate(provider: LLMProvider, model: String, system: String, prompt: String,
-                         onStart: (Subprocess) -> Void) async throws -> MeetingNotes {
-        let data = try await generateJSON(provider: provider, model: model, system: system, prompt: prompt,
-                                          format: .meetingNotes, onStart: onStart)
+    static func generate(provider: LLMProvider, model: String, thinkingEffort: ThinkingEffort = .auto,
+                         system: String, prompt: String, onStart: (Subprocess) -> Void) async throws -> MeetingNotes {
+        let data = try await generateJSON(provider: provider, model: model, thinkingEffort: thinkingEffort,
+                                          system: system, prompt: prompt, format: .meetingNotes, onStart: onStart)
         do { return try JSONDecoder().decode(MeetingNotes.self, from: data) }
         catch { throw LLMError.badOutput(error.localizedDescription + provider.badOutputHint) }
     }
 
     /// 回传符合 format.schema 的 JSON
-    static func generateJSON(provider: LLMProvider, model: String, system: String, prompt: String,
-                             format: OutputFormat, onStart: (Subprocess) -> Void) async throws -> Data {
-        guard let backend = provider.backend(model: model) else {
+    static func generateJSON(provider: LLMProvider, model: String, thinkingEffort: ThinkingEffort = .auto,
+                             system: String, prompt: String, format: OutputFormat,
+                             onStart: (Subprocess) -> Void) async throws -> Data {
+        guard let backend = provider.backend(model: model, thinkingEffort: thinkingEffort) else {
             throw LLMError.failed(String(localized: "整理工具设置为「不整理」"))
         }
         return try await backend.generateJSON(system: system, prompt: prompt, format: format, onStart: onStart)

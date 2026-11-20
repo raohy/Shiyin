@@ -908,24 +908,35 @@ enum DebugControl {
             Keychain.debugSimulated[args[1]] = args[2] == "-" ? nil : args[2]
             Keychain.debugForget(args[1])
         case "keychainreads": write(["reads": Keychain.debugReads], to: args[1])   // keychainreads <输出.json>：查钥匙串的次数
-        case "llmprovider":   // llmprovider <整理工具> [模型]：只放内存，不改共用的设置；给 - 改回设置
-            AppSettings.debugProvider = args[1] == "-" ? nil : LLMProvider(rawValue: args[1])
-            AppSettings.debugModel = args.count > 2 ? args[2] : nil
+        case "llmprovider":   // llmprovider <整理工具> [模型] [思考强度]：只放内存，不改共用的设置；给 - 改回设置
+            if args[1] == "-" {
+                AppSettings.debugProvider = nil
+                AppSettings.debugModel = nil
+                AppSettings.debugThinkingEffort = nil
+            } else {
+                AppSettings.debugProvider = LLMProvider(rawValue: args[1])
+                AppSettings.debugModel = args.count > 2 ? (args[2] == "-" ? nil : args[2]) : nil
+                AppSettings.debugThinkingEffort = args.count > 3 ? ThinkingEffort(rawValue: args[3]) : nil
+            }
             model.refreshSummarizerProblem()
         case "summarizer":   // summarizer <输出.json>：整理工具准备好了没、登录缓存、暂停（design §34.6）
             let problem = AppSettings.summarizerProblem
             write(["provider": AppSettings.provider.rawValue,
+                   "model": AppSettings.model,
+                   "thinkingEffort": AppSettings.thinkingEffort.rawValue,
                    "ready": problem == nil,
                    "problem": problem.map { String(describing: $0) } ?? "",
                    "message": problem?.message ?? "",
                    "action": problem?.actionTitle ?? "",
                    "shown": model.summarizerProblem.map { String(describing: $0) } ?? "",
                    "loggedIn": ["claude": CLILoginCache.loggedIn(.claude).map { $0 ? "yes" : "no" } ?? "unknown",
-                                "codex": CLILoginCache.loggedIn(.codex).map { $0 ? "yes" : "no" } ?? "unknown"]], to: args[1])
-        case "loginrefresh":   // loginrefresh：重新查 claude、codex 的登录状态
+                                "codex": CLILoginCache.loggedIn(.codex).map { $0 ? "yes" : "no" } ?? "unknown",
+                                "agy": CLILoginCache.loggedIn(.agy).map { $0 ? "yes" : "no" } ?? "unknown"]], to: args[1])
+        case "loginrefresh":   // loginrefresh：重新查 claude、codex、agy 的登录状态
             Task {
                 await CLILogin.refresh(.claude)
                 await CLILogin.refresh(.codex)
+                await CLILogin.refresh(.agy)
             }
         case "listmodels":  // listmodels <整理工具> <结果.json>：设置页「选择」用的模型清单
             if let provider = LLMProvider(rawValue: args[1]) {
@@ -1250,10 +1261,11 @@ enum DebugControl {
                 ["lane": lane.rawValue, "job": r.job.id ?? 0, "kind": r.job.kind.rawValue, "stage": r.stage, "progress": r.progress ?? -1,
                  "remaining": r.remaining ?? -1, "server": r.server.map { ["text": $0.text, "waiting": $0.waiting] } as Any] },
             "enterprise": EnterpriseServer.shared.debugState,
-            // 找到的 claude、codex：用户自己装的，或桌面版附的（design §37.4）
+            // 找到的 claude、codex、agy：用户自己装的，或桌面版附的（design §37.4）
             "tools": ["claude": Paths.locateTool("claude").map { ["path": $0.url.path, "desktopApp": $0.desktopApp ?? ""] } as Any,
                       "codex": Paths.locateTool("codex").map { ["path": $0.url.path, "desktopApp": $0.desktopApp ?? "",
                                                                 "extraPath": $0.extraPath] } as Any,
+                      "agy": Paths.locateTool("agy").map { ["path": $0.url.path, "desktopApp": $0.desktopApp ?? ""] } as Any,
                       "claudeDesktop": DesktopApps.hasClaude],
             "transcriptionEngine": AppSettings.transcriptionEngine,
             "textSize": TextSize.level,   // 会议内容的文字大小（design §38.5）

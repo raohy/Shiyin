@@ -54,6 +54,21 @@ enum CoachCheck {
         check(decoded == state, "持久化往返保留状态")
         let prompt = try MeetingCoachPrompt.input(state: state, batch: batch)
         check(prompt.contains("newTranscript") && prompt.contains("asked") && prompt.contains("ignored"), "模型获得已处理问题状态")
+        let schema = try JSONSerialization.jsonObject(with: Data(MeetingCoachPrompt.schema.utf8)) as? [String: Any]
+        let properties = schema?["properties"] as? [String: Any]
+        let questions = properties?["questions"] as? [String: Any]
+        let items = questions?["items"] as? [String: Any]
+        let questionProperties = items?["properties"] as? [String: Any]
+        let priority = questionProperties?["priority"] as? [String: Any]
+        check(priority?["type"] as? String == "integer" && priority?["enum"] == nil, "agy 兼容的提问优先级格式")
+
+        var priorityState = MeetingAssistance()
+        let priorityBatch = CoachBatch(lines: lines, state: priorityState)
+        priorityState.merge(CoachOutput(summary: "", questions: [
+            .init(text: "交付日期？", reason: "", segment: 0, priority: 0),
+            .init(text: "负责人？", reason: "", segment: 0, priority: 9),
+            .init(text: "验收标准？", reason: "", segment: 0, priority: 2)]), batch: priorityBatch)
+        check(priorityState.questions.map(\.priority) == [1, 3, 2], "优先级在合并时限制到 1～3")
         check(state.notesReference.contains("Asked does not mean answered") && !state.notesReference.contains("交付范围包含接口吗"), "会后上下文不把建议当事实并排除忽略问题")
         var limited = state
         limited.preparation.background = String(repeating: "字", count: 5000)

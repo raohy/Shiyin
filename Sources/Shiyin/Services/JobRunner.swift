@@ -53,16 +53,18 @@ enum AppSettings {
     /// shiyinctl llmprovider：只在内存换整理工具，不改跟用户共用的设置（design §19.5）
     nonisolated(unsafe) static var debugProvider: LLMProvider?
     nonisolated(unsafe) static var debugModel: String?
+    nonisolated(unsafe) static var debugThinkingEffort: ThinkingEffort?
     #endif
 
     /// 用户选过的整理工具；没选过（或不是认得的值）是 nil（R35）
     static var chosenProvider: LLMProvider? { LLMProvider(rawValue: d.string(forKey: providerKey) ?? "") }
 
-    /// 没选过时自动用这台 Mac 上有的 CLI（先 claude 再 codex），都没有就先不整理（R35.1、design §19.6）。
+    /// 没选过时自动用这台 Mac 上有的 CLI（先 claude 再 codex 再 agy），都没有就先不整理（R35.1、design §19.6）。
     /// 每次都重新找：之后装了 CLI 就自动用上
     static var detectedProvider: LLMProvider {
         if Paths.findTool("claude") != nil { return .claude }
         if Paths.findTool("codex") != nil { return .codex }
+        if Paths.findTool("agy") != nil { return .agy }
         return .none
     }
 
@@ -85,6 +87,17 @@ enum AppSettings {
         if let debugModel { return debugModel }
         #endif
         return d.string(forKey: provider.modelKey) ?? ""
+    }
+    static var thinkingEffort: ThinkingEffort {
+        #if DEBUG
+        if let debugThinkingEffort {
+            return provider.supportedThinkingEfforts.contains(debugThinkingEffort) ? debugThinkingEffort : .auto
+        }
+        #endif
+        let raw = d.string(forKey: provider.thinkingEffortKey) ?? ""
+        guard let effort = ThinkingEffort(rawValue: raw),
+              provider.supportedThinkingEfforts.contains(effort) else { return .auto }
+        return effort
     }
     static var autoSummarize: Bool { flag(autoSummarizeKey, default: true) }
     static var mcpEnabled: Bool { flag(mcpEnabledKey, default: false) }
@@ -609,7 +622,8 @@ final class JobRunner {
                 speakerName: { names[$0] ?? language.defaultSpeaker($0) },
                 segments: segments.map { ($0.start, $0.speaker, $0.text) })
             var suggestions = try await callLLM(lane) { onStart in
-                try await SpeakerNaming.suggest(context, provider: provider, model: AppSettings.model, onStart: onStart)
+                try await SpeakerNaming.suggest(context, provider: provider, model: AppSettings.model,
+                                                thinkingEffort: AppSettings.thinkingEffort, onStart: onStart)
             }
             guard isStillRunning(job) else { return }
             // 中文会议用简体时，原因、名字转成简体（design §47.2）
@@ -651,7 +665,8 @@ final class JobRunner {
                 segments: segments.map { ($0.text, speakerName($0.speaker)) })
             let suggestions = try await callLLM(lane) { onStart in
                 try await TranscriptCorrection.suggest(
-                    context, provider: provider, model: AppSettings.model, onStart: onStart,
+                    context, provider: provider, model: AppSettings.model,
+                    thinkingEffort: AppSettings.thinkingEffort, onStart: onStart,
                     onProgress: { [weak self] value in self?.running[lane]?.progress = value })
             }
             guard isStillRunning(job) else { return }
@@ -684,7 +699,8 @@ final class JobRunner {
             (segment.text, segment.speaker.map { names[$0] ?? language.defaultSpeaker($0) })
         })
         let changed = try await callLLM(lane) { onStart in
-            try await TranscriptCleanup.clean(context, provider: provider, model: AppSettings.model, onStart: onStart,
+            try await TranscriptCleanup.clean(context, provider: provider, model: AppSettings.model,
+                                              thinkingEffort: AppSettings.thinkingEffort, onStart: onStart,
                                               onProgress: { [weak self] value in self?.running[lane]?.progress = value })
         }
         guard isStillRunning(job) else { return }
@@ -752,7 +768,8 @@ final class JobRunner {
         }
         let system = NotesPrompt.system(meeting.meetingLanguage, documents: !context.documents.isEmpty)
         var notes = try await callLLM(lane) { onStart in
-            try await LLMClient.generate(provider: provider, model: AppSettings.model, system: system, prompt: prompt, onStart: onStart)
+            try await LLMClient.generate(provider: provider, model: AppSettings.model,
+                                         thinkingEffort: AppSettings.thinkingEffort, system: system, prompt: prompt, onStart: onStart)
                 .outputScript(meeting.meetingLanguage)
         }
         guard isStillRunning(job) else { return false }

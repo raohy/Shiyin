@@ -13,7 +13,8 @@ enum MeetingCoachPrompt {
     The summary must remain under 2000 Chinese characters. Return only the requested JSON structure.
     """
 
-    static let schema = #"{"type":"object","additionalProperties":false,"required":["summary","questions"],"properties":{"summary":{"type":"string"},"questions":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","reason","segment","priority"],"properties":{"text":{"type":"string"},"reason":{"type":"string"},"segment":{"type":"integer"},"priority":{"type":"integer","enum":[1,2,3]}}}}}}"#
+    // agy 不接受整数枚举；输出合并时仍会把 priority 限制在 1～3。
+    static let schema = #"{"type":"object","additionalProperties":false,"required":["summary","questions"],"properties":{"summary":{"type":"string"},"questions":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","reason","segment","priority"],"properties":{"text":{"type":"string"},"reason":{"type":"string"},"segment":{"type":"integer"},"priority":{"type":"integer"}}}}}}"#
 
     static func input(state: MeetingAssistance, batch: CoachBatch) throws -> String {
         struct Known: Encodable { let text: String; let status: String }

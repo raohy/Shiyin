@@ -28,6 +28,9 @@
    - 关键文件：`Sources/Shiyin/Store/Asking.swift`、`Views/AskTab.swift`、`Views/MainWindow.swift`、`scripts/dev/ask-integration.py`。
 5. **文档编号隔离**
    - 本 fork 专属设计与需求编号统一加 `F` 前缀（如 `§F45`、`§F46`、`§F51`、`§F52`、`RF70`、`RF71`），避免与上游持续递增的编号冲突。
+6. **Antigravity CLI（agy）与思考强度选择（RF72，`§F53`）**
+   - `LLMProvider.agy` 作为整理工具之一接入设置、状态检查、环境检查、引导、会议整理与提问（`agy --output-format json --disable-slash-commands --json-schema ... --print=...`，`agy models` 按基础模型归并）；设置页在「模型」下方提供按工具保存的「思考强度」（`ThinkingEffort`）选择，透传至 `agy`、`claude`、`codex`、OpenAI API 与 Gemini API。
+   - 关键文件：`Sources/Shiyin/Notes/LLMClient.swift`、`Notes/Backends/CLIBackends.swift`、`Notes/Backends/OpenAIAPI.swift`、`Notes/Backends/GeminiAPI.swift`、`Services/Paths.swift`、`Services/JobRunner.swift`、`Services/SummarizerReadiness.swift`、`Services/CLILogin.swift`、`Services/EnvironmentCheck.swift`、`Views/SettingsView.swift`、`Views/OnboardingView.swift`、`Debug/DebugControl.swift`、`Tests/ShiyinTests/AgyCLITests.swift`。
 
 ## 3. 同步上游标准流程
 

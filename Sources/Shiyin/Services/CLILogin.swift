@@ -15,7 +15,7 @@ enum CLILogin {
     static func status(_ provider: LLMProvider) async -> Status? {
         #if DEBUG
         // -debugCLILogin no：当成没登录，不执行 CLI（design §34.6）
-        if UserDefaults.standard.string(forKey: "debugCLILogin") == "no", provider == .claude || provider == .codex {
+        if UserDefaults.standard.string(forKey: "debugCLILogin") == "no", provider.isCLI {
             return Status(loggedIn: false, detail: "")
         }
         #endif
@@ -39,6 +39,9 @@ enum CLILogin {
                 .map(String.init) ?? ""
             let loggedIn = line.localizedCaseInsensitiveContains("logged in") && !line.localizedCaseInsensitiveContains("not logged in")
             return Status(loggedIn: loggedIn, detail: line)
+        case .agy:
+            // agy 目前没有非交互式的登录状态查询子命令（未登录直接跑 agy -p 会阻塞），按已安装处理并由测试确认
+            return nil
         default:
             return nil
         }
@@ -52,24 +55,29 @@ enum CLILogin {
         return status
     }
 
-    /// 目前的整理工具是 claude、codex 时，距离上次查超过 60 秒才再查（app 启动、回到前景）
+    /// 目前的整理工具是 claude、codex、agy 时，距离上次查超过 60 秒才再查（app 启动、回到前景）
     static func refreshIfStale() async {
         let provider = AppSettings.provider
-        guard provider == .claude || provider == .codex, CLILoginCache.isStale(provider, after: 60) else { return }
+        guard provider.isCLI, CLILoginCache.isStale(provider, after: 60) else { return }
         await refresh(provider)
     }
 
     /// 打开「终端」执行登录命令（会开浏览器登录页）。用 .command 文件打开，不需要自动化权限
     static func openLogin(_ provider: LLMProvider) {
-        let tool = provider == .codex ? "codex" : "claude"
-        guard let location = Paths.locateTool(tool) else { return }
+        guard let tool = provider.cliToolName, let location = Paths.locateTool(tool) else { return }
         // 桌面版附的 codex：打开那个 app 登录（R55.3），不开终端
         if let app = location.appURL {
             NSWorkspace.shared.open(app)
             return
         }
         let exe = location.url
-        let arguments = provider == .codex ? "login" : "auth login"
+        let arguments: String
+        switch provider {
+        case .codex: arguments = "login"
+        case .agy: arguments = ""
+        default: arguments = "auth login"
+        }
+        let command = arguments.isEmpty ? shellQuote(exe.path) : "\(shellQuote(exe.path)) \(arguments)"
         let intro = String(localized: "拾音：正在打开浏览器登录 \(provider.shortLabel)。登录完成后，回到拾音按「重试」或「测试整理工具」。")
         let done = String(localized: "完成后可以关掉这个窗口。")
         let script = """
@@ -77,7 +85,7 @@ enum CLILogin {
             clear
             echo \(shellQuote(intro))
             echo
-            \(shellQuote(exe.path)) \(arguments)
+            \(command)
             echo
             echo \(shellQuote(done))
             """
