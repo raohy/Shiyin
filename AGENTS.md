@@ -47,11 +47,9 @@
 
 ## 4. 验证、自检与安全红线
 
-- **基础底线检查**：任何 Mac 改动或上游同步完成后，必须运行 `bash scripts/ci/check-macos.sh`（覆盖单元测试、提问助手逻辑检查、本地化完整度检查与 Release 编译）。修改界面文字时补齐中英文，并提交 `Localizable.xcstrings` 的变更。
-- **关键链路隔离集成检查**：
-  - 涉及录音、实时快稿/复核、会中助手或数据库迁移时，组装独立 bundle id（非 `com.weiwei.shiyin`）的临时 DEBUG `.app`，用临时 `SHIYIN_HOME`、独立 `SHIYIN_DEBUG_CHANNEL` 和本地假服务运行 `scripts/dev/coach-integration.py`。
-  - 涉及提问进度与取消重试时，按同样隔离方式运行 `scripts/dev/ask-integration.py`。
-  - 严禁使用用户真实会议数据或真实 API key 代替测试数据。
-- **不干扰用户正在使用的应用**：绝对不关闭用户正在录音或处理任务的拾音进程。日常验证构建使用 `swift build` 或独立临时目录组装测试 `.app`；只有在用户明确要求安装到本机时，才运行 `scripts/build-app.sh --install`。
-- **数据库变更说明**：若上游或二开涉及 SQLite schema 变更，需确认向后迁移兼容与备份机制，并在交付摘要中说明；代码回滚到 `last-good` 不等同于数据库自动回退。
-- **如实汇报**：明确列出实际跑过的命令、通过/跳过的用例，以及未覆盖的真机项（真实麦克风、真实 Qwen 模型、真实 LLM API、实际界面体验），不将自动检查通过等同于人工验收。
+- **基本验证**：常规改动以 `swift build` / 对应单元测试通过为主；同步上游或较大改动时运行 `bash scripts/ci/check-macos.sh`。修改界面文字时补齐中英文（`scripts/dev/l10n.py check`）并提交 `Localizable.xcstrings`。无需默认组装隔离 `.app` 或跑重型集成脚本，确有需要再按需执行。
+- **安全红线**：
+  - 绝不关闭用户正在录音或处理任务的拾音进程；仅在用户明确要求安装到本机时运行 `scripts/build-app.sh --install`。
+  - 严禁使用用户真实会议数据或真实 API key 进行测试。
+  - 若涉及 SQLite schema 变更，需确认向后迁移兼容并在摘要中说明（回滚 `last-good` 不会回退数据库）。
+- **如实汇报**：简明列出实际跑过的检查命令与结果，不将自动检查等同于真机验收。

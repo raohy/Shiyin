@@ -1,15 +1,48 @@
 <img src="docs/images/icon.png" width="96" alt="拾音图标">
 
-**简体中文** | [English](.github/README.md) | 官网：[shiyin.weibuilds.com](https://shiyin.weibuilds.com)
+**简体中文** | [English](.github/README.md) | 上游仓库：[juinwei7/Shiyin](https://github.com/juinwei7/Shiyin) | 上游官网：[shiyin.weibuilds.com](https://shiyin.weibuilds.com)
 
 # 拾音 Shiyin
 
-macOS 的会议记录 app。录下会议（现场或在线），录音中就能看到实时逐字稿；录完在本机转录、分出说话者，再交给 Claude、Codex 或 API 整理成会议记录。记录里每一条都附上录音时间点，点一下就能听到原话。
+> [!NOTE]
+> 本仓库是基于 [`juinwei7/Shiyin`](https://github.com/juinwei7/Shiyin) 的个人自用 macOS 二开 Fork，持续同步上游功能与修复。所有增强改动均聚焦于 **macOS 版**（Windows 版基本沿用上游）。
+
+macOS 的会议记录 app。录下会议（现场或在线），录音中就能看到实时逐字稿；录完在本机转录、分出说话者，再交给 Claude、Codex、Antigravity（`agy`）或各类 API 整理成会议记录。记录里每一条都附上录音时间点，点一下就能听到原话。
 
 - 录音、转录、说话者识别都在本机完成，录音不会上传
-- 不需要安装 Python、Homebrew 或 ffmpeg，下载 DMG 就能用
+- 不需要安装 Python、Homebrew 或 ffmpeg，克隆源码即可构建安装（上游原版另提供 DMG）
 - Mac 界面有简体中文和英文（跟着 macOS 的语言），会议可以是中文、英文、日文、广东话或韩文（韩文是实验性的）
 - 需要 Apple Silicon 和 macOS 26
+
+## 本 Fork 主要改动（相对上游）
+
+| 模块 | 相对上游的主要改动 | 适用平台 |
+|---|---|---|
+| 整理工具与思考强度 | 新增 Antigravity CLI（`agy`）接入，新增按工具保存的「思考强度」设置 | macOS |
+| 会前准备与会中助手 | 支持会前填写背景/目标/问题，会中每 30 秒生成追问建议并保留至会后 | macOS |
+| 实时转录与音频复核 | 可选 Qwen3-ASR 实时快稿，录音中本机同步复核长音频并原地替换显示 | macOS |
+| 大陆简体中文适配 | 界面、提示词、导出、字体及中文/广东话转录统一输出大陆简体 | macOS |
+| 提问交互优化 | 提交后即时显示原问题、处理阶段与耗时，支持取消与失败保留重试 | macOS |
+
+1. **Antigravity CLI（`agy`）接入与「思考强度」调节（Mac）**
+   - 支持将 `agy` CLI 作为整理工具，接入设置、引导、状态检查、环境检查、使用说明，以及会议记录整理、校稿、逐字稿校正、精简逐字稿、猜说话者、单场/跨会议提问与会中提问助手。
+   - 支持在「模型」一行点击「选择」从 `agy models` 拉取可用模型清单（按基础模型归并），同时支持手动输入模型名称或留空使用默认模型。
+   - 在「设置 → 整理工具」的「模型」下方新增「思考强度」选择（默认 / 低 / 中 / 高 / 超高 / 最高），按整理工具独立保存并透传至 `agy`、`claude`、`codex`、OpenAI API 与 Gemini API；选中特定 `agy` 模型时自动过滤该模型支持的档位（无档位后缀的模型禁用该选项并提示使用默认设置）。
+2. **会前准备与会中提问助手（Mac）**
+   - 支持先创建会议填写标题、背景内容、目标、角色与关注点及已有问题，保存后再开始录音（同时保留快速录音入口）。
+   - 录音中约每 30 秒（或手动点击「立即分析」）基于本机音频复核稿分析，生成带理由、优先级与依据时间点的追问建议；默认展示最多 5 条待问问题，支持合并去重、手动标记已问/忽略、独立 45 秒超时，且停止录音或关闭助手后不写入迟到响应。
+   - 会后保留全部清单并作为整理的非事实参考，且与上游会议编辑、裁切、拆分、合并的时间点重映射保持兼容。
+3. **Qwen3-ASR 实时快稿、本机延迟音频复核与会中复核替换（Mac）**
+   - 设置中「实时转录引擎」支持切换「macOS 系统识别（低延迟）」或「Qwen3-ASR（上下文优先，参考词汇表与上一段音频/原文续写）」。
+   - 录音中本机同步对约 18～30 秒完整音频进行延迟复核；录音界面先实时显示快稿，复核成功后按时间范围原地替换并标记「已复核」（跨边界暂时重复或空复核时保留快稿，数据库中分别保存），供会中提问助手专用且音频全程不上传。
+4. **大陆简体中文全面适配与统一输出（Mac）**
+   - Mac 界面文案、中文提示词、会议记录导出（Markdown / PDF / Word / HTML）与中文字体（`PingFang SC` / `Songti SC`）统一为大陆简体与大陆习惯用词。
+   - Breeze、Qwen3-ASR 及系统内置识别的中文与广东话转录结果统一通过 OpenCC 与大陆用词覆盖表转为简体；英文、日文、韩文的提示词与字形保持原样不受影响。
+5. **提问进度反馈与取消重试（Mac）**
+   - 单场与跨会议提问提交后立即展示原问题、当前处理阶段与已用耗时；支持随时取消，取消或失败时保留原问题，便于修改或直接重试。
+6. **维护与适用范围说明**
+   - 上述增强均面向 **macOS 版**（Windows 版基本沿用上游，Windows 版简体适配与跨平台标准答案未在本 Fork 同步改写）。
+   - 采用 `main` 单主线持续合并上游更新，日常通过本地构建安装使用，不再单独发布 Fork 版 DMG Release（协作与验证规则见 [AGENTS.md](AGENTS.md)）。
 
 ![会议记录](docs/images/summary.png)
 
@@ -20,8 +53,6 @@ macOS 的会议记录 app。录下会议（现场或在线），录音中就能�
 3. **停止并转录**：停止后马上用实时逐字稿整理一份草稿，同时在本机正式转录并分出说话者。点「说话者 1」可以改成人名，拾音会记住声音，下次自动带入。
 4. **看会议记录**：转录完自动整理成摘要、决议、待办、未决问题，每一条都能点时间点跳回录音。不确定的人名和专有名词会变成待确认的题目：有疑问的那一条旁边有「？」，点了就能当场回答，记录顶部的「还有 N 题待确认」可以一次看完；回答后 AI 会依答案修正（按「是」直接确认，不用等）。想知道谁说了什么，可以在「提问」标签页直接问。
 5. **导出或分享**：会议记录存成 Markdown、PDF、Word，心智图存成图片，逐字稿存成字幕档，或把整场会议打包成 .shiyin 传给同事。
-
-> 本轮简体中文适配针对 Mac 版；Windows 版的简体适配和跨平台标准答案将在后续跟进。
 
 ## 功能
 
@@ -52,7 +83,7 @@ macOS 的会议记录 app。录下会议（现场或在线），录音中就能�
   - 拾音觉得可能把不同的人当成同一位时（人多、吵杂），逐字稿上方会提醒你重新识别说话者
 - **会议记录**
   - 模板：一般会议、一对一、访谈、课堂／演讲、脑力激荡，也可以自订
-  - 整理工具：Claude Code、Codex CLI、Anthropic API、OpenAI API、Gemini API、OpenAI 兼容 API（Groq、OpenRouter、本机的 Ollama、LM Studio），或「不整理」只要逐字稿
+  - 整理工具：Claude Code、Codex CLI、Antigravity CLI（`agy`）、Anthropic API、OpenAI API、Gemini API、OpenAI 兼容 API（Groq、OpenRouter、本机的 Ollama、LM Studio），或「不整理」只要逐字稿（支持按整理工具设置思考强度）
   - 只装了 Codex 桌面版（Mac 上新版叫 ChatGPT）也可以：拾音会用它附的 codex。只有 Claude 桌面版时，引导和设置会说明怎么另外装 Claude Code，附上可以复制的安装命令
   - 停止录音后先用实时逐字稿整理一份草稿（标「草稿」），正式转录完成后自动换成正式版
   - 可以直接编辑；每次修改都留版本，可以复原
@@ -94,30 +125,32 @@ macOS 的会议记录 app。录下会议（现场或在线），录音中就能�
 | 系统 | macOS 26 以上 |
 | 内存 | 8 GB 以上。转录加说话者识别的峰值约 2.9 GB，长录音分段转录，会议长短影响不大（4 小时的会议 2.9 GB，M3 Pro 实测） |
 | 磁盘空间 | 模型约 1.7 GB（第一次使用时下载；改用 macOS 内置识别就不用），日文、韩文会议另外 574 MB、自动检测语言 60 MB、改选 Qwen3-ASR 或开广东话会议另外约 2.5 GB，加上录音：m4a 约每小时 10～30 MB |
-| 整理工具 | 择一：已登录的 [Claude Code](https://claude.com/claude-code)（`claude`）、Codex CLI（`codex`，只装了 Codex 桌面版也可以）、Anthropic API key、OpenAI API key、Gemini API key，或 OpenAI 兼容 API（Groq、OpenRouter 填 key；本机的 Ollama、LM Studio 不用 key）。也可以选「不整理」 |
+| 整理工具 | 择一：已登录的 [Claude Code](https://claude.com/claude-code)（`claude`）、Codex CLI（`codex`，只装了 Codex 桌面版也可以）、Antigravity CLI（`agy`）、Anthropic API key、OpenAI API key、Gemini API key，或 OpenAI 兼容 API（Groq、OpenRouter 填 key；本机的 Ollama、LM Studio 不用 key）。也可以选「不整理」 |
 | 网络 | 第一次下载模型、整理会议记录时需要；录音、转录、说话者识别都不需要 |
 
 ## 安装
 
-### 用 DMG 安装
-
-1. 取得 `Shiyin-<版本>.dmg`（[官网](https://shiyin.weibuilds.com)、这个 repo 的 Releases，或向维护的人拿），打开后把「拾音」拖到旁边的 Applications（应用程序）。
-2. 拾音没有经过 Apple 公证，第一次打开会被挡下：先按「完成」（不要按「丢到垃圾桶」），再到「系统设置 → 隐私与安全性」的「安全性」按「强制打开」（只要做一次）。DMG 里的「安装说明.pdf」有完整步骤（英文版是「Install Guide.pdf」）。
-3. 第一次打开会出现引导：允许麦克风、下载转录模型（约 1.7 GB）、选整理工具。每一步都可以略过，之后在设置里补做。
-4. 3.1.1 起，拾音会自动检查这个 repo 的 Releases 有没有新版，询问你之后自动更新。
-
-### 从源代码建置
+### 从源代码建置（本 Fork 推荐）
 
 需要 Xcode 26（Swift 6.2 以上）。第一次建置会用 Swift Package Manager 下载 GRDB、FluidAudio 和 whisper.cpp 的 XCFramework。
 
 ```bash
-git clone https://github.com/juinwei7/Shiyin.git
+git clone https://github.com/raohy/Shiyin.git
 cd Shiyin
 scripts/make-signing-cert.sh --trust   # 只要做一次：建立并信任自签证书（要输入登录密码），之后更新 app 时权限不用重新允许
 scripts/build-app.sh --install         # 建置 release 版并安装到 ~/Applications
 ```
 
 没有执行 `make-signing-cert.sh --trust` 也能建置，会改用 ad-hoc 签名，只是每次重新建置后系统可能会再问一次权限。
+
+### 用 DMG 安装（上游原版）
+
+> 本 Fork 不单独发布 DMG，若需免构建体验上游原版，可前往 [上游 Releases](https://github.com/juinwei7/Shiyin/releases) 或[上游官网](https://shiyin.weibuilds.com)下载（不含本 Fork 新增功能）。
+
+1. 取得 `Shiyin-<版本>.dmg` 后，打开并把「拾音」拖到旁边的 Applications（应用程序）。
+2. 拾音没有经过 Apple 公证，第一次打开会被挡下：先按「完成」（不要按「丢到垃圾桶」），再到「系统设置 → 隐私与安全性」的「安全性」按「强制打开」（只要做一次）。DMG 里的「安装说明.pdf」有完整步骤（英文版是「Install Guide.pdf」）。
+3. 第一次打开会出现引导：允许麦克风、下载转录模型（约 1.7 GB）、选整理工具。每一步都可以略过，之后在设置里补做。
+4. 上游原版 3.1.1 起会自动检查对应 Releases 的新版并询问更新。
 
 ## Windows 版
 
@@ -164,9 +197,9 @@ Mac 和 Windows 都可以用。说话者的声纹只存在自己的电脑；公�
 
 ## 发布新版
 
-本 fork 的单主线开发、上游同步与自检规则见 [AGENTS.md](AGENTS.md)：日常开发和同步上游直接在 `main` 进行，并以 `last-good` 标签作为实测稳定回滚点，不再单独走 PR 门禁与正式发版流程。
+本 fork 的单主线开发、上游同步与验证规则见 [AGENTS.md](AGENTS.md)：日常开发和同步上游直接在 `main` 进行，并以 `last-good` 标签作为实测稳定回滚点，不再单独走 PR 门禁与正式发版流程。
 
-本地自动检查：`bash scripts/ci/check-macos.sh`。它运行 Swift 测试、会中助手纯逻辑回归、本地化检查和发布配置编译，不启动应用或使用真实会议。GUI 集成和真实模型验证按相关设计另外执行并注明结果。
+日常验证以 `swift build` / 对应单元测试为主；同步上游或较大改动时运行 `bash scripts/ci/check-macos.sh`（覆盖 Swift 单元测试、会中助手纯逻辑回归、本地化检查和 Release 编译，不启动应用或使用真实会议）。以下为上游原版的正式发布流程供参考：
 
 ### 用 GitHub Actions（推荐）
 
@@ -248,7 +281,7 @@ app 会检查新版的签名是否跟目前的 app 相符。执行过 `make-sign
 
 | 页面 | 内容 |
 |---|---|
-| 整理工具 | Claude、Codex、Anthropic API、OpenAI API、Gemini API、OpenAI 兼容 API 或不整理；登录状态、测试整理工具；API key；OpenAI 兼容 API 的网址（有常用服务可选）；模型；转录完是否自动整理、是否检查可能听错的字 |
+| 整理工具 | Claude、Codex、Antigravity（`agy` CLI）、Anthropic API、OpenAI API、Gemini API、OpenAI 兼容 API 或不整理；登录状态、测试整理工具；API key；OpenAI 兼容 API 的网址（有常用服务可选）；模型与思考强度；转录完是否自动整理、是否检查可能听错的字 |
 | 模板 | 内置和自订的模板、默认模板 |
 | 录音 | 录音来源、麦克风、权限设置；检测在线会议和不提醒的 app、全域快捷键（开始停止录音、标记重点） |
 | 转录 | 正式转录引擎（Breeze、Qwen3-ASR 或 macOS 内置）、说话者识别、实时逐字稿；默认会议语言、中文的字、自动检测会议语言 |
@@ -344,9 +377,9 @@ sqlite3 ~/Library/Application\ Support/Shiyin/shiyin.sqlite             # 看资
 
 ## 赞助
 
-拾音是个人的开源项目，免费使用。觉得好用的话，可以在 Ko-fi 请我喝杯咖啡。
+拾音是上游原作者 [juinwei7](https://github.com/juinwei7/Shiyin) 开发的个人开源项目，免费使用。如果你觉得这个工具好用，可以在 Ko-fi 请原作者喝杯咖啡：
 
-[![在 Ko-fi 请我喝杯咖啡](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/weiwei_chang)
+[![在 Ko-fi 请原作者喝杯咖啡](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/weiwei_chang)
 
 ## 授权
 

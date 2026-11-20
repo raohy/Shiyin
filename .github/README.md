@@ -1,15 +1,35 @@
 <img src="../docs/images/icon.png" width="96" alt="Shiyin icon">
 
-[简体中文](../README.md) | **English** | Website: [shiyin.weibuilds.com](https://shiyin.weibuilds.com/en/)
+[简体中文](../README.md) | **English** | Upstream: [juinwei7/Shiyin](https://github.com/juinwei7/Shiyin) | Upstream website: [shiyin.weibuilds.com](https://shiyin.weibuilds.com/en/)
 
 # Shiyin 拾音
 
-A meeting-notes app for macOS. Record a meeting (in person or online) and watch a live transcript as it happens. Afterwards Shiyin transcribes the recording on your Mac, identifies the speakers, and has Claude, Codex or an API write the meeting notes. Every item in the notes carries a timestamp: click it to hear what was actually said.
+> [!NOTE]
+> This repository is a personal macOS fork of [`juinwei7/Shiyin`](https://github.com/juinwei7/Shiyin) that continuously syncs upstream features and fixes. Fork additions below focus on **macOS** (the Windows version stays aligned with upstream).
+
+A meeting-notes app for macOS. Record a meeting (in person or online) and watch a live transcript as it happens. Afterwards Shiyin transcribes the recording on your Mac, identifies the speakers, and has Claude, Codex, Antigravity (`agy`) or an API write the meeting notes. Every item in the notes carries a timestamp: click it to hear what was actually said.
 
 - Recording, transcription and speaker identification all run locally; recordings are never uploaded
-- No Python, Homebrew or ffmpeg to install: download the DMG and go
+- No Python, Homebrew or ffmpeg to install: clone and build locally (upstream also provides prebuilt DMGs)
 - Mac interface in English and Simplified Chinese (follows your macOS language); meetings can be in English, Chinese, Japanese, Cantonese or Korean (experimental)
 - Requires Apple Silicon and macOS 26
+
+## What's Changed in This Fork
+
+| Area | Key changes vs. upstream | Platform |
+|---|---|---|
+| Summarizer & thinking effort | Added Antigravity CLI (`agy`) support and per-provider thinking effort settings | macOS |
+| Pre-meeting prep & live coach | Pre-meeting context/questions; live follow-up suggestions every ~30s, preserved after the meeting | macOS |
+| Live Qwen3-ASR & audio review | Optional Qwen3-ASR live transcript, local delayed audio review, and in-place replacement in live view | macOS |
+| Mainland Simplified Chinese | Unified Simplified Chinese UI, prompts, exports, fonts, and Chinese/Cantonese transcript output | macOS |
+| Ask progress & retry | Immediate display of question, progress stage and elapsed time, plus cancel and retry | macOS |
+
+1. **Antigravity CLI (`agy`) & Thinking Effort Controls (Mac)**: supports `agy` CLI across settings, onboarding, readiness/environment checks, summarization, transcript correction/cleanup, speaker naming, Ask, and the live meeting coach; fetches and groups models by base model via `agy models`; adds a per-provider Thinking Effort picker (`auto`, `low`, `medium`, `high`, `xhigh`, `max`) under Model for `agy`, `claude`, `codex`, OpenAI API, and Gemini API (filtering unsupported levels for `agy` models).
+2. **Pre-meeting Preparation & Live Meeting Coach (Mac)**: allows filling in meeting context, goals, role focus, and initial questions before recording (while keeping quick-record); during recording, analyzes newly reviewed local audio every ~30s (or on demand) to suggest follow-up questions with rationale, priority, and timestamps (showing up to 5 active questions, deduplicated, 45s independent timeout, ignoring late responses after stop); keeps the checklist after the meeting as non-factual summary reference and stays compatible with upstream meeting editing/trimming/splitting/merging.
+3. **Optional Qwen3-ASR Live Transcript & Delayed Local Audio Review (Mac)**: lets you switch live transcription between macOS built-in speech recognition (low latency) and local Qwen3-ASR (glossary- and context-aware); simultaneously reviews ~18–30s audio windows locally during recording for the live coach and replaces matching live draft ranges in the recording view with a reviewed badge (retaining drafts on boundary overlap or empty review).
+4. **Mainland Simplified Chinese Normalization (Mac)**: standardizes the Mac UI, Chinese prompts, exports (Markdown/PDF/Word/HTML), fonts (`PingFang SC` / `Songti SC`), and Chinese/Cantonese transcription outputs (via OpenCC + Mainland phrasing overrides) to Simplified Chinese, leaving English, Japanese, and Korean prompts and scripts untouched.
+5. **Ask Progress & Cancel/Retry (Mac)**: displays the submitted question, active stage, and elapsed time immediately for both single-meeting and cross-meeting Ask, with cancellation and preserved input for easy retry on failure or cancel.
+6. **Maintenance & Scope**: all fork enhancements target **macOS** (Windows remains upstream-aligned); developed on `main` without separate fork DMG releases (see [AGENTS.md](../AGENTS.md)).
 
 ![Meeting notes](../docs/images/en/summary.png)
 
@@ -48,7 +68,7 @@ A meeting-notes app for macOS. Record a meeting (in person or online) and watch 
   - When Shiyin suspects different people were treated as one (crowded or noisy rooms), a note above the transcript suggests identifying speakers again
 - **Meeting notes**
   - Templates: General meeting, One-on-one, Interview, Lecture / talk, Brainstorm, or your own
-  - Summarizers: Claude Code, Codex CLI, Anthropic API, OpenAI API, Gemini API, an OpenAI-compatible API (Groq, OpenRouter, or Ollama and LM Studio on your Mac), or “Don’t summarize” for transcripts only
+  - Summarizers: Claude Code, Codex CLI, Antigravity CLI (`agy`), Anthropic API, OpenAI API, Gemini API, an OpenAI-compatible API (Groq, OpenRouter, or Ollama and LM Studio on your Mac), or “Don’t summarize” for transcripts only (with per-provider thinking effort settings)
   - Only have the Codex desktop app (now called ChatGPT on the Mac)? That works too: Shiyin uses the codex bundled with it. If you only have the Claude desktop app, the welcome guide and Settings explain how to install Claude Code as well, with an install command you can copy
   - Right after you stop recording, Shiyin drafts notes from the live transcript (marked “Draft”) and replaces them when the final transcript is ready
   - Edit the notes directly; every change is versioned and can be reverted
@@ -83,30 +103,32 @@ A meeting-notes app for macOS. Record a meeting (in person or online) and watch 
 | System | macOS 26 or later |
 | Memory | 8 GB or more. Transcription plus speaker identification peaks at about 2.9 GB. Long recordings are transcribed in parts, so meeting length makes little difference (a 4-hour meeting: 2.9 GB, measured on M3 Pro) |
 | Disk space | About 1.7 GB of models (downloaded on first use; not needed with the macOS transcriber), another 574 MB for Japanese meetings, 60 MB for language detection and about 2.5 GB if you choose Qwen3-ASR, plus recordings: m4a is about 10–30 MB per hour |
-| Summarizer | One of: a signed-in [Claude Code](https://claude.com/claude-code) (`claude`), Codex CLI (`codex`; the Codex desktop app alone works too), an Anthropic, OpenAI or Gemini API key, or an OpenAI-compatible API (Groq and OpenRouter need a key; Ollama and LM Studio on your Mac don’t). Or choose “Don’t summarize” |
+| Summarizer | One of: a signed-in [Claude Code](https://claude.com/claude-code) (`claude`), Codex CLI (`codex`; the Codex desktop app alone works too), Antigravity CLI (`agy`), an Anthropic, OpenAI or Gemini API key, or an OpenAI-compatible API (Groq and OpenRouter need a key; Ollama and LM Studio on your Mac don’t). Or choose “Don’t summarize” |
 | Internet | Needed to download the models and to summarize; not needed for recording, transcription or speaker identification |
 
 ## Install
 
-### From the DMG
-
-1. Get `Shiyin-<version>.dmg` (from the [website](https://shiyin.weibuilds.com/en/), this repo’s Releases, or from whoever maintains your copy), open it and drag Shiyin to Applications.
-2. Shiyin isn’t notarized by Apple, so macOS blocks it the first time: click Done (not Move to Trash), then go to System Settings → Privacy & Security and click Open Anyway (once). “Install Guide.pdf” in the DMG has the full steps.
-3. On first launch, a guide walks you through allowing the microphone, downloading the transcription model (about 1.7 GB) and choosing a summarizer. You can skip any step and finish it later in Settings.
-4. From 3.1.1 on, Shiyin checks this repo’s Releases for new versions and, after asking you, updates itself.
-
-### Build from source
+### Build from source (recommended for this fork)
 
 Requires Xcode 26 (Swift 6.2 or later). The first build uses Swift Package Manager to download GRDB, FluidAudio and the whisper.cpp XCFramework.
 
 ```bash
-git clone https://github.com/juinwei7/Shiyin.git
+git clone https://github.com/raohy/Shiyin.git
 cd Shiyin
 scripts/make-signing-cert.sh --trust   # once: create and trust a self-signed certificate (asks for your login password) so permissions survive app updates
 scripts/build-app.sh --install         # build the release app and install it to ~/Applications
 ```
 
 Without `make-signing-cert.sh --trust` the build still works with an ad-hoc signature, but macOS may ask for permissions again after each rebuild.
+
+### From the DMG (upstream original)
+
+> This fork does not publish separate DMG releases. To try the upstream original without building from source, download the DMG from [upstream Releases](https://github.com/juinwei7/Shiyin/releases) or the [upstream website](https://shiyin.weibuilds.com/en/) (does not include fork additions).
+
+1. Get `Shiyin-<version>.dmg`, open it and drag Shiyin to Applications.
+2. Shiyin isn’t notarized by Apple, so macOS blocks it the first time: click Done (not Move to Trash), then go to System Settings → Privacy & Security and click Open Anyway (once). “Install Guide.pdf” in the DMG has the full steps.
+3. On first launch, a guide walks you through allowing the microphone, downloading the transcription model (about 1.7 GB) and choosing a summarizer. You can skip any step and finish it later in Settings.
+4. From 3.1.1 on, upstream Shiyin checks its Releases for new versions and, after asking you, updates itself.
 
 ## Windows
 
@@ -321,9 +343,9 @@ The transcription and speaker identification models aren’t in this repo; they 
 
 ## Support
 
-Shiyin is a free, personal open-source project. If you find it useful, you can buy me a coffee on Ko-fi.
+Shiyin is a free, personal open-source project created by upstream author [juinwei7](https://github.com/juinwei7/Shiyin). If you find it useful, you can buy the original author a coffee on Ko-fi:
 
-[![Buy me a coffee on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/weiwei_chang)
+[![Buy the original author a coffee on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/weiwei_chang)
 
 ## License
 
